@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="utf-8"?>
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:viewer="com.esri.viewer.*" layout="absolute"
+				   width="100%"
+				   borderSkin="{null}" 
+				   xmlns:singleLineSearch="com.esri.viewer.components.singleLineSearch.*"
+				   creationComplete="creationCompleteHandler(event)"
+				   widgetConfigLoaded="widgetConfigLoadedHandler(event)" xmlns:Herramientas="widgets.DANE.Herramientas.*">
+	<fx:Script>
+		<![CDATA[
+			import com.esri.viewer.AppEvent;
+			
+			import flashx.textLayout.formats.VerticalAlign;
+			
+			import mx.collections.ArrayList;
+			import mx.events.FlexEvent;
+			
+			import spark.layouts.HorizontalAlign;
+			import spark.layouts.TileLayout;
+			import spark.layouts.TileOrientation;
+			
+			import widgets.HeaderController.Link;
+			
+			[Bindable]
+			private var linkList:ArrayList;
+			
+			[Bindable]
+			private var usuarioActivo:String = "Invitado";
+			
+			[Bindable]
+			private var mostarFullScreen:Boolean;
+			
+			[Embed("assets/images/AbrirSesion16.png")]
+			private const iniciarSesionIcon:Class;
+			
+			[Embed("assets/images/CerrarSesion16.png")]
+			private const cerrarSesionIcon:Class;
+			
+			protected function creationCompleteHandler(event:FlexEvent):void
+			{
+				if (configData)
+				{
+					
+				}
+				
+				AppEvent.addListener(SeguridadLdap.ABRIR_LOGGIN,iniciarSession);
+				AppEvent.addListener(SeguridadLdap.CAMBIO_USUARIO_LOGGIN,sesionIniciada);
+			}
+			
+			protected function widgetConfigLoadedHandler(event:Event):void
+			{
+				if (configXML)
+				{
+					const shouldEnableSearch:Boolean = (configXML.search.@visible[0] == "true")
+						|| (configXML.search[0] && !configXML.search.@visible[0]);
+					if (shouldEnableSearch)
+					{
+						singleLineSearch.hostBaseWidget = this;
+						singleLineSearch.includeInLayout = true;
+						singleLineSearch.visible = true;
+					}
+					
+					if(configXML.mostrarFullScreen[0])
+					{
+						mostarFullScreen = configXML.mostrarFullScreen[0].toString() == "true";
+					}
+					
+					configureLinks();
+				}
+			}
+			
+			private function configureLinks():void
+			{
+				const links:Array = [];
+				
+				//backwards compatibility
+				if (configXML.about[0])
+				{
+					links.push(aboutXMLToLinkXML(configXML.about[0]));
+				}
+				
+				const linksXML:XMLList = configXML.links.link;
+				var link:Link;
+				for each (var linkXML:XML in linksXML)
+				{
+					link = createLinkFromXML(linkXML);
+					if (link)
+					{
+						links.push(link);
+					}
+				}
+				
+				if (links.length == 0)
+				{
+					return;
+				}
+				
+				linkList = new ArrayList(links);
+				
+				if (links.length > 1)
+				{
+					const tileLayout:TileLayout = new TileLayout();
+					tileLayout.verticalGap = 4;
+					tileLayout.horizontalGap = 10;
+					tileLayout.requestedRowCount = 2;
+					tileLayout.orientation = TileOrientation.COLUMNS;
+					tileLayout.verticalAlign = VerticalAlign.MIDDLE;
+					tileLayout.horizontalAlign = HorizontalAlign.LEFT;
+					
+					linkGroup.layout = tileLayout;
+				}
+				
+				linkGroup.visible = true;
+				linkGroup.includeInLayout = true;
+			}
+			
+			private function aboutXMLToLinkXML(aboutXML:XML):Link
+			{
+				var aboutLink:Link;
+				
+				if (configXML.about.visible[0] != "false")
+				{
+					aboutLink = new Link();
+					aboutLink.content = configXML.about.content || "";
+					aboutLink.label = configXML.labels.abouttext[0] || configXML.about.label[0] || getDefaultString("aboutLabel");
+					aboutLink.contentCloseLabel = configXML.labels.btnlabel[0] || configXML.about.btnlabel[0] || getDefaultString("okLabel");
+					aboutLink.contentWidth = configXML.about.width || 300;
+					aboutLink.contentHeight = configXML.about.height || 300;
+				}
+				
+				return aboutLink;
+			}
+			
+			private function createLinkFromXML(linkXML:XML):Link
+			{
+				var link:Link;
+				
+				const isValidLinkXML:Boolean = linkXML.@url[0] || linkXML.content[0];
+				if (isValidLinkXML)
+				{
+					link = new Link();
+					link.url = linkXML.@url[0];
+					link.content = linkXML.content[0];
+					link.label = linkXML.@label[0] || getDefaultString("aboutLabel");
+					link.contentHeight = linkXML.content.@height[0] || 300;
+					link.contentWidth = linkXML.content.@width[0] || 300;
+					link.contentCloseLabel = linkXML.content.@closelabel[0] || getDefaultString("okLabel");
+				}
+				
+				return link;
+			}
+			
+			/**Muestra la ventana de inicio de sesión**/
+			protected function iniciarSession(event:AppEvent):void
+			{
+				seguridadLdap.visible = true;
+				seguridadLdap.callBack = event.callback;
+			}
+			
+			protected function sesionIniciada(event:AppEvent):void
+			{
+				if(event.data && event.data.usuario)
+				{
+					usuarioActivo = event.data.usuario;
+				}else
+				{
+					usuarioActivo = "Invitado";
+				}
+				/*loggin = event.data.validacion;
+				idSession = event.data.idSession;
+				*/
+			}
+			
+			
+			protected function imgIniciarSesion_clickHandler(event:MouseEvent):void
+			{
+				if(usuarioActivo == null || usuarioActivo.toLocaleLowerCase() == "invitado")
+				{
+					AppEvent.dispatch(SeguridadLdap.ABRIR_LOGGIN);
+				}else
+				{
+					AppEvent.dispatch(SeguridadLdap.CERRAR_SESION);
+				}
+			}
+			
+
+			
+			protected function imgFullscreen_clickHandler(event:MouseEvent):void
+			{
+				if(stage.displayState == StageDisplayState.NORMAL)
+				{
+					stage.displayState = StageDisplayState.FULL_SCREEN_INTERACTIVE;
+				}else
+				{
+					stage.displayState = StageDisplayState.NORMAL;
+				}
+					
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	
+	<s:Group id="headerGroup"
+			 width="100%" height="85">
+		<s:Group id="headerContent"
+				 width="100%" height="{headerGroup.height - 45}">
+			<s:Rect width="100%" height="100%"
+					alpha="{getStyle('contentBackgroundAlpha')}">
+				<s:fill>
+					<s:SolidColor color="{getStyle('contentBackgroundColor')}"/>
+				</s:fill>
+			</s:Rect>
+			
+			<s:HGroup width="100%" height="100%"
+					  gap="5"
+					  paddingLeft="5"
+					  paddingRight="5"
+					  verticalAlign="middle"
+					  horizontalAlign="center">
+				
+				<singleLineSearch:SingleLineSearch id="singleLineSearch"
+												   width="70%" height="28"
+												   includeInLayout="false"
+												   visible="false"/>
+				
+				<s:DataGroup id="linkGroup"
+							 dataProvider="{linkList}"
+							 includeInLayout="false"
+							 itemRenderer="widgets.HeaderController.LinkItemRenderer"
+							 visible="false"/>
+				
+				
+				<mx:LinkButton icon="{usuarioActivo != null &amp;&amp; usuarioActivo.toLocaleLowerCase() == 'invitado' ? iniciarSesionIcon : cerrarSesionIcon}"
+							   label="{'' + (usuarioActivo || 'Invitado')}"
+							   id="imgIniciarSesion"
+							   toolTip ="{usuarioActivo != null &amp;&amp; usuarioActivo.toLocaleLowerCase() == 'invitado' ? 'Iniciar Sesión' : 'Cerrar Sesión'}"
+							   click="imgIniciarSesion_clickHandler(event)"
+							   useHandCursor="true"
+							   buttonMode="true"
+							   visible="{usuarioActivo != null}"
+							   includeInLayout="{usuarioActivo != null}"
+							   />
+			</s:HGroup>
+			<s:Image id="imgFullscreen"
+					 source="assets/images/Fullscreen32.png"
+					 useHandCursor="true"
+					 buttonMode="true"
+					 right="5"
+					 top="5"
+					 toolTip="Pantalla Completa"
+					 click="imgFullscreen_clickHandler(event)"
+					 visible="{mostarFullScreen}"
+					 includeInLayout="{mostarFullScreen}"
+					 />
+		</s:Group>
+		
+		<s:filters>
+			<s:DropShadowFilter alpha="0.5"
+								blurX="10"
+								blurY="10"/>
+		</s:filters>
+	</s:Group>
+	
+	<Herramientas:SeguridadLdap id="seguridadLdap" includeInLayout="false" visible="false" y="{headerGroup.height}" 
+								x="{imgIniciarSesion.x + imgIniciarSesion.width - seguridadLdap.width}">
+		<Herramientas:filters>
+			<s:DropShadowFilter alpha="0.6" blurX="16" blurY="16" distance="5"/>			
+		</Herramientas:filters>
+	</Herramientas:SeguridadLdap>
+</viewer:BaseWidget>

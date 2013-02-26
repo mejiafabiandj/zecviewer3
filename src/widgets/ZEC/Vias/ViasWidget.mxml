@@ -1,0 +1,597 @@
+<?xml version="1.0" encoding="utf-8"?>
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:viewer="com.esri.viewer.*" layout="absolute"
+				   widgetConfigLoaded="init(event)" xmlns:supportClasses="com.esri.ags.tasks.supportClasses.*" 
+				   xmlns:tasks="com.esri.ags.tasks.*" xmlns:esri="http://www.esri.com/2008/ags"
+				   xmlns:text="flash.text.*">
+
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.FeatureSet;
+			import com.esri.ags.Graphic;
+			import com.esri.ags.SpatialReference;
+			import com.esri.ags.Units;
+			import com.esri.ags.events.FlareMouseEvent;
+			import com.esri.ags.geometry.Extent;
+			import com.esri.ags.geometry.Geometry;
+			import com.esri.ags.geometry.MapPoint;
+			import com.esri.ags.geometry.Polyline;
+			import com.esri.ags.layers.GraphicsLayer;
+			import com.esri.ags.symbols.SimpleLineSymbol;
+			import com.esri.ags.symbols.TextSymbol;
+			import com.esri.ags.tasks.GeometryServiceSingleton;
+			import com.esri.ags.tasks.supportClasses.LengthsParameters;
+			import com.esri.ags.utils.JSON;
+			import com.esri.ags.utils.WebMercatorUtil;
+			
+			import flash.net.navigateToURL;
+			
+			import gov.dane.util.GeometryUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.ColorPickerEvent;
+			import mx.events.FlexEvent;
+			import mx.formatters.NumberFormatter;
+			import mx.rpc.AsyncResponder;
+			import mx.rpc.Fault;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.utils.ColorUtil;
+			import mx.utils.ObjectProxy;
+			
+			import org.alivepdf.colors.RGBColor;
+			
+			import spark.events.GridSelectionEvent;
+			import spark.events.IndexChangeEvent;
+			
+			
+			[Bindable] private var providerCmbOrigen:ArrayCollection = new ArrayCollection();
+			[Bindable] private var providerCmbDestino:ArrayCollection = new ArrayCollection();
+			[Bindable] private var providerRuta:ArrayCollection = new ArrayCollection();
+			
+			[Bindable] private var textoNota:String;
+			
+			
+			protected function init(event:Event):void
+			{
+				if(configObject)
+				{
+					textoNota = configObject.configuration.nota;
+					servicio.url = configObject.configuration.url;
+					servicio.send({op:"obtenerOrigenes"});
+				}
+			}
+
+			protected function servicio_resultHandler(event:ResultEvent):void
+			{
+				if(event.token.message.body)
+				{
+					var result:Object;
+					
+					switch(event.token.message.body.op)
+					{
+						case "obtenerOrigenes":
+						{
+							providerCmbOrigen.removeAll();
+							
+							if(event.result && event.result is String)
+							{
+								result = com.esri.ags.utils.JSON.decode(event.result.toString());
+								if(result is Array)
+								{
+									providerCmbOrigen.addAll(new ArrayCollection(result as Array));
+								}else if(result)
+								{
+									providerCmbOrigen.addItem(result);
+								}
+							}							
+						}break;
+						case "obtenerDestinos":
+						{
+							providerCmbDestino.removeAll();
+							
+							if(event.result && event.result is String)
+							{
+								result = com.esri.ags.utils.JSON.decode(event.result.toString());
+								if(result is Array)
+								{
+									providerCmbDestino.addAll(new ArrayCollection(result as Array));
+								}else if(result)
+								{
+									providerCmbDestino.addItem(result);
+								}
+							}							
+						}break;
+
+						case "obtenerInfo":
+						{
+							providerRuta.removeAll();
+							
+							if(event.result && event.result is String)
+							{
+								result = com.esri.ags.utils.JSON.decode(event.result.toString());
+								if(result is Array)
+								{
+									providerRuta.addAll(new ArrayCollection(result as Array));
+								}else if(result)
+								{
+									providerRuta.addItem(result);
+								}
+							}							
+						}break;
+						
+						case "obtenerGeometria":
+						{
+							if(event.result && event.result is String)
+							{
+								result = com.esri.ags.utils.JSON.decode(event.result.toString());
+								
+								var rutas:Array = [];
+								
+								for each(var ruta:Object in result.alternativas)
+								{
+									var route:Polyline = new Polyline(null,new SpatialReference(4326));
+									
+									for each(var segmento:Object in ruta.segmentos)
+									{
+										var path:Array = [];
+										for (var i:Number = 0; i < segmento.ordinates.length ; i += 2) 
+										{
+											var point:MapPoint = new MapPoint(segmento.ordinates[i],segmento.ordinates[i+1],new SpatialReference(4326));
+											path.push(point);
+										}
+										route.addPath(path);
+									}
+									
+									
+									var gra:Graphic = new Graphic(route,simboloRuta);
+									var nf:NumberFormatter = new NumberFormatter();
+									nf.precision = 2;
+									nf.useThousandsSeparator = true;
+									
+									gra.toolTip = nf.format(com.esri.ags.utils.GeometryUtil.geodesicLengths([route], Units.KILOMETERS)[0]) + " Kilómetros"; 
+									
+									
+									var txtSymbol:TextSymbol = new TextSymbol(gra.toolTip,null,getStyle("color"),1,true,getStyle("color"),true,getStyle("contentBackgroundColor"));
+									
+									var lblGra:Graphic = new Graphic(
+										route.paths[Math.floor(route.paths.length / 2)][ Math.floor(route.paths[Math.floor(route.paths.length / 2)].length / 2) ] as MapPoint,
+										txtSymbol
+									);
+									
+									rutas.push(gra);
+									rutas.push(lblGra);
+								}
+								
+								if(rutas.length > 0)
+								{
+									grapichsLayerRutasInvias.graphicProvider = new ArrayCollection(rutas);
+									var extentGrupo:Extent = GeometryUtil.extendGrupo(grapichsLayerRutasInvias.graphicProvider as ArrayCollection);
+									
+									map.extent = extentGrupo;
+									if(!map.extent.contains(extentGrupo))
+									{
+										map.zoomOut();
+									}
+								}
+							}
+							
+						}break;
+					}
+					
+					if(event.token.message.body.op == "obtenerEvento" || 
+						event.token.message.body.op == "obtenerPeajes" ||
+						event.token.message.body.op == "obtenerObras" ||
+						event.token.message.body.op == "obtenerEstacionesServicio" ||
+						event.token.message.body.op == "obtenerHospitales" ||
+						event.token.message.body.op == "obtenerPolicia" ||
+						event.token.message.body.op == "obtenerPuentes" ||
+						event.token.message.body.op == "obtenerSAC"
+					)
+					{
+						if(event.result && event.result is String)
+						{
+							var eventos:Array = [];
+							result = com.esri.ags.utils.JSON.decode(event.result.toString());
+							if(result is Array)
+							{
+								for each(var evento:Object in result)
+								{
+									var punto:MapPoint;
+									for (var prop:String in evento)
+									{
+										punto = new MapPoint(evento[prop].longitud,evento[prop].latitud,new SpatialReference(4326));
+										
+										var atributos:ObjectProxy = new ObjectProxy();
+										for (var att:String in evento[prop])
+										{
+											var at:String = configObject.configuration.labels[att] || att;
+											atributos[at] = evento[prop][att];
+										}
+										//new ObjectProxy(evento[prop])
+										eventos.push(new Graphic(punto,simboloEvento,atributos));
+										break;
+									}
+								}
+							}
+							
+							if(eventos.length == 0)
+							{
+								Alert.show("No se encontraron registros en esta ruta!");
+							}
+							grapichsLayerEventosRutasInvias.graphicProvider = new ArrayCollection(eventos);
+						}
+					}
+					
+				}
+				
+			}
+
+
+			protected function servicio_faultHandler(event:FaultEvent):void
+			{
+				
+			}
+			
+			private function isWebMercator(wkid:Number):Boolean
+			{
+				return wkid == 102100 || wkid == 3857 || wkid == 102113;
+			}
+			
+			private function labelCmbOrigen(item:Object):String
+			{
+				return item.municipio.nombre;
+			}
+
+
+			protected function cmbOrigen_changeHandler(event:IndexChangeEvent):void
+			{
+				providerCmbDestino.removeAll();
+				grapichsLayerRutasInvias.clear();
+				grapichsLayerEventosRutasInvias.clear();
+				
+				if(cmbOrigen.selectedItem && cmbOrigen.selectedItem.municipio && cmbOrigen.selectedItem.municipio.id)
+				{
+					servicio.send(
+						{
+							op:"obtenerDestinos",
+							codOrigen:cmbOrigen.selectedItem.municipio.id
+						}
+					);
+				}
+			}
+
+
+			protected function cmbDestino_changeHandler(event:IndexChangeEvent):void
+			{
+				providerRuta.removeAll();
+				grapichsLayerRutasInvias.clear();
+				grapichsLayerEventosRutasInvias.clear();
+				
+				if(cmbDestino.selectedItem && cmbDestino.selectedItem.municipio && cmbDestino.selectedItem.municipio.id)
+				{
+					servicio.send(
+						{
+							op:"obtenerInfo",
+							codOrigen:cmbOrigen.selectedItem.municipio.id,
+							codDestino:cmbDestino.selectedItem.municipio.id
+						}
+					);
+				}
+			}
+
+
+			protected function gridRutas_selectionChangeHandler(event:GridSelectionEvent):void
+			{
+				grapichsLayerRutasInvias.clear();
+				grapichsLayerEventosRutasInvias.clear();
+				
+				if(gridRutas.selectedItem && gridRutas.selectedItem.ruta && gridRutas.selectedItem.ruta.id)
+				{
+					servicio.send(
+						{
+							op:"obtenerGeometria",
+							idRuta:gridRutas.selectedItem.ruta.id
+						}
+					);
+				}
+			}
+
+
+			protected function wTemplate_openHandler(event:Event):void
+			{
+				map.addLayer(grapichsLayerRutasInvias);
+				map.addLayer(grapichsLayerEventosRutasInvias);
+				
+			}
+
+
+			protected function wTemplate_closedHandler(event:Event):void
+			{
+				map.removeLayer(grapichsLayerRutasInvias);
+				map.removeLayer(grapichsLayerEventosRutasInvias);
+				
+			}
+
+
+			protected function txtNota_linkHandler(event:TextEvent):void
+			{
+				navigateToURL(new URLRequest(event.text), '_blank');				
+			}
+
+			public function buscar(item:Object):void
+			{
+				servicio.send(
+					{
+						op:item.op,
+						idRuta:gridRutas.selectedItem.ruta.id
+					}
+				);
+			}
+			
+			
+			private function flareClickHandler(event:FlareMouseEvent):void
+			{
+				
+				
+				var c:ClassFactory = eventosInfowindow;
+				c.properties = {data:event.graphic.attributes};
+				map.infoWindowContent  = c.newInstance(); 
+				//map.infoWindow.show(map.toMapFromStage(event.stageX, event.stageY));
+				//event.graphic.infoWindowRenderer = c;
+				
+				//event.graphic.dispatchEvent(new MouseEvent(MouseEvent.CLICK,true,false,0,0));
+				
+				map.infoWindow.data = event.graphic.attributes;
+				map.infoWindow.show(event.graphic.geometry as MapPoint,new Point(event.stageX, event.stageY));
+			}
+			
+
+			protected function grapichsLayerEventosRutasInvias_creationCompleteHandler(event:FlexEvent):void
+			{
+				grapichsLayerEventosRutasInvias.addEventListener("flareClick", flareClickHandler);
+			}
+			
+			
+		]]>
+	</fx:Script>
+
+	<fx:Declarations>
+		<s:HTTPService id="servicio" method="GET" showBusyCursor="true" result="servicio_resultHandler(event)" fault="servicio_faultHandler(event)" resultFormat="text"/>
+		
+		<esri:GraphicsLayer id="grapichsLayerRutasInvias" name="Rutas Invias"/>
+		<esri:GraphicsLayer id="grapichsLayerEventosRutasInvias" name="Eventos Rutas Invias" clusterer="{clusterer}" creationComplete="grapichsLayerEventosRutasInvias_creationCompleteHandler(event)">
+			<esri:infoWindowRenderer>
+				<fx:Component id="eventosInfowindow">
+					<esri:LabelDataRenderer creationComplete="labeldatarenderer1_creationCompleteHandler(event)" dataChange="labeldatarenderer1_dataChangeHandler(event)">
+						<fx:Script>
+							<![CDATA[
+								import mx.collections.ArrayCollection;
+								import mx.events.ColorPickerEvent;
+								import mx.events.FlexEvent;
+								import mx.utils.ObjectProxy;
+								
+								[Bindable] private var attributes:ArrayCollection = new ArrayCollection();
+								[Bindable] private var mainLabel:String;
+
+								protected function labeldatarenderer1_creationCompleteHandler(event:FlexEvent = null):void
+								{
+									attributes.removeAll();
+									
+									mainLabel = data.nombre || data.descripcion;
+									
+									var att:Array = [];
+									for (var prop:String in data)
+									{
+										att.push(new ObjectProxy({label:prop,value:data[prop]}));
+									}
+									
+									attributes.addAll(new ArrayCollection(att.sortOn("label", Array.CASEINSENSITIVE)));
+								}
+
+								protected function labeldatarenderer1_dataChangeHandler(event:FlexEvent):void
+								{
+									labeldatarenderer1_creationCompleteHandler();
+								}
+
+							]]>
+						</fx:Script>
+						<esri:layout>
+							<s:VerticalLayout/>
+						</esri:layout>
+						<s:Label fontWeight="bold">{mainLabel}</s:Label>
+						<s:DataGrid dataProvider="{attributes}">
+							<s:columns>
+								<s:ArrayList>
+									<s:GridColumn dataField="label" headerText="Atributo" width="150" sortDescending="true"/>
+									<s:GridColumn dataField="value" headerText="Valor" width="200"/>
+								</s:ArrayList>
+							</s:columns>
+						</s:DataGrid>
+						<!--<s:DataGroup dataProvider="{attributes}" itemRenderer="widgets.DANE.Vias.LabelInfoWindowRenderer">
+							<s:layout>
+								<s:TileLayout requestedColumnCount="2"/>
+							</s:layout>
+						</s:DataGroup>-->
+					</esri:LabelDataRenderer>
+				</fx:Component>
+			</esri:infoWindowRenderer>
+		</esri:GraphicsLayer>
+		
+		<esri:WeightedClusterer id="clusterer" symbol="{flareSymbol}" />
+		<esri:FlareSymbol id="flareSymbol"
+						  flareMaxCount="20"
+						  flareSizeIncOnRollOver="3"
+						  textFormat="{tf}"
+						  backgroundAlpha="0.4"
+						  backgroundColor="{pkrGraphicsColorEventos.selectedColor}"
+						  borderThickness="3"
+						  borderColor="{pkrGraphicsColorEventos.selectedColor}"
+						  size="30"
+						  />
+		<text:TextFormat id="tf"
+						 font="Arial"
+						 size="14"
+						 color="0x000000"
+						 bold="true"/>
+		
+		<esri:SimpleLineSymbol id="simboloRuta" color="{pkrGraphicsColor.selectedColor}" style="solid" width="3"/>
+		
+		<esri:SimpleMarkerSymbol style="circle" color="{pkrGraphicsColorEventos.selectedColor}" alpha="0.4" id="simboloEvento" size="25">
+			<esri:SimpleLineSymbol color="{pkrGraphicsColorEventos.selectedColor}" width="3" style="solid"/>
+		</esri:SimpleMarkerSymbol>
+		
+		<!--<esri:PictureMarkerSymbol source="assets/images/i_target.png" id="simboloEvento" width="25" height="25"/>-->
+	</fx:Declarations>
+	
+
+	<viewer:WidgetTemplate id="wTemplate" 
+						   width="550" 
+						   height="310"
+						   open="wTemplate_openHandler(event)"
+						   closed="wTemplate_closedHandler(event)">
+		<s:BorderContainer cornerRadius="5" top="15" bottom="0" right="0" left="0" backgroundAlpha="0" 
+						   minHeight="50">
+			<s:VGroup horizontalCenter="0" verticalCenter="0" verticalAlign="middle" 
+					  horizontalAlign="center" left="5" top="5" right="5" bottom="5"
+					  >
+				
+				<mx:Grid verticalAlign="middle" horizontalAlign="center" width="100%">
+					<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle">
+						<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+							<s:Label text="Origen"/>
+						</mx:GridItem>
+						<mx:GridItem verticalAlign="middle" width="100%">
+							<s:DropDownList id="cmbOrigen" width="100%" 
+											dataProvider="{providerCmbOrigen}"
+											prompt="Seleccione"
+											labelFunction="labelCmbOrigen"
+											change="cmbOrigen_changeHandler(event)"
+											/>
+						</mx:GridItem>
+					</mx:GridRow>
+					<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle" 
+								visible="{cmbOrigen.selectedItem}"
+								includeInLayout="{cmbOrigen.selectedItem}">
+						<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+							<s:Label text="Destino"/>
+						</mx:GridItem>
+						<mx:GridItem verticalAlign="middle" width="100%">
+							<s:DropDownList id="cmbDestino" width="100%" 
+											dataProvider="{providerCmbDestino}"
+											prompt="Seleccione"
+											labelFunction="labelCmbOrigen"
+											change="cmbDestino_changeHandler(event)"
+											/>
+						</mx:GridItem>
+					</mx:GridRow>
+				</mx:Grid>
+				
+				<s:DataGrid id="gridRutas" dataProvider="{providerRuta}" color="{getStyle('color')}" 
+							width="100%" height="100%"
+							maxHeight="150"
+							caretColor="{getStyle('color')}"
+							visible="{cmbDestino.selectedItem}"
+							includeInLayout="{cmbDestino.selectedItem}" 
+							skinClass="widgets.DANE.Vias.DataGridRutasSkin"
+							selectionChange="gridRutas_selectionChangeHandler(event)"
+							verticalScrollPolicy="auto">
+					<s:columns>
+						<s:ArrayList>
+							<s:GridColumn dataField="ruta.nombreMunicipioOrigen" headerText="Origen" />
+							<s:GridColumn dataField="ruta.nombreMunicipioDestino" headerText="Destino"/>
+							<s:GridColumn dataField="ruta.observaciones" headerText="Observaciones"/>
+						</s:ArrayList>
+					</s:columns>
+				</s:DataGrid>
+				
+				<s:VGroup width="100%" 
+						  visible="{grapichsLayerRutasInvias.graphicProvider.length > 0}"
+						  includeInLayout="{grapichsLayerRutasInvias.graphicProvider.length > 0}"
+						  >
+					<s:HGroup verticalAlign="middle">
+						<s:VGroup verticalAlign="middle">
+							<s:HGroup verticalAlign="middle">
+								<s:Label text="Color de la ruta" width="100%"/>
+								<mx:ColorPicker id="pkrGraphicsColor" selectedColor="0x00FFFF"/>
+							</s:HGroup>
+							<s:HGroup verticalAlign="middle">
+								<s:Label text="Eventos"/>
+								<mx:ColorPicker id="pkrGraphicsColorEventos" selectedColor="0x0033CC"/>
+							</s:HGroup>
+						</s:VGroup>
+						
+						
+						<s:Line height="90%">
+							<s:stroke>
+								<s:SolidColorStroke color="{getStyle('color')}"/>
+							</s:stroke>
+						</s:Line>
+						
+						<s:DataGroup width="100%">
+							<s:layout>
+								<s:TileLayout horizontalAlign="left" verticalAlign="middle" orientation="rows" requestedColumnCount="4"/>
+							</s:layout>
+							<s:itemRenderer>
+								<fx:Component>
+									<mx:LinkButton icon="{data.imageIcon}"
+												   label="{data.label}"
+												   maxWidth="90" click="linkbutton1_clickHandler(event)">
+										<fx:Script>
+											<![CDATA[
+												protected function linkbutton1_clickHandler(event:MouseEvent):void
+												{
+													outerDocument.buscar(event.currentTarget.data);
+												}
+											]]>
+										</fx:Script>
+									</mx:LinkButton>
+												   
+								</fx:Component>
+							</s:itemRenderer>
+							<s:dataProvider>
+								<s:ArrayList>
+									<fx:Object op="obtenerEvento"
+											   imageIcon="@Embed('assets/images/logos invias/evento.gif')"
+											   label="Eventos"/>
+									<fx:Object op="obtenerPeajes"
+											   imageIcon="@Embed('assets/images/logos invias/peaje.gif')"
+											   label="Peajes"
+											   />
+									<fx:Object op="obtenerObras"
+											   imageIcon="@Embed('assets/images/logos invias/works.gif')"
+											   label="Obras"
+											   />
+									<fx:Object op="obtenerEstacionesServicio"
+											   imageIcon="@Embed('assets/images/logos invias/estacion.gif')"
+											   label="Estaciones de servicio"
+											   />
+									<fx:Object op="obtenerHospitales"
+											   imageIcon="@Embed('assets/images/logos invias/hospital.gif')"
+											   label="Hospitales"
+											   />
+									<fx:Object op="obtenerPolicia"
+											   imageIcon="@Embed('assets/images/logos invias/policia.gif')"
+											   label="Policía"
+											   />
+									<fx:Object op="obtenerPuentes"
+											   imageIcon="@Embed('assets/images/logos invias/puente.gif')"
+											   label="Puentes"
+											   />
+									<fx:Object op="obtenerSAC"
+											   imageIcon="@Embed('assets/images/logos invias/sau.gif')"
+											   label="Serv. Atención al usuario"
+											   />
+								</s:ArrayList>		
+							</s:dataProvider>
+						</s:DataGroup>
+							
+					</s:HGroup>
+				</s:VGroup>
+				<mx:Text id="txtNota" htmlText="{textoNota}" link="txtNota_linkHandler(event)" selectable="true"/>
+			</s:VGroup>
+		</s:BorderContainer>
+	</viewer:WidgetTemplate>
+</viewer:BaseWidget>

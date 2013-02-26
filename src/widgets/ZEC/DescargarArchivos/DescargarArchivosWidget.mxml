@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:viewer="com.esri.viewer.*" layout="absolute"
+				   creationComplete="DescargarArchivosWidget_creationCompleteHandler(event)"
+				   widgetConfigLoaded="DescargarArchivosWidget_widgetConfigLoadedHandler(event)">
+	<fx:Script>
+		<![CDATA[
+			import flash.net.navigateToURL;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.FlexEvent;
+			import mx.events.ResizeEvent;
+			
+			import spark.components.gridClasses.GridColumn;
+			import spark.events.GridSelectionEvent;
+			import spark.events.TextOperationEvent;
+			
+			
+			[Bindable] private var providerCampos:ArrayCollection = new ArrayCollection();
+			
+			protected function DescargarArchivosWidget_creationCompleteHandler(event:FlexEvent):void
+			{
+				// TODO Auto-generated method stub
+				
+			}
+			
+			protected function DescargarArchivosWidget_widgetConfigLoadedHandler(event:Event):void
+			{
+				if(configObject && configObject.configuration)
+				{
+					if(configObject.configuration.archivo is ArrayCollection)
+					{
+						providerLstArchivos.addAll(configObject.configuration.archivo as ArrayCollection);
+					}else if( configObject.configuration.hasOwnProperty("archivo") && configObject.configuration.archivo)
+					{
+						providerLstArchivos.addItem(configObject.configuration.archivo);
+					}
+					
+					if(configObject.configuration.campos)
+					{
+						if(configObject.configuration.campos.campo is ArrayCollection)
+						{
+							for each(var campo:Object in configObject.configuration.campos.campo)
+							{
+								var col:GridColumn = new GridColumn(campo.campo);
+								col.headerText = campo.label;
+								col.width = campo.ancho;
+								
+								providerCampos.addItem(col);
+							}
+							
+						}else if( configObject.configuration.campos.hasOwnProperty("campo") && configObject.configuration.campos.campo)
+						{
+							var colum:GridColumn = new GridColumn(configObject.configuration.campos.campo.campo);
+							colum.headerText = configObject.configuration.campos.campo.label;
+							colum.width = configObject.configuration.campos.campo.ancho;
+							
+							providerCampos.addItem(colum);
+						}
+					}
+					
+				}
+				
+			}
+			
+			protected function wTemplate_minimizedHandler(event:Event):void
+			{
+				// TODO Auto-generated method stub
+				
+			}
+			
+			protected function wTemplate_openHandler(event:Event):void
+			{
+				// TODO Auto-generated method stub
+				
+			}
+			
+			protected function wTemplate_closedHandler(event:Event):void
+			{
+				// TODO Auto-generated method stub
+				
+			}
+			
+			private function filterProviderLstArchivos(item:Object):Boolean
+			{
+				if(txtFiltro && txtFiltro.text)
+				{
+					if(item.label.toString().toLocaleUpperCase().lastIndexOf(txtFiltro.text.toLocaleUpperCase()) != -1 )
+					{
+						return true;
+					}else
+					{
+						return false
+					}
+				}
+				return true;
+			}
+			
+			protected function txtFiltro_changeHandler(event:TextOperationEvent):void
+			{
+				providerLstArchivos.refresh();
+			}
+			
+			protected function grp_resizeHandler(event:ResizeEvent):void
+			{
+				lstArchivos.maxWidth= grp.width;
+				lstArchivos.width = grp.width;
+			}
+			
+			protected function lstArchivos_selectionChangeHandler(event:GridSelectionEvent):void
+			{
+				if(lstArchivos.selectedItem)
+				{
+					if(lstArchivos.selectedItem.url)
+					{
+						navigateToURL(new URLRequest(lstArchivos.selectedItem.url),"_blank");
+					}
+				}
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<s:ArrayCollection id="providerLstArchivos" filterFunction="filterProviderLstArchivos"/>
+	</fx:Declarations>
+	
+	<viewer:WidgetTemplate id="wTemplate"
+						   minimized="wTemplate_minimizedHandler(event)"
+						   open="wTemplate_openHandler(event)"
+						   closed="wTemplate_closedHandler(event)"
+						   >
+		<s:BorderContainer cornerRadius="5" top="15" bottom="0" right="0" left="0" backgroundAlpha="0" 
+						   minHeight="50">
+			<s:VGroup horizontalCenter="0" verticalCenter="0" verticalAlign="middle" 
+					  horizontalAlign="center" left="5" top="5" right="5" bottom="5"
+					  >
+				<s:HGroup width="100%" horizontalAlign="center" verticalAlign="middle">
+					<s:Label text="Filtro"/>
+					<s:TextInput id="txtFiltro" change="txtFiltro_changeHandler(event)"/>
+				</s:HGroup>
+				
+				<mx:VBox id="grp" width="100%" height="100%" resize="grp_resizeHandler(event)">
+					<s:DataGrid id="lstArchivos" width="100%" height="100%" dataProvider="{providerLstArchivos}" maxWidth="{grp.width}"
+								selectionChange="lstArchivos_selectionChangeHandler(event)" columns="{providerCampos}">
+					</s:DataGrid>
+				</mx:VBox>
+				
+				
+			</s:VGroup>
+			
+		</s:BorderContainer>
+	</viewer:WidgetTemplate>
+</viewer:BaseWidget>

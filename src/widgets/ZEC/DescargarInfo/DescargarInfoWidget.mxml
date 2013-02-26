@@ -1,0 +1,429 @@
+<?xml version="1.0" encoding="utf-8"?>
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" 
+				   xmlns:viewer="com.esri.viewer.*" layout="absolute"
+				   widgetConfigLoaded="DescargarInfo_widgetConfigLoadedHandler(event)"
+				   creationComplete="DescargarInfo_creationCompleteHandler(event)">
+	
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.layers.Layer;
+			import com.esri.viewer.AppEvent;
+			import com.esri.viewer.ViewerContainer;
+			
+			import flash.net.navigateToURL;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.FlexEvent;
+			import mx.rpc.AsyncToken;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			import spark.events.IndexChangeEvent;
+			
+			[Bindable] private var lblNivelInformacion:String;
+			[Bindable] private var lblNivelDepartamento:String;
+			[Bindable] private var lblNivelMunicipio:String;
+			[Bindable] private var lblBotonConsulta:String;
+			[Bindable] private var providerCmbNivelInfo:ArrayCollection = new ArrayCollection();
+			[Bindable] private var providerCmbNivelDepartamento:ArrayCollection = new ArrayCollection();
+			[Bindable] private var providerCmbNivelMunicipio:ArrayCollection = new ArrayCollection();
+			[Bindable] private var urlDownload:String = new String;
+			
+			private var tokenServlet:AsyncToken;
+			
+			
+			
+			protected function DescargarInfo_widgetConfigLoadedHandler(event:Event):void
+			{
+				if(configXML && configObject){
+					
+					lblNivelInformacion  = 	configObject.configuration.textos.txtNivelInfo || configXML.textos.txtNivelInfo || 'Nivel de información';
+					lblNivelDepartamento = 	configObject.configuration.textos.txtNivelDepartamento || configXML.textos.txtNivelDepartamento || 'Departamento';
+					lblNivelMunicipio    = 	configObject.configuration.textos.txtNivelMunicipio || configXML.textos.txtNivelMunicipio || 'Municipio';
+					lblBotonConsulta     =  configObject.configuration.textos.txtBotonConsulta || configXML.textos.txtBotonConsulta || 'Consultar'; 
+					
+					providerCmbNivelInfo.addAll(configObject.configuration.servicio.niveles.nivel);
+					cmbNivelInfo.selectedIndex = 0;
+					cmbNivelInfo.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-1,0));
+					
+					servletAlfa.url = configObject.configuration.servicio.url_alfa;
+					urlDownload = configObject.configuration.servicio.url_download;
+					
+				}
+			}
+			
+			protected function servletAlfa_faultHandler(event:FaultEvent):void
+			{
+				showError("No fué posible realizar la consulta.\n"+ event.message);
+			}
+			
+			
+			protected function servletAlfa_resultHandler(event:ResultEvent):void
+			{
+				var provider:ArrayCollection;
+				var combo:DropDownList;
+				var operacion:String;
+				
+				if(!tokenServlet)
+				{
+					showError("Ocurrio un error en la consulta realizada");
+					return;
+				}
+				
+				switch(tokenServlet.message.body.operacionConsultaBasica)
+				{
+					case "consultarDepartamentos":
+					{
+						provider = providerCmbNivelDepartamento;
+						combo = cmbNivelDepartamento;
+						operacion = "consultar los departamentos";
+						break;
+						
+					}
+					case "consultarMunicipiosDepartamento":
+					{
+						provider = providerCmbNivelMunicipio;
+						combo = cmbNivelMunicipio;
+						operacion = "consultar los municipios del departamento seleccionado";
+						break;
+					}
+				}
+				
+				if(provider)
+				{
+					try
+					{
+						var itemSeleccione:Object = new Object();
+						itemSeleccione = "Seleccione...";
+						provider.addItem(itemSeleccione);
+						
+						if(event.result.Resultados)
+						{
+							if(event.result.Resultados.Resultado is ArrayCollection){
+								provider.addAll(event.result.Resultados.Resultado);
+							}else{
+								provider.addItem(event.result.Resultados.Resultado);
+							}
+						}else{
+							provider.removeAll();
+							itemSeleccione = "No hay resultados";
+							provider.addItem(itemSeleccione);
+						}
+						
+						if(combo){
+							combo.selectedIndex = 0;
+							combo.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE, false, false, -1, 0));
+						}
+						
+					}catch(e:Error)
+					{
+						showError("No fué posible "+operacion+".\n"+e.message);
+					}
+					
+				}
+				
+				tokenServlet = null;
+				
+			}
+			
+			
+			/**
+			 * Retorna el nombre del mapa base que se encuentra activo
+			 **/
+			public function selectedBasemap():String
+			{
+				var selectedBasemap:String;
+				
+				for each(var layer:Layer in map.layers)
+				{
+					for each(var basemap:Object in configData.basemaps)
+					{
+						if(layer.id == basemap.label)
+						{
+							if(layer.visible)
+							{
+								selectedBasemap = layer.id;
+							}
+						}
+					}
+					
+				}
+				
+				return selectedBasemap;
+			}
+			
+			/**
+			 * Evento resultado de el cambio del mapa base
+			 **/
+			private function basemapMenuClicked(event:AppEvent):void
+			{
+				var id:String = event.data as String;
+				if (id)
+				{
+					var basemap:String;
+					for (var i:uint = 0; i < configData.basemaps.length; i++)
+					{
+						if (configData.basemaps[i].id == id)
+						{
+							basemap = configData.basemaps[i].label;
+							break;
+						}
+					}
+					if (basemap)
+					{
+						providerCmbNivelDepartamento = new ArrayCollection();
+						tokenServlet = servletAlfa.send(
+							{
+								operacionConsultaBasica:"consultarDepartamentos",
+								vigencia:basemap
+							});
+					}
+				}
+			}
+			
+			
+			protected function btnConsultar_clickHandler(event:MouseEvent):void
+			{
+				var url:String = "";
+				
+				switch(currentState)
+				{
+					case "departamento":
+					{
+						url = urlDownload+"?" +
+							"op="+cmbNivelInfo.selectedItem.operacion +
+							"&vigencia="+selectedBasemap()+
+							"&codDep="+cmbNivelDepartamento.selectedItem.CODIGO_DEPARTAMENTO;
+						
+						navigateToURL( new URLRequest(url),"_blank");
+						break;
+					}
+					case "municipio":
+					{
+						url = urlDownload+"?" +
+							"op="+cmbNivelInfo.selectedItem.operacion +
+							"&vigencia="+selectedBasemap()+
+							"&codDep="+cmbNivelDepartamento.selectedItem.CODIGO_DEPARTAMENTO+
+							"&codMun="+cmbNivelMunicipio.selectedItem.CODIGO_CONCATENADO_MUNICIPIO;
+							
+						navigateToURL( new URLRequest(url),"_blank");
+						break;
+					}
+					default:
+					{
+						url = urlDownload+"?" +
+							"op="+cmbNivelInfo.selectedItem.operacion +
+							"&vigencia="+selectedBasemap();
+						
+						navigateToURL( new URLRequest(url),"_blank");
+						break;
+					}
+				}
+				
+			}
+			
+			
+			protected function DescargarInfo_creationCompleteHandler(event:FlexEvent):void
+			{
+				currentState = "default";
+				AppEvent.addListener(AppEvent.BASEMAP_SWITCH,basemapMenuClicked);
+			}
+			
+			
+			protected function cmbNivelDepartamento_changeHandler(event:IndexChangeEvent):void
+			{
+				providerCmbNivelMunicipio = new ArrayCollection();
+				
+				if(cmbNivelDepartamento.selectedIndex != 0)
+				{
+					
+					if(cmbNivelDepartamento.selectedItem.CODIGO_DEPARTAMENTO)
+					{
+						tokenServlet = servletAlfa.send(
+							{
+								operacionConsultaBasica:"consultarMunicipiosDepartamento",
+								codigoDepartamento:cmbNivelDepartamento.selectedItem.CODIGO_DEPARTAMENTO,
+								vigencia:selectedBasemap()
+							});
+					}	
+				}
+				
+				validarSeleccion();
+			}
+			
+			
+			private function validarSeleccion():void
+			{
+				
+				switch(currentState)
+				{
+					case "departamento":
+					{
+						if(cmbNivelDepartamento.selectedIndex != 0 &&cmbNivelDepartamento.selectedItem && cmbNivelDepartamento.selectedItem.CODIGO_DEPARTAMENTO)
+						{
+							btnConsultar.enabled = true;
+						}else
+						{
+							btnConsultar.enabled = false;
+						}
+						break;
+					}
+					case "municipio":
+					{
+						if(cmbNivelMunicipio.selectedIndex != 0 && cmbNivelMunicipio.selectedItem && cmbNivelMunicipio.selectedItem.CODIGO_CONCATENADO_MUNICIPIO)
+						{
+							btnConsultar.enabled = true;
+						}else
+						{
+							btnConsultar.enabled = false;
+						}						
+						break;
+					}
+					default:
+					{
+						if(cmbNivelInfo.selectedIndex != 0){
+							btnConsultar.enabled = true;	
+						}else{
+							btnConsultar.enabled = false;
+						}
+						
+					}
+				}
+			}
+			
+			
+			protected function cmbNivelInfo_changeHandler(event:IndexChangeEvent):void
+			{
+				var basemap:String = "";
+				
+				if(cmbNivelInfo.selectedItem){
+					
+					switch(cmbNivelInfo.selectedItem.criterios)
+					{
+						case "pais":
+						{
+							currentState = "default";
+							break;
+						}
+						case "departamento":
+						{
+							currentState = "departamento";
+							
+							basemap = selectedBasemap();
+							
+							if(basemap)
+							{
+								providerCmbNivelDepartamento = new ArrayCollection();
+								tokenServlet = servletAlfa.send(
+									{
+										operacionConsultaBasica:"consultarDepartamentos",
+										vigencia:basemap
+									});
+							}else
+							{
+								showError("No fué posible encontrar la vigencia seleccionada");
+							}
+							
+							break;	
+						}
+						case "municipio":
+						{
+							currentState = "municipio";
+							
+							basemap = selectedBasemap();
+							
+							if(basemap)
+							{
+								providerCmbNivelDepartamento = new ArrayCollection();
+								tokenServlet = servletAlfa.send(
+									{
+										operacionConsultaBasica:"consultarDepartamentos",
+										vigencia:basemap
+									});
+							}else
+							{
+								showError("No fué posible encontrar la vigencia seleccionada");
+							}
+							
+							//Municipios
+							cmbNivelDepartamento.selectedIndex = 0;
+							cmbNivelDepartamento.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-1,0));
+							
+							
+							break;
+						}
+						default:
+						{
+							currentState = "default";
+							break;	
+						}
+							
+					}
+					validarSeleccion();
+				}
+				
+			}
+			
+			
+			protected function cmbNivelMunicipio_changeHandler(event:IndexChangeEvent):void
+			{
+				validarSeleccion();
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<s:HTTPService id="servletAlfa" showBusyCursor="true" fault="servletAlfa_faultHandler(event)" result="servletAlfa_resultHandler(event)"/>
+	</fx:Declarations>
+	
+	<viewer:states>
+		<s:State name="default"/>
+		<s:State name="departamento"/>
+		<s:State name="municipio"/>
+	</viewer:states>
+	
+	<viewer:WidgetTemplate id="wTemplate" width.default="350" height.default="150" width.departamento="350" height.departamento="200" width.municipio="350" height.municipio="220">
+		<s:BorderContainer cornerRadius="5" left="5" top="5" bottom="5" right="5" backgroundColor="{getStyle('contentBackgroundColor')}" minHeight="50">
+			<s:VGroup horizontalCenter="0" verticalCenter="0" 
+					  horizontalAlign="center" verticalAlign="middle"
+					  left="5" top="5" bottom="5" right="5" >
+				
+				<mx:Grid width="100%" minWidth="0" minHeight="20" verticalAlign="middle">
+					<mx:GridRow width="100%">
+						<mx:GridItem horizontalAlign="right" verticalAlign="middle">
+							<s:Label text="{lblNivelInformacion}"/>		
+						</mx:GridItem>
+						<mx:GridItem verticalAlign="middle" width="100%">
+							<s:DropDownList id="cmbNivelInfo" dataProvider="{providerCmbNivelInfo}" change="cmbNivelInfo_changeHandler(event)" width="100%"/>			
+						</mx:GridItem>
+					</mx:GridRow>
+					
+					<mx:GridRow width="100%" includeIn="departamento,municipio">
+						<mx:GridItem horizontalAlign="right" verticalAlign="middle">
+							<s:Label text="{lblNivelDepartamento}"/>		
+						</mx:GridItem>
+						<mx:GridItem verticalAlign="middle" width="100%">
+							<s:DropDownList id="cmbNivelDepartamento" dataProvider="{providerCmbNivelDepartamento}" 
+											labelField="NOMBRE_DEPARTAMENTO" change.departamento="validarSeleccion()" change.municipio="cmbNivelDepartamento_changeHandler(event)" width="100%"/>			
+						</mx:GridItem>
+					</mx:GridRow>
+					
+					<mx:GridRow width="100%" includeIn="municipio">
+						<mx:GridItem horizontalAlign="right" verticalAlign="middle">
+							<s:Label text="{lblNivelMunicipio}"/>		
+						</mx:GridItem>
+						<mx:GridItem verticalAlign="middle" width="100%">
+							<s:DropDownList id="cmbNivelMunicipio" dataProvider="{providerCmbNivelMunicipio}" labelField="NOMBRE_MUNICIPIO" 
+											change="cmbNivelMunicipio_changeHandler(event)" width="100%"/>			
+						</mx:GridItem>
+					</mx:GridRow>	
+				</mx:Grid>
+				
+				<s:Button id="btnConsultar" label="{lblBotonConsulta}" enabled="false" click="btnConsultar_clickHandler(event)"/>
+				
+			</s:VGroup>
+		</s:BorderContainer>
+	</viewer:WidgetTemplate>
+</viewer:BaseWidget>

@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" 
+		 currentState="{inState}" width="100%" height="100%">
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			/**
+			 * Estado del componente
+			 **/
+			private var _inState:String="DataGrid";
+			[Bindable]public function get inState():String{ return _inState; }
+			public function set inState(value:String):void{ _inState = value; }
+			
+			/**
+			 * Arreglo de DataGridColumn
+			 * 	var column:DataGridColumn = new DataGridColumn("C1");
+			 column.headerText = "Columna 1";
+			 column.headerWordWrap = true;
+			 column.width = 120;
+			 columns.push(column);
+			 */ 
+			private var _columns:Array=new Array();
+			[Bindable]public function get columns():Array{ return _columns; }
+			public function set columns(value:Array):void{ _columns = value; }
+			
+			/**
+			 * Arreglo con información
+			 */
+			private var _provider:ArrayCollection=new ArrayCollection();;
+			[Bindable]public function get provider():ArrayCollection{ return _provider; }
+			public function set provider(value:ArrayCollection):void{ _provider = value; }
+			
+			
+			
+		]]>
+	</fx:Script>
+	<s:states>
+		<s:State name="DataGrid" />
+		<s:State name="OLAPDataGrid" />
+	</s:states>
+	<mx:DataGrid includeIn="DataGrid" 
+				 id="tDataGrid" 
+				 wordWrap="true" 
+				 variableRowHeight="true" 
+				 horizontalScrollPolicy="auto" 
+				 verticalAlign="middle"
+				 headerStyleName="HeaderStyle"
+				 fontSize="10" 
+				 paddingLeft="5" 
+				 paddingRight="5" 
+				 paddingTop="5" 
+				 paddingBottom="5" 
+				 height="100%" 
+				 width="100%" 
+				 left="10" 
+				 top="10" 
+				 right="10" 
+				 bottom="10" 
+				 dropShadowVisible="true"
+				 columns="{columns}"
+				 dataProvider="{provider}"
+				 >
+	</mx:DataGrid>
+	<mx:OLAPDataGrid includeIn="OLAPDataGrid"
+					 id="tOLAPDataGrid" 
+					 wordWrap="true" 
+					 variableRowHeight="true"
+					 horizontalScrollPolicy="auto" 
+					 verticalAlign="middle"
+					 fontSize="10"
+					 paddingLeft="5" 
+					 paddingRight="5" 
+					 paddingTop="5" 
+					 paddingBottom="5" 
+					 height="100%" 
+					 left="10" 
+					 top="10" 
+					 right="10" 
+					 bottom="10" 
+					 dropShadowVisible="true" >
+	</mx:OLAPDataGrid>
+</s:Group>

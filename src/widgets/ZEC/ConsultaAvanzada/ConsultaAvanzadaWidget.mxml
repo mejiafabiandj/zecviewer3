@@ -1,0 +1,509 @@
+<?xml version="1.0" encoding="utf-8"?>
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" 
+				   xmlns:viewer="com.esri.viewer.*" 
+				   layout="absolute"
+				   widgetConfigLoaded="ConsultaAvanzada_widgetConfigLoadedHandler(event)"
+				   creationComplete="ConsultaAvanzada_creationCompleteHandler(event)" 
+				   xmlns:ConsultaAvanzada="widgets.DANE.ConsultaAvanzada.*" 
+				   xmlns:esri="http://www.esri.com/2008/ags">
+
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.FeatureSet;
+			import com.esri.ags.events.DetailsEvent;
+			import com.esri.ags.layers.Layer;
+			import com.esri.ags.layers.supportClasses.Field;
+			import com.esri.ags.layers.supportClasses.LayerDetails;
+			import com.esri.ags.utils.JSONUtil;
+			import com.esri.viewer.AppEvent;
+			import com.esri.viewer.ViewerContainer;
+			import com.esri.viewer.WidgetStates;
+			import com.esri.viewer.utils.Hashtable;
+			
+			import gov.dane.util.Constantes;
+			import gov.dane.util.TokenUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.CollectionEvent;
+			import mx.events.FlexEvent;
+			import mx.rpc.AsyncResponder;
+			import mx.rpc.Fault;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.http.HTTPService;
+			import mx.utils.ObjectProxy;
+			
+			import spark.events.IndexChangeEvent;
+			
+			import widgets.DANE.ConsultaAvanzada.renderers.CriterioEvent;
+			import widgets.WidgetContainer.WidgetContainer;
+			
+			[Bindable] [Embed(source="assets/images/add.png")] public var imgAdd:Class;
+			
+			[Bindable] private var providerCmbNivel:ArrayCollection = new ArrayCollection();
+			[Bindable] public var providerGrdCriterios:ArrayCollection = new ArrayCollection();
+			[Bindable] public static var providerFields:ArrayCollection = new ArrayCollection();
+			
+			private var providerOperacionesAlfanumericas:ArrayCollection = new ArrayCollection();
+			private var providerOperacionesNumericas:ArrayCollection = new ArrayCollection();
+			
+			private var selectedVigencia:Object;
+			
+			private var widgetState:String;
+			
+			private static var instancia:ConsultaAvanzadaWidget;
+			
+			public static function getInstance():ConsultaAvanzadaWidget
+			{
+				return instancia;
+			}
+			
+			protected function ConsultaAvanzada_creationCompleteHandler(event:FlexEvent):void
+			{
+				currentState = "compacto";
+				instancia = this;
+				AppEvent.addListener(AppEvent.BASEMAP_SWITCH, basemapMenuClicked);
+				AppEvent.addListener(AppEvent.WIDGET_STATE_CHANGED,widgetStateChanged);
+			}
+			
+			protected function ConsultaAvanzada_widgetConfigLoadedHandler(event:Event = null):void
+			{
+				if(configObject)
+				{
+					var vigenciaSeleccionada:Boolean = false;
+					var vigencia:Object;
+					
+					if(configObject.configuration.retornarGeometria)
+					{
+						query.returnGeometry = configObject.configuration.retornarGeometria;
+					}else
+					{
+						query.returnGeometry = false;
+					}
+					
+					
+					if(configObject.configuration.generalizargeometria && configObject.configuration.generalizargeometria.hasOwnProperty("value") && configObject.configuration.generalizargeometria.value == true)
+					{
+						query.maxAllowableOffset = configObject.configuration.generalizargeometria.cantidad;
+					}
+					
+					
+					for each(vigencia in configObject.configuration.vigencias.vigencia)
+					{
+						if(vigencia.label == selectedBasemap())
+						{
+							vigenciaSeleccionada = true;
+							
+							selectedVigencia = vigencia;
+							
+							providerCmbNivel.addItem({label:"Seleccione..."});
+							if(vigencia.niveles.nivel is ArrayCollection)
+							{
+								providerCmbNivel.addAll(vigencia.niveles.nivel);
+							}else
+							{
+								providerCmbNivel.addItem(vigencia.niveles.nivel);
+							}
+							
+							cmbNivel.selectedIndex = 0;
+							cmbNivel.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-1,0));
+							
+							break;
+						}
+					}
+					
+					if(!vigenciaSeleccionada)
+					{
+						for each(vigencia in configObject.configuration.vigencias.vigencia)
+						{
+							if(vigencia.label == "default")
+							{
+								selectedVigencia = vigencia;
+								
+								providerCmbNivel.addItem({label:"Seleccione..."});
+								if(vigencia.niveles.nivel is ArrayCollection)
+								{
+									providerCmbNivel.addAll(vigencia.niveles.nivel);
+								}else
+								{
+									providerCmbNivel.addItem(vigencia.niveles.nivel);
+								}
+								
+								cmbNivel.selectedIndex = 0;
+								cmbNivel.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-1,0));
+								
+								break;
+							}
+						}
+					}
+				}
+			}
+
+
+			protected function wTemplate_openHandler(event:Event):void
+			{
+				providerCmbNivel.removeAll();
+				ConsultaAvanzada_widgetConfigLoadedHandler();
+			}
+
+
+			protected function wTemplate_closedHandler(event:Event):void
+			{
+				// TODO Auto-generated method stub
+			}
+
+
+			protected function wTemplate_minimizedHandler(event:Event):void
+			{
+				// TODO Auto-generated method stub
+			}
+			
+			/**
+			 * Evento resultado de el cambio del mapa base
+			 **/
+			private function basemapMenuClicked(event:AppEvent):void
+			{
+				if(widgetState != WidgetStates.WIDGET_MINIMIZED)
+				{
+					providerCmbNivel.removeAll();
+					ConsultaAvanzada_widgetConfigLoadedHandler();
+				}
+			}
+			
+			private function widgetStateChanged(event:AppEvent):void
+			{
+				widgetState = event.data.state;
+			}
+			
+			/**
+			 * Retorna el nombre del mapa base que se encuentra activo
+			 **/
+			public function selectedBasemap():String
+			{
+				var selectedBasemap:String;
+				
+				for each(var layer:Layer in map.layers)
+				{
+					for each(var basemap:Object in configData.basemaps)
+					{
+						if(layer.id == basemap.label)
+						{
+							if(layer.visible)
+							{
+								selectedBasemap = layer.id;
+							}
+						}
+					}
+				}
+				return selectedBasemap;
+			}
+			
+			/**
+			 * Retorna el mapa base que se encuentra activo
+			 **/
+			public function layerSelectedBasemap():Object
+			{
+				var layerSelectedBasemap:Object;
+				
+				for each(var layer:Layer in map.layers)
+				{
+					for each(var basemap:Object in configData.basemaps)
+					{
+						if(layer.id == basemap.label)
+						{
+							layerSelectedBasemap = basemap;
+							
+						}
+					}
+				}
+				return layerSelectedBasemap;
+			}
+
+
+			protected function cmbNivel_changeHandler(event:IndexChangeEvent):void
+			{
+				providerGrdCriterios.removeAll();
+				providerFields.removeAll();
+				if(providerCmbNivel[event.newIndex].id)
+				{
+					if(configObject.configuration.vigencias.vigencia is ArrayCollection)
+					{
+						for each(var vigencia:ObjectProxy in configObject.configuration.vigencias.vigencia)
+						{
+							if(vigencia.label == selectedBasemap())
+							{
+								servicio.url = vigencia.url + "/" + providerCmbNivel[event.newIndex].id; 
+								if(vigencia.useproxy)
+								{
+									servicio.url = configData.proxyUrl + servicio.url;
+								}
+								servicio.resultFormat = mx.rpc.http.HTTPService.RESULT_FORMAT_TEXT;
+								
+								servicio.send({
+									f:"json",
+									token:TokenUtil.buscarToken(vigencia.url,configData)
+								});
+							}
+						}
+					}else if(configObject.configuration.vigencias.vigencia)
+					{
+						if(configObject.configuration.vigencias.vigencia.label == selectedBasemap())
+						{
+							
+						}
+					}
+					//layerSelectedBasemap().getDetails(providerCmbNivel[event.newIndex].id,new AsyncResponder(layerDetailsResult,layerDetailsFault));
+					
+					currentState = "expandido";
+				}else
+				{
+					currentState = "compacto";
+				}
+			}
+			
+			private function layerDetailsResult(details:LayerDetails,token:Object = null):void
+			{
+				for each(var field:Field in details.fields)
+				{
+					if(field.type != Field.TYPE_GEOMETRY && field.type != Field.TYPE_OID)
+					{
+						providerFields.addItem(field)
+					}
+				}
+				
+				providerGrdCriterios.addItem({});
+			}
+
+			private function layerDetailsFault(fault:Fault,token:Object = null):void
+			{
+				showError("No fué posible consultar los atributos del nivel de informaión seleccionado");
+			}
+			
+			protected function btnAddCriterio_clickHandler(event:MouseEvent):void
+			{
+				wTemplate.height = wTemplate.height<600 ? wTemplate.height + 28 :  wTemplate.height;
+				providerGrdCriterios.addItem({});
+			}
+			
+			protected function btnConsultar_clickHandler(event:MouseEvent):void
+			{
+				if(providerGrdCriterios.length > 0)
+				{
+					var errores:Array = new Array();
+					var where:String = "";
+					for each(var criterio:Object in providerGrdCriterios)
+					{
+						if(!criterio.atributo || !criterio.operador || !criterio.valor)
+						{
+							errores.push(providerGrdCriterios.getItemIndex(criterio) + 1);
+						}else
+						{
+							var operador:String;
+							var tipo:String = criterio.atributo.type;
+							
+							
+							if(tipo == Field.TYPE_STRING || tipo == Field.TYPE_XML)
+							{
+								switch(criterio.operador)
+								{
+									case "Contiene":
+									{
+										where += "(LOWER(" + criterio.atributo.name + ") LIKE '%" + criterio.valor.toString().toLocaleLowerCase() + "%' OR LOWER(" + criterio.atributo.name + ") LIKE '*" + criterio.valor.toString().toLocaleLowerCase() + "*') AND ";
+										break;
+									}
+									case "Igual":
+									{
+										where += "LOWER(" + criterio.atributo.name + ") = '" + criterio.valor.toString().toLocaleLowerCase() + "' AND ";
+										break;
+									}
+									case "Diferente":
+									{
+										where += "LOWER(" + criterio.atributo.name + ") <> '" + criterio.valor.toString().toLocaleLowerCase() + "' AND ";
+										break;
+									}
+									case "Comienza por":
+									{
+										where += "(LOWER(" + criterio.atributo.name + ") LIKE '" + criterio.valor.toString().toLocaleLowerCase() + "%' OR LOWER(" + criterio.atributo.name + ") LIKE '" + criterio.valor.toString().toLocaleLowerCase() + "*') AND ";
+										break;
+									}
+									case "Termina en":
+									{
+										where += "(LOWER(" + criterio.atributo.name + ") LIKE '%" + criterio.valor.toString().toLocaleLowerCase() + "' OR LOWER(" + criterio.atributo.name + ") LIKE '*" + criterio.valor.toString().toLocaleLowerCase() + "') AND ";
+										break;
+									}
+								}
+							}else if(	tipo == Field.TYPE_DATE ||
+								tipo == Field.TYPE_DOUBLE ||
+								tipo == Field.TYPE_GLOBAL_ID ||
+								tipo == Field.TYPE_GUID ||	
+								tipo == Field.TYPE_INTEGER ||
+								tipo == Field.TYPE_OID ||
+								tipo == Field.TYPE_SINGLE ||
+								tipo == Field.TYPE_SMALL_INTEGER)
+							{
+								switch(criterio.operador)
+								{
+									case "Igual":
+									{
+										where += criterio.atributo.name + " = " + criterio.valor + " AND ";
+										break;
+									}
+									case "Menor":
+									{
+										where += criterio.atributo.name + " < " + criterio.valor + " AND ";
+										break;
+									}
+									case "Mayor":
+									{
+										where += criterio.atributo.name + " > " + criterio.valor + " AND ";
+										break;
+									}
+									case "Menor o Igual":
+									{
+										where += criterio.atributo.name + " <= " + criterio.valor + " AND ";
+										break;
+									}
+									case "Mayor o Igual":
+									{
+										where += criterio.atributo.name + " >= " + criterio.valor + " AND ";
+										break;
+									}
+								}
+							}
+						}
+					}
+					if(errores.length > 0)
+					{
+						showError(((errores.length > 1) ? "Los Criterios " : "El criterio ") + errores.join(", ") + " no " + 
+							((errores.length > 1) ? "contienen" : "contiene")+ " la información necesaria para realizar la consulta");
+					}else
+					{
+						var token:Object = {vigencia:selectedVigencia,layer:cmbNivel.selectedItem.id};
+						where = where.substring(0,where.lastIndexOf("AND "));
+						query.where = where;
+						
+						
+						queryTask.url = selectedVigencia.url + "/" + cmbNivel.selectedItem.id;
+						
+						queryTask.proxyURL = (selectedVigencia.useproxy ? configData.proxyUrl :null);
+						queryTask.useAMF = queryTask.proxyURL? false: selectedVigencia.useAMF;
+						queryTask.token = TokenUtil.buscarToken(queryTask.url,configData);
+						
+						queryTask.execute(query,new AsyncResponder(queryTask_Result,queryTask_Fault,token));
+					}
+				}
+			}
+			
+			private function queryTask_Result(featureSet:FeatureSet,token:Object = null):void
+			{
+				if(featureSet.features.length == 0)
+				{
+					Alert.show("La consulta realizada no retornó resultados");
+				}else
+				{
+					setState(WidgetStates.WIDGET_MINIMIZED);
+					addSharedData(Constantes.OPERACION_ABRIR_WIDGET,new ArrayCollection([{label:"Resultados",data:{featureSet:featureSet,token:query.returnGeometry ? null: token}}]));
+					
+				}
+			}
+			
+			private function queryTask_Fault(fault:Fault,token:Object = null):void
+			{
+				showError("No fué posible realizar la consulta\n\n" + fault.message);
+			}
+			
+
+			protected function servicio_resultHandler(event:ResultEvent):void
+			{
+				var resultado:Object = JSONUtil.decode(event.result.toString());
+				
+				
+				for each(var field:Object in resultado.fields)
+				{
+					if(field.type != Field.TYPE_GEOMETRY && field.type != Field.TYPE_OID)
+					{
+						providerFields.addItem(field)
+					}
+				}
+				
+				providerGrdCriterios.addItem({});
+			}
+			
+			protected function servicio_faultHandler(event:FaultEvent):void
+			{
+				Alert.show("No fué posible consultar los atributos del nivel de información seleccionado \n\n" + event.message);
+			}
+			
+		]]>
+	</fx:Script>
+
+	<fx:Declarations>
+		<esri:Query id="query" outFields="[*]"  outSpatialReference="{map.spatialReference}"/>
+		<esri:QueryTask id="queryTask" method="POST" showBusyCursor="true" />
+		
+		<s:HTTPService id="servicio" result="servicio_resultHandler(event)" fault="servicio_faultHandler(event)" showBusyCursor="true" method="POST"/>
+	</fx:Declarations>
+	
+	<viewer:WidgetTemplate id="wTemplate" 
+						   open="wTemplate_openHandler(event)"
+						   closed="wTemplate_closedHandler(event)"
+						   minimized="wTemplate_minimizedHandler(event)"
+						   width.expandido="600" width.compacto="350" height.compacto="120" height.expandido="250">
+		<s:BorderContainer cornerRadius="5" top="15" bottom="0" right="0" left="0" backgroundAlpha="0" 
+						   minHeight="50"
+						   >
+			<s:VGroup horizontalCenter="0" verticalCenter="0" verticalAlign="middle" horizontalAlign="center" left="5" top="5" right="5" bottom="5"
+					  >
+				<s:HGroup verticalAlign="middle" horizontalAlign="center" width="100%">
+					<s:Label text="Nivel de Información"/>
+					<s:DropDownList id="cmbNivel" width="170" dataProvider="{providerCmbNivel}"
+									change="cmbNivel_changeHandler(event)"/>
+				</s:HGroup>
+				<s:Group width="100%" includeIn="expandido">
+					<mx:LinkButton id="btnAddCriterio" label="Añadir criterio" toolTip="Añade un nuevo criterio"
+								   click="btnAddCriterio_clickHandler(event)" icon="{imgAdd}"/>
+				</s:Group>
+				<mx:Grid width="100%" verticalAlign="middle" horizontalAlign="center" 
+						 borderStyle="solid" cornerRadius="5"
+						 borderColor="{getStyle('selectionColor')}"
+						 includeIn="expandido"
+						 >
+					<mx:GridRow verticalAlign="middle" horizontalAlign="center" width="100%"
+								borderStyle="solid" cornerRadius="4">
+						<mx:GridItem verticalAlign="middle" horizontalAlign="center" width="200">
+							<s:Label text="Atributo" fontWeight="bold" fontSize="12"/>
+						</mx:GridItem>
+						<mx:GridItem verticalAlign="middle" horizontalAlign="center" width="120">
+							<s:Label text="Operador" fontWeight="bold" fontSize="12"/>
+						</mx:GridItem>
+						<mx:GridItem verticalAlign="middle" horizontalAlign="center" width="100%">
+							<s:Label text="Valor" fontWeight="bold" fontSize="12"/>
+						</mx:GridItem>
+						<mx:GridItem verticalAlign="middle" horizontalAlign="center" width="30" minHeight="25">
+							
+						</mx:GridItem>
+					</mx:GridRow>
+					<mx:Repeater id="rptrCriterios" dataProvider="{providerGrdCriterios}">
+						<ConsultaAvanzada:RowCriterio item="{rptrCriterios.currentItem}"/>
+					</mx:Repeater>
+					<mx:GridRow>
+						<mx:GridItem>
+							<mx:Spacer height="5"/>
+						</mx:GridItem>
+					</mx:GridRow>
+				</mx:Grid>
+				
+				<s:Button id="btnConsultar" label="Buscar" click="btnConsultar_clickHandler(event)" includeIn="expandido"/>
+			</s:VGroup>
+		</s:BorderContainer>
+	</viewer:WidgetTemplate>
+	
+	
+	<viewer:states>
+		<s:State name="compacto"/>
+		<s:State name="expandido"/>
+	</viewer:states>
+</viewer:BaseWidget>

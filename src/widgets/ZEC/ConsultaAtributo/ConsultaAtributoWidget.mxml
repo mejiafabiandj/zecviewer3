@@ -1,0 +1,360 @@
+<?xml version="1.0" encoding="utf-8"?>
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" 
+				   xmlns:viewer="com.esri.viewer.*" 
+				   layout="absolute"
+				   creationComplete="ConsultaAtributoWidget_creationCompleteHandler(event)"
+				   widgetConfigLoaded="ConsultaAtributoWidget_widgetConfigLoadedHandler(event)" xmlns:esri="http://www.esri.com/2008/ags" xmlns:geometry="com.esri.ags.geometry.*">
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.FeatureSet;
+			import com.esri.ags.events.DrawEvent;
+			import com.esri.ags.geometry.Geometry;
+			import com.esri.ags.layers.Layer;
+			import com.esri.ags.layers.supportClasses.Field;
+			import com.esri.ags.layers.supportClasses.LayerDetails;
+			import com.esri.ags.utils.JSONUtil;
+			import com.esri.viewer.AppEvent;
+			import com.esri.viewer.ViewerContainer;
+			import com.esri.viewer.WidgetStates;
+			import com.esri.viewer.managers.EventBus;
+			
+			import gov.dane.util.Constantes;
+			import gov.dane.util.TokenUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.FlexEvent;
+			import mx.rpc.AsyncResponder;
+			import mx.rpc.Fault;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			import spark.events.IndexChangeEvent;
+			
+			[Bindable] [Embed(source="assets/images/edit_addtoselection.png")] public var imgExtent:Class;
+			
+			[Bindable] private var providerCmbNivel:ArrayCollection = new ArrayCollection();
+			[Bindable] private var selectedNivelFields:Array = new Array();
+			[Bindable] private var lastDrawnGeometry:Geometry = null;
+				
+			private var selectedVigencia:Object;
+			
+			
+
+			protected function ConsultaAtributoWidget_creationCompleteHandler(event:FlexEvent):void
+			{
+				AppEvent.addListener(AppEvent.BASEMAP_SWITCH, basemapMenuClicked);
+			}
+
+
+			protected function ConsultaAtributoWidget_widgetConfigLoadedHandler(event:Event = null):void
+			{
+				if(configObject)
+				{
+					providerCmbNivel.removeAll();
+					txtConsulta.text = "";
+					
+					for each(var vigencia:Object in configObject.configuration.vigencias.vigencia)
+					{
+						if(vigencia.label == selectedBasemap())
+						{
+							selectedVigencia = vigencia;
+							
+							providerCmbNivel.addItem({label:"Seleccione..."});
+							if(vigencia.niveles.nivel is ArrayCollection)
+							{
+								providerCmbNivel.addAll(vigencia.niveles.nivel);
+							}else
+							{
+								providerCmbNivel.addItem(vigencia.niveles.nivel);
+							}
+							
+							cmbNivel.selectedIndex = 0;
+							cmbNivel.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-1,0));
+							break;
+						}
+					}
+				}
+			}
+
+
+			protected function wTemplate_openHandler(event:Event):void
+			{
+				ConsultaAtributoWidget_widgetConfigLoadedHandler()
+				lastDrawnGeometry = null;
+			}
+
+
+			protected function wTemplate_closedHandler(event:Event):void
+			{
+				map.removeLayer(graphicsLayerFiltroGeografico);
+				lastDrawnGeometry = null;
+			}
+
+
+			protected function wTemplate_minimizedHandler(event:Event):void
+			{
+				// TODO Auto-generated method stub
+			}
+
+			/**
+			 * Evento resultado de el cambio del mapa base
+			 **/
+			private function basemapMenuClicked(event:AppEvent):void
+			{
+				ConsultaAtributoWidget_widgetConfigLoadedHandler();
+			}
+			
+			/**
+			 * Retorna el nombre del mapa base que se encuentra activo
+			 **/
+			public function selectedBasemap():String
+			{
+				var selectedBasemap:String;
+				
+				for each(var layer:Layer in map.layers)
+				{
+					for each(var basemap:Object in configData.basemaps)
+					{
+						if(layer.id == basemap.label)
+						{
+							if(layer.visible)
+							{
+								selectedBasemap = layer.id;
+							}
+						}
+					}
+				}
+				return selectedBasemap;
+			}
+			
+			/**
+			 * Retorna el mapa base que se encuentra activo
+			 **/
+			public function layerSelectedBasemap():Object
+			{
+				var layerSelectedBasemap:Object;
+				
+				for each(var layer:Layer in map.layers)
+				{
+					for each(var basemap:Object in configData.basemaps)
+					{
+						if(layer.id == basemap.label)
+						{
+							if(layer.visible)
+							{
+								layerSelectedBasemap = layer;
+							}
+						}
+					}
+				}
+				return layerSelectedBasemap;
+			}
+			
+			private function validar():void
+			{
+				btnConsultar.enabled = cmbNivel.selectedItem.id && txtConsulta.text && txtConsulta.text != "";
+			}
+
+
+			protected function cmbNivel_changeHandler(event:IndexChangeEvent):void
+			{
+				validar();
+				if(providerCmbNivel[event.newIndex].id)
+				{
+					servicio.url = selectedVigencia.url + "/" + providerCmbNivel[event.newIndex].id;
+					servicio.send({
+						f:"json",
+						token:TokenUtil.buscarToken(selectedVigencia.url,configData)
+					});
+					//layerSelectedBasemap().getDetails(providerCmbNivel[event.newIndex].id,new AsyncResponder(layerDetailsResult,layerDetailsFault));
+				}
+			}
+			
+			private function layerDetailsResult(details:LayerDetails,token:Object = null):void
+			{
+				selectedNivelFields = details.fields;
+			}
+			
+			private function layerDetailsFault(fault:Fault,token:Object = null):void
+			{
+				showError("No fué posible consultar los atributos del nivel de informaión seleccionado");
+			}
+
+
+			protected function btnConsultar_clickHandler(event:MouseEvent):void
+			{
+				var where:String = "";
+				for each(var field:Field in selectedNivelFields)
+				{
+					var tipo:String = field.type;
+					if(tipo == Field.TYPE_STRING || tipo == Field.TYPE_XML)
+					{
+						where += "(LOWER(" + field.name + ") LIKE '%" + txtConsulta.text.toLocaleLowerCase() + "%' OR LOWER(" + field.name + ") LIKE '*" + txtConsulta.text.toLocaleLowerCase() + "*') OR ";
+					}else if(tipo == Field.TYPE_DATE ||
+						tipo == Field.TYPE_DOUBLE ||
+						tipo == Field.TYPE_INTEGER ||
+						tipo == Field.TYPE_SINGLE ||
+						tipo == Field.TYPE_SMALL_INTEGER)
+					{
+						if(Number(txtConsulta.text))
+							where += "(" + field.name + " LIKE '%" + txtConsulta.text + "%' OR " + field.name + " LIKE '*" + txtConsulta.text + "*') OR ";
+					}
+				}
+				var token:Object = {vigencia:selectedVigencia,layer:cmbNivel.selectedItem.id};
+				where = where.substring(0,where.lastIndexOf("OR "));
+				query.where = where;
+				if(lastDrawnGeometry)
+				{
+					query.geometry = lastDrawnGeometry;
+				}else
+				{
+					query.geometry = null;
+				}
+				
+				
+				queryTask.url = selectedVigencia.url + "/" + cmbNivel.selectedItem.id;				
+				
+				queryTask.proxyURL = (selectedVigencia.useproxy ? configData.proxyUrl :null);
+				queryTask.useAMF = queryTask.proxyURL? false: selectedVigencia.useAMF;
+				queryTask.token = TokenUtil.buscarToken(queryTask.url,configData);
+				
+				
+				queryTask.execute(query,new AsyncResponder(queryTask_Result,queryTask_Fault,token));
+			}
+			
+			
+			private function queryTask_Result(featureSet:FeatureSet,token:Object = null):void
+			{
+				map.removeLayer(graphicsLayerFiltroGeografico);
+				lastDrawnGeometry = null;
+				
+				if(featureSet.features.length == 0)
+				{
+					Alert.show("La consulta realizada no retornó resultados");
+				}else
+				{
+					setState(WidgetStates.WIDGET_MINIMIZED);
+					
+					addSharedData(Constantes.OPERACION_ABRIR_WIDGET,new ArrayCollection([{label:"Resultados",data:{featureSet:featureSet,token:token}}]));
+				}
+			}
+			 
+			
+			private function queryTask_Fault(fault:Fault,token:Object = null):void
+			{
+				map.removeLayer(graphicsLayerFiltroGeografico);
+				lastDrawnGeometry = null;
+				
+				showError("No fué posible realizar la consulta\n\n" + fault.message);
+			}
+
+
+			protected function btnFiltroGeografico_clickHandler(event:MouseEvent):void
+			{
+				drawTool.activate(DrawTool.FREEHAND_POLYGON);
+				map.addLayer(graphicsLayerFiltroGeografico);
+				graphicsLayerFiltroGeografico.clear();
+			}
+
+
+			protected function drawTool_drawEndHandler(event:DrawEvent):void
+			{
+				lastDrawnGeometry = event.graphic.geometry;
+				drawTool.deactivate();
+			}
+
+			protected function servicio_resultHandler(event:ResultEvent):void
+			{
+				if(event.result && event.result is String)
+				{
+					var resultObject:Object = JSONUtil.decode(event.result as String);
+					if(resultObject && resultObject.hasOwnProperty("fields")){
+						selectedNivelFields = [];
+						
+						for each(var ob:Object in resultObject.fields){
+							var field:Field = new Field();
+							field.alias = ob.alias;
+							field.domain = ob.domain;
+							field.type = ob.type;
+							field.length = ob.type;
+							field.name = ob.name;
+							
+							selectedNivelFields.push(field);
+						}
+					}
+					
+				}
+			}
+			
+			protected function servicio_faultHandler(event:FaultEvent):void
+			{
+				Alert.show("No fúe posible conectar con el servicio para obtener la información del nivel seleccionado");
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<mx:Validator id="validator" source="{txtConsulta}" property="text" triggerEvent="change" required="true" requiredFieldError="Debe ingresar un valor" />
+		
+		<esri:DrawTool id="drawTool"
+					   drawEnd="drawTool_drawEndHandler(event)"
+					   graphicsLayer="{graphicsLayerFiltroGeografico}"
+					   map="{map}">
+			<esri:fillSymbol>
+				<esri:SimpleFillSymbol id="yellowParcels" color="0xFCCBFF" style="solid">
+					<esri:SimpleLineSymbol color="0x7C3F7F" width="3"/>
+				</esri:SimpleFillSymbol>
+			</esri:fillSymbol>
+		</esri:DrawTool>
+		
+		<esri:GraphicsLayer id="graphicsLayerFiltroGeografico"/>
+		
+		<esri:Query id="query" outFields="[*]" returnGeometry="false" 
+					outSpatialReference="{map.spatialReference}"
+					spatialRelationship="esriSpatialRelIntersects"/>
+		<esri:QueryTask id="queryTask" method="POST" showBusyCursor="true" />
+		
+		<s:HTTPService id="servicio" showBusyCursor="true" result="servicio_resultHandler(event)" fault="servicio_faultHandler(event)" resultFormat="text"/>
+	</fx:Declarations>
+	
+	<viewer:WidgetTemplate id="wTemplate" 
+						   open="wTemplate_openHandler(event)"
+						   closed="wTemplate_closedHandler(event)"
+						   minimized="wTemplate_minimizedHandler(event)"
+						    width="350" height="190">
+		<s:BorderContainer cornerRadius="5" top="15" bottom="0" right="0" left="0" backgroundAlpha="0" 
+						   minHeight="50"
+						   >
+			<s:VGroup horizontalCenter="0" verticalCenter="0" verticalAlign="middle" horizontalAlign="center" left="5" top="5" right="5" bottom="5"
+					  >
+				<mx:Grid verticalAlign="middle" horizontalAlign="center" width="100%">
+					<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle">
+						<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+							<s:Label text="Nivel de Información"/>
+						</mx:GridItem>
+						<mx:GridItem verticalAlign="middle" width="100%">
+							<s:DropDownList id="cmbNivel" width="100%" 
+											dataProvider="{providerCmbNivel}" change="cmbNivel_changeHandler(event)"/>
+						</mx:GridItem>
+					</mx:GridRow>
+					<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle">
+						<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+							<s:Label text="Buscar por"/>
+						</mx:GridItem>
+						<mx:GridItem verticalAlign="middle" width="100%">
+							<s:TextInput id="txtConsulta" width="100%" change="validar()" enter="{btnConsultar.dispatchEvent(new MouseEvent(MouseEvent.CLICK))}"/>
+						</mx:GridItem>
+					</mx:GridRow>
+				</mx:Grid>
+				<s:HGroup width="100%">
+					<mx:LinkButton id="btnFiltroGeografico" icon="{imgExtent}" label="Filtrar por área" toolTip="Trace su área para filtrar la consulta"
+								   click="btnFiltroGeografico_clickHandler(event)"/>
+				</s:HGroup>
+				<s:Button id="btnConsultar" label="Consultar" click="btnConsultar_clickHandler(event)"/>
+			</s:VGroup>
+		</s:BorderContainer>
+	</viewer:WidgetTemplate>
+</viewer:BaseWidget>

@@ -1,0 +1,465 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" 
+		 xmlns:toc="com.esri.viewer.components.toc.*"
+		 creationComplete="init()" xmlns:Time="widgets.DANE.Time.*">
+	
+	<s:states>		
+		<s:State name="normal"/>
+		<s:State name="noBasemaps"/>
+	</s:states>
+
+	
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.Map;
+			import com.esri.ags.TimeExtent;
+			import com.esri.ags.layers.ArcGISTiledMapServiceLayer;
+			import com.esri.ags.layers.Layer;
+			import com.esri.viewer.AppEvent;
+			import com.esri.viewer.ViewerContainer;
+			import com.esri.viewer.components.toc.tocClasses.TocMapLayerItem;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.ArrayList;
+			import mx.controls.DateField;
+			import mx.core.FlexGlobals;
+			import mx.events.FlexEvent;
+			import mx.formatters.DateFormatter;
+			import mx.utils.ObjectProxy;
+			
+			import spark.events.IndexChangeEvent;
+			import spark.formatters.DateTimeFormatter;
+			
+			private var hideTimer:Timer = new Timer(300, 1); // TODO - redo with transition
+			
+			private var timeListHideTimer:Timer = new Timer(300, 1); // TODO - redo with transition
+			
+			/**Fabian**/
+			private var basemapHideTimer:Timer = new Timer(300, 1);
+			
+			private var hideSuspended:Boolean = false;
+			
+			[Bindable] public var timeExtent:ObjectProxy;
+			
+			[Bindable]
+			private var basemapList:ArrayList;
+			
+			[Bindable]
+			private var opLayerListButtonLabel:String = "Tabla de contenido";
+			
+			[Bindable] public var map:Map
+			
+			private function init():void
+			{
+				var expandLayerItems:Boolean = true;
+				
+				initBasemapButtonBar();
+				if (opLayerListButton.visible)
+				{
+					initTOC(expandLayerItems);
+				}
+				
+				hideTimer.addEventListener(TimerEvent.TIMER_COMPLETE, hideTimer_timerCompleteHandler, false, 0, true);
+				basemapHideTimer.addEventListener(TimerEvent.TIMER_COMPLETE, basemapHideTimer_timerCompleteHandler, false, 0, true);
+				timeListHideTimer.addEventListener(TimerEvent.TIMER_COMPLETE, timeListHideTimer_timerCompleteHandler, false, 0, true);
+				
+				AppEvent.dispatch(AppEvent.DATA_OPT_LAYERS, null, getOpLayers);
+				
+			}
+			
+			private function initBasemapButtonBar():void
+			{
+				basemapList = new ArrayList();
+				var labels:Array = [];
+				for each (var basemap:Object in ViewerContainer.getInstance().configData.basemaps)
+				{
+					var label:String = basemap.label;
+					if (labels.indexOf(label) == -1) // avoid duplicates using the labels
+					{
+						labels.push(label);
+						basemapList.addItem(basemap);
+					}
+				}
+				
+				if (basemapList.length <= 1)
+				{
+					this.currentState = "noBasemaps";
+				}
+				else
+				{
+					setBasemapButtonBarIndexToTopmostVisibleBasemap();
+				}
+			}
+			
+			private function initTOC(expandLayerItems:Boolean = false):void
+			{
+				
+				toc.map = map;
+				toc.isMapServiceOnly = false; //gotta get this from the config file
+				toc.excludeLayers = getExcludeLayers();
+				toc.excludeGraphicsLayers = false;
+				/*if (expandLayerItems)
+				{
+					toc.expandLayerItems();
+				}*/
+			}
+			
+			private function getExcludeLayers():ArrayCollection
+			{
+				var excludeLayers:ArrayCollection = new ArrayCollection();
+				
+				if (ViewerContainer.getInstance().configData && ViewerContainer.getInstance().configData.basemaps)
+				{
+					// exclude basemaps
+					for (var i:int = 0; i < ViewerContainer.getInstance().configData.basemaps.length; i++)
+					{
+						excludeLayers.addItem(ViewerContainer.getInstance().configData.basemaps[i].label);
+					}
+				}
+				
+				
+				return excludeLayers;
+			}
+			
+			private function getOpLayers(event:AppEvent):void
+			{
+				var opLayersList:Array = event.data as Array;
+				if (opLayersList.length > 0)
+				{
+					opLayerListButton.visible = true;
+				}
+			}
+			
+			private function setBasemapButtonBarIndexToTopmostVisibleBasemap():void
+			{
+				for (var i:int; i < basemapList.length; i++)
+				{
+					if (basemapList.getItemAt(i).visible)
+					{
+						//Fabian:
+						if(baseMapsList.numChildren < i)
+						{
+							map.dispatchEvent(new AppEvent(AppEvent.BASEMAP_SWITCH,basemapList.getItemAt(i).id));
+						}
+						//basemapButtonBar.selectedIndex = i;
+					}
+				}
+			}
+			
+			private function hideTimer_timerCompleteHandler(event:TimerEvent):void
+			{
+				if (!hideSuspended)
+				{
+					AppEvent.dispatch(AppEvent.TOC_HIDDEN);
+					opLayersContainer.visible = false;
+				}
+			}
+			
+			private function startHideTimer():void
+			{
+				
+				if((toc.mouseX < 0 || toc.mouseX > toc.width) || (toc.mouseY > toc.height || toc.mouseY < 0))
+				{
+					hideTimer.reset();
+					hideTimer.start();
+				}
+			}
+			
+			private function opLayerListButton_rollOverHandler(event:MouseEvent):void
+			{
+				opLayersContainer.visible = true;
+				hideTimer.reset();
+				updateOpLayersContainerPosition();
+				
+				map.layers;
+			}
+			
+			private function updateOpLayersContainerPosition():void
+			{
+				var opLayersContainerGlobalBottomRightPoint:Point = opLayersContainer.parent.localToGlobal(new Point(opLayersContainer.width, opLayersContainer.height));
+				positionOpLayersContainerHorizontally(opLayersContainerGlobalBottomRightPoint.x);
+				positionOpLayersContainerVertically(opLayersContainerGlobalBottomRightPoint.y);
+			}
+			
+			private function positionOpLayersContainerHorizontally(x:Number):void
+			{
+				var appWidth:Number = FlexGlobals.topLevelApplication.width;
+				if (x > appWidth)
+				{
+					opLayersContainer.x = -opLayersContainer.width + opLayerListButton.width;
+				}
+				else
+				{
+					opLayersContainer.x = 0;
+				}
+			}
+			
+			private function positionOpLayersContainerVertically(y:Number):void
+			{
+				var appHeight:Number = FlexGlobals.topLevelApplication.height;
+				if (y > appHeight)
+				{
+					opLayersContainer.y = mapLayersContainer.y + 1 - opLayersContainer.height;
+				}
+				else
+				{
+					opLayersContainer.y = mapLayersContainer.height - 1;
+				}
+			}
+			
+			private function basemapButtonBar_changeHandler(event:IndexChangeEvent):void
+			{
+				AppEvent.dispatch(AppEvent.BASEMAP_SWITCH, basemapList.getItemAt(event.newIndex).id);
+			}
+			
+			protected function opLayersContainer_creationCompleteHandler(event:FlexEvent):void
+			{
+				opLayersContainer.setStyle("backgroundColor", getStyle("contentBackgroundColor"));
+				opLayersContainer.setStyle("skinClass", FlexGlobals.topLevelApplication.getStyle("skinClass"));
+			}
+			
+			protected function opLayersContainer_clickHandler(event:MouseEvent):void
+			{
+				AppEvent.dispatch(AppEvent.TOC_HIDDEN); // always hide the toc layer menu
+			}
+			
+			
+			protected function baseMapsBox_creationCompleteHandler(event:FlexEvent):void
+			{
+				baseMapsBox.setStyle("backgroundColor", getStyle("contentBackgroundColor"));
+				baseMapsBox.x = basemapSelector.localToContent(new Point(basemapSelector.x,basemapSelector.y)).x;
+				//Alpha doesnt seem to have effect.
+				//opBox.setStyle("backgroundAlpha", FlexGlobals.topLevelApplication.getStyle("backgroundAlpha"));
+				baseMapsBox.setStyle("skinClass", FlexGlobals.topLevelApplication.getStyle("skinClass"));
+			}
+			
+			
+			protected function tbb_rollOverHandler(event:MouseEvent):void
+			{
+				baseMapsBox.visible = true;
+				basemapHideTimer.reset();
+			}
+			
+			private function basemapHideTimer_timerCompleteHandler(event:TimerEvent):void
+			{
+				baseMapsBox.visible = false;
+			}
+			
+			private function startBasemapHideTimer():void
+			{
+				basemapHideTimer.reset();
+				basemapHideTimer.start();
+			}
+
+			protected function baseMapsList_changeHandler(event:IndexChangeEvent):void
+			{
+				if(baseMapsList.selectedItem)
+				{
+					map.dispatchEvent(new AppEvent(AppEvent.BASEMAP_SWITCH,baseMapsList.selectedItem.id));
+				}
+			}
+
+
+			
+			private function startTimeListHideTimer():void
+			{
+				
+				timeListHideTimer.reset();
+				timeListHideTimer.start();
+				
+			}
+			
+			private function timeListHideTimer_timerCompleteHandler(event:TimerEvent):void
+			{
+				timeStampsContainer.visible = false;
+			}
+
+
+			protected function etapasSelector_rollOverHandler(event:MouseEvent):void
+			{
+				timeStampsContainer.visible = true;
+				timeListHideTimer.reset();
+			}
+
+
+			protected function timeStampsContainer_creationCompleteHandler(event:FlexEvent):void
+			{
+				timeStampsContainer.setStyle("backgroundColor", getStyle("contentBackgroundColor"));
+				timeStampsContainer.x = basemapSelector.localToContent(new Point(etapasSelector.x,etapasSelector.y)).x;
+				//Alpha doesnt seem to have effect.
+				//opBox.setStyle("backgroundAlpha", FlexGlobals.topLevelApplication.getStyle("backgroundAlpha"));
+				timeStampsContainer.setStyle("skinClass", FlexGlobals.topLevelApplication.getStyle("skinClass"));
+			}
+
+
+			protected function timeList_creationCompleteHandler(event:FlexEvent):void
+			{
+				timeList.addEventListener("uptateMapTime",timeList_updateMapTime);
+			}
+			
+			private function timeList_updateMapTime(event:AppEvent):void
+			{
+				var selectedTimes:Array = [];
+				
+				var time:ObjectProxy;
+				for each (time in provider)
+				{
+					var index:Number = provider.getItemIndex(time);
+					if(timeList.dataGroup.getElementAt(index) is TimeListItemRenderer)
+					{
+						if((timeList.dataGroup.getElementAt(index) as TimeListItemRenderer).chkIncluir.selected)
+						{
+							selectedTimes.push(time);
+						}
+					}
+				}
+				
+				var minStart:Date;
+				var maxEnd:Date;
+				var startString:Array;
+				var start:Date;
+				var endString:Array;
+				var end:Date;
+				var te:TimeExtent;
+				
+				if(selectedTimes.length == 0)
+				{
+					map.timeExtent = null;
+				}
+				
+				for each (time in selectedTimes)
+				{
+					startString = time.starttime.toString().split(";");
+					start = DateField.stringToDate(startString[0],startString[1]);
+					start.setTime(start.time - 18000000);
+					//1325394000000
+					//
+					endString = time.endtime.toString().split(";");
+					end = DateField.stringToDate(endString[0],endString[1]);
+					end.setTime(end.time - 18000001);
+					
+					if(!map.timeExtent)
+					{
+						te = new TimeExtent(start,end);
+						map.timeExtent = te;
+					}else
+					{
+						if(!minStart || minStart > start)
+						{
+							minStart = start;
+						}
+						if(!maxEnd || maxEnd < end)
+						{
+							maxEnd = end;
+						}
+						te = new TimeExtent(minStart,maxEnd);
+						map.timeExtent = te;
+					}
+						
+				}
+				
+			}
+
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+		<s:ArrayCollection id="provider" source="{timeExtent.timestamp.toArray()}"/>
+	</fx:Declarations>
+	
+	<s:HGroup id="mapLayersContainer" gap="9" width="100%" horizontalAlign="center">
+		<s:Button id="opLayerListButton"
+				  label="{opLayerListButtonLabel}"
+				  rollOut="startHideTimer()"
+				  rollOver="opLayerListButton_rollOverHandler(event)"
+				  visible="true"/>
+		<!--<s:ButtonBar id="basemapButtonBar"
+		change="basemapButtonBar_changeHandler(event)"
+		dataProvider="{basemapList}"
+		excludeFrom="noBasemaps"
+		labelField="label"
+		requireSelection="true"/>-->
+		<s:Button id="basemapSelector" 
+				  label="Mapa Base"
+				  rollOut="startBasemapHideTimer()"
+				  rollOver="tbb_rollOverHandler(event)"/>
+		
+		<s:Button id="etapasSelector" 
+				  label="Etapas"
+				  rollOut="startTimeListHideTimer()"
+				  rollOver="etapasSelector_rollOverHandler(event)"/>
+		
+	</s:HGroup>
+	
+	<s:BorderContainer id="baseMapsBox"
+					   y="{basemapSelector.height - 5}"
+					   
+					   creationComplete="baseMapsBox_creationCompleteHandler(event)"
+					   includeInLayout="false"
+					   rollOut="startBasemapHideTimer()"
+					   rollOver="basemapHideTimer.reset()"
+					   visible="false"
+					   cornerRadius="5"
+					   >
+		<s:BorderContainer left="5" top="5" bottom="5" right="5" 
+						   backgroundAlpha="0.5" 
+						   borderAlpha="0.8" cornerRadius="5" backgroundColor="{ViewerContainer.getInstance().getStyle('contentBackgroundColor')}">
+			<s:List dataProvider="{basemapList}" id="baseMapsList" 
+					top="5" bottom="5" left="5" right="5" 
+					maxHeight="250" 
+					minWidth="80"
+					requireSelection="true"
+					contentBackgroundColor="{ViewerContainer.getInstance().getStyle('contentBackgroundColor')}"
+					alternatingItemColors="{[ViewerContainer.getInstance().getStyle('contentBackgroundColor'),ViewerContainer.getInstance().getStyle('contentBackgroundColor')]}"
+					color="{ViewerContainer.getInstance().getStyle('color')}"
+					rollOverColor="{ViewerContainer.getInstance().getStyle('rollOverColor')}"
+					change="baseMapsList_changeHandler(event)"
+					>
+				
+			</s:List>
+		</s:BorderContainer>
+	</s:BorderContainer>
+	
+	<s:BorderContainer id="opLayersContainer"
+					   width="265" height="180"
+					   click="opLayersContainer_clickHandler(event)"
+					   creationComplete="opLayersContainer_creationCompleteHandler(event)"
+					   includeInLayout="false"
+					   rollOut="startHideTimer()"
+					   rollOver="hideTimer.reset()"
+					   visible="false">
+		<toc:TOC id="toc"
+				 left="2" right="2" top="3" bottom="3"
+				 contentBackgroundColor="{ViewerContainer.getInstance().getStyle('contentBackgroundColor')}"
+				 alternatingItemColors="{[ViewerContainer.getInstance().getStyle('contentBackgroundColor'),ViewerContainer.getInstance().getStyle('contentBackgroundColor')]}"
+				 color="{ViewerContainer.getInstance().getStyle('color')}"
+				 rollOverColor="{ViewerContainer.getInstance().getStyle('rollOverColor')}"/>
+		
+	</s:BorderContainer>
+	
+	<s:BorderContainer id="timeStampsContainer"
+					   y="{etapasSelector.height - 5}"
+					   width="155" height="150"
+					   includeInLayout="false"
+					   creationComplete="timeStampsContainer_creationCompleteHandler(event)"
+					   rollOut="startTimeListHideTimer()"
+					   rollOver="timeListHideTimer.reset()"
+					   visible="false">
+		<s:List id="timeList" dataProvider="{provider}" 
+				left="2" right="2" top="3" bottom="3"
+				contentBackgroundColor="{ViewerContainer.getInstance().getStyle('contentBackgroundColor')}"
+				alternatingItemColors="{[ViewerContainer.getInstance().getStyle('contentBackgroundColor'),ViewerContainer.getInstance().getStyle('contentBackgroundColor')]}"
+				color="{ViewerContainer.getInstance().getStyle('color')}"
+				rollOverColor="{ViewerContainer.getInstance().getStyle('rollOverColor')}"
+				selectionColor="{ViewerContainer.getInstance().getStyle('selectionColor')}"
+				itemRenderer="widgets.DANE.MultiplesMapas.TimeListItemRenderer"
+				creationComplete="timeList_creationCompleteHandler(event)"/>
+		
+	</s:BorderContainer>
+	
+	
+
+	
+</s:Group>

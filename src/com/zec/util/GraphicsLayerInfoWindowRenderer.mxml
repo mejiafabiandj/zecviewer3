@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 creationComplete="infoWindowContent_creationCompleteHandler(event)">
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.layers.supportClasses.Field;
+			import com.esri.viewer.AppEvent;
+			import com.esri.viewer.ViewerContainer;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.FlexEvent;
+			
+			private var _propiedades:Object;
+			
+			public function get propiedades():Object
+			{
+				return _propiedades;
+			}
+			
+			/**
+			 * objeto que contiene las propiedades fields de tipo <code>ArrayCollecction</code> y attributes de tipo <code>Object</code>
+			 **/
+			public function set propiedades(value:Object):void
+			{
+				provider = new ArrayCollection();
+				
+				_propiedades = value;
+				fields = value.fields;
+				attributes = value.attributes;
+				
+				fields = new ArrayCollection(fields.toArray().sortOn("alias"));
+				
+				for each(var field:Field in fields)
+				{
+					if(field.type != Field.TYPE_GUID && field.type != Field.TYPE_GEOMETRY && field.type != Field.TYPE_GLOBAL_ID && field.type != Field.TYPE_OID && field.type != Field.TYPE_RASTER)
+					{
+						provider.addItem({alias:field.alias,name:field.name,value:attributes[field.name]});
+					}
+				}
+			}
+			
+			[Bindable] private var fields:ArrayCollection;
+			
+			[Bindable] private var attributes:Object;
+			
+			[Bindable] private var provider:ArrayCollection;
+			
+			[Bindable] private var isRasterConsultable:Boolean = false;
+			
+			
+			
+			protected function infoWindowContent_creationCompleteHandler(event:FlexEvent):void
+			{
+				if(ViewerContainer.getInstance().widgetManager.configData.data)
+				{
+					if(ViewerContainer.getInstance().widgetManager.configData.data.consultaRaster && ViewerContainer.getInstance().widgetManager.configData.data.consultaRaster == true)
+					{
+						isRasterConsultable = ViewerContainer.getInstance().widgetManager.configData.data.consultaRaster;
+					}else
+					{
+						isRasterConsultable = false;
+					}
+				}
+			}
+			
+			/*/////////////////////////////////////////////////////////////////////////////////////*/
+			/*////////////////////////FUNCIONALIDADES DEL BANCO DE IMÁGENES////////////////////////*/
+			/*/////////////////////////////////////////////////////////////////////////////////////*/
+			
+			protected function btnOpcionesRaster_clickHandler(event:MouseEvent):void
+			{
+				AppEvent.dispatch(Constantes.MOSTRAR_CONFIGURACION_RASTER,true);
+			}
+			
+
+			protected function btnConsultarRaster_clickHandler(event:MouseEvent):void
+			{
+				if(propiedades.feature)
+				{
+					AppEvent.dispatch(Constantes.OPERACION_CONSULTAR_RASTER,propiedades.feature);
+				}
+			}
+
+
+			protected function lblComplementoRaster_clickHandler(event:MouseEvent):void
+			{
+				if(panelRaster.visible)
+				{
+					panelRaster.visible = false;
+					panelRaster.includeInLayout = false;
+				}else
+				{
+					panelRaster.visible = true;
+					panelRaster.includeInLayout = true;
+				}
+			}
+
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		
+	</fx:Declarations>
+	<s:VGroup width="100%" height="100%" horizontalAlign="center">
+		<mx:DataGrid id="infoContent" 
+					 width="100%" height="180" 
+					 wordWrap="true"
+					 variableRowHeight="true" 
+					 borderStyle="solid"
+					 selectionColor="{getStyle('rollOverColor')}"
+					 verticalGridLines="true"
+					 horizontalGridLines="true"
+					 verticalGridLineColor="{getStyle('contentBackgroundColor')}"
+					 horizontalGridLineColor="{getStyle('contentBackgroundColor')}"
+					 dataProvider="{provider}"
+					 minHeight="0"
+					 maxHeight="200"
+					 >
+			<mx:columns>
+				<mx:DataGridColumn headerText="Atributo" dataField="alias" width="200"/>
+				<mx:DataGridColumn headerText="Valor" dataField="value" width="150"/>
+			</mx:columns>
+		</mx:DataGrid>
+		
+		<s:Group width="100%" minHeight="0"
+				 includeInLayout="{isRasterConsultable}" 
+				 visible="{isRasterConsultable}">
+			<s:BorderContainer right="5" bottom="5" left="5" top="10" minHeight="10" 
+							   cornerRadius="5"
+							   backgroundAlpha="{getStyle('contentBackgroundAlpha')}"
+							   backgroundColor="{getStyle('contentBackgroundColor')}">
+				<s:Group id="panelRaster" left="5" top="5" bottom="5" right="5" minHeight="0"
+						 visible="false" includeInLayout="false">
+					<s:layout>
+						<s:HorizontalLayout horizontalAlign="center" verticalAlign="middle"/>
+					</s:layout>
+					
+					<mx:LinkButton id="btnConsultarRaster" label="Consultar" toolTip="Consulta la información raster disponible para la zona seleccionada"
+									   click="btnConsultarRaster_clickHandler(event)"/>
+					<mx:LinkButton id="btnOpcionesRaster" label="Opciones Avanzadas" toolTip="Configura las opciones avanzadas para la consulta geográfica a la información Raster"
+								   click="btnOpcionesRaster_clickHandler(event)"/>
+				</s:Group>
+			</s:BorderContainer>
+			<s:Label x="16" y="6" toolTip="Mostrar/Ocultar las herramientas para las consultas Raster" text="►Complemento Raster" fontWeight="bold" 
+					 backgroundAlpha="{getStyle('contentBackgroundAlpha')}"
+					 backgroundColor="{getStyle('contentBackgroundColor')}"
+					 id="lblComplementoRaster" useHandCursor="true" buttonMode="true" click="lblComplementoRaster_clickHandler(event)"/>
+		</s:Group>
+	</s:VGroup>
+</s:Group>

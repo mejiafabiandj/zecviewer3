@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 currentStateChange="group1_currentStateChangeHandler(event)" 
+		 xmlns:util="gov.dane.util.*" 
+		 xmlns:BusquedaOperativa="widgets.DANE.BusquedaOperativa.*"
+		 
+		 >
+	<fx:Metadata>
+		/**Eventodisparado cuando se realiza correctamente la seleccion de un criterio**/ 
+		[Event(name="aceptar", type="com.esri.viewer.AppEvent")]
+	</fx:Metadata>
+	<fx:Script>
+		<![CDATA[
+			import com.esri.viewer.AppEvent;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.StateChangeEvent;
+			import mx.utils.ObjectProxy;
+			
+			import spark.events.IndexChangeEvent;
+			
+			
+			
+			public const ACEPTAR:String = "aceptar";
+			
+			
+			[Bindable] public var providerCriterios:ArrayCollection = new ArrayCollection();
+			
+			[Bindable] private var providerJerarquias:ArrayCollection = new ArrayCollection();
+			
+			[Bindable] private var seleccionValida:Boolean = false;
+			
+			/**Define el objeto que generó el evento de abrir lista**/
+			public var target:Object;
+
+			protected function group1_currentStateChangeHandler(event:StateChangeEvent):void
+			{
+				validarSeleccion();
+			}
+			
+			protected function cmbCriterios_changeHandler(event:IndexChangeEvent):void
+			{
+				if(event.newIndex != -1)
+				{
+					if(cmbCriterios.selectedItem.campo is ArrayCollection)
+					{
+						currentState = "jerarquia";
+						
+						providerJerarquias.removeAll()
+						if(cmbCriterios.selectedItem.campo is ArrayCollection)
+						{
+							for each(var campo:ObjectProxy in cmbCriterios.selectedItem.campo)
+							{
+								if(campo.datos is ArrayCollection)
+								{
+									campo.datos = new ArrayCollection(campo.datos.toArray().sortOn("valor", Array.CASEINSENSITIVE));
+								}
+								
+								providerJerarquias.addItem(campo);
+							}
+							
+						}else if (cmbCriterios.selectedItem.campo)
+						{
+							if(cmbCriterios.selectedItem.campo.datos is ArrayCollection)
+							{
+								cmbCriterios.selectedItem.campo.datos = new ArrayCollection(cmbCriterios.selectedItem.campo.datos.toArray().sortOn("valor", Array.CASEINSENSITIVE));
+							}
+							providerJerarquias.addItem(cmbCriterios.selectedItem.campo);
+						}
+						
+						if(!cmbCriterios.selectedItem.valores)
+						{
+							Alert.show("No hay valores para llenar los criterios de la consulta: " +cmbCriterios.selectedItem.alias);
+							//return;
+						}else
+						{
+							var valores:Object = cmbCriterios.selectedItem.valores;
+							
+							var nombreCampo:String = cmbCriterios.selectedItem.campo[0].nombreCampo;
+							
+							if(valores[nombreCampo] is ArrayCollection)
+							{
+								cmbCriterios.selectedItem.campo[0].datos = valores[nombreCampo];
+							}else if(valores[nombreCampo])
+							{
+								cmbCriterios.selectedItem.campo[0].datos = new ArrayCollection([valores[nombreCampo]]);
+							}
+						}
+						
+					}else if(cmbCriterios.selectedItem.campo)
+					{
+						//poner los valores por defecto del estado Jerarquia
+						if(rowJerarquia)
+						{
+							for (var i:Number = rowJerarquia.length - 1 ; i >= 0 ; i--)
+							{
+								var r:RowSeleccionJerarquica = rowJerarquia[i];
+								r.item.datos = new ArrayCollection();
+							}
+							
+							providerJerarquias = new ArrayCollection();
+							
+						}
+						
+						var opciones:Array = [];
+						if(cmbCriterios.selectedItem.valores)
+						{
+							for each (var valor:ObjectProxy in cmbCriterios.selectedItem.valores[cmbCriterios.selectedItem.campo.nombreCampo])
+							{
+								opciones.push(valor.valor);
+							}
+						}
+						currentState = "autocompletar";
+						autocompletarTexto.opciones = opciones;
+					}else
+					{
+						dispatchEvent(new AppEvent(ACEPTAR,{accion:cmbCriterios.selectedItem,target:target}));
+					}
+				}else
+				{
+					currentState = "default";
+				}
+				
+				validarSeleccion();
+			}
+			
+			protected function rowJerarquia_seleccionCompletaHandler(event:AppEvent):void
+			{
+				validarSeleccion();
+			}
+			
+			private function validarSeleccion():void
+			{
+				if(currentState == "jerarquia")
+				{
+					if(rowJerarquia)
+					{
+						var itemsSeleccionadosOk:Boolean = true;
+						
+						for (var i:Number = rowJerarquia.length - 1 ; i >= 0 ; i--)
+						{
+							var r:RowSeleccionJerarquica = rowJerarquia[i];
+							if(!r.cmbJerarquias.selectedItem)
+							{
+								itemsSeleccionadosOk = false;
+								break;
+							}
+						}
+						
+						seleccionValida = itemsSeleccionadosOk;
+					}
+				}else if(currentState == "autocompletar")
+				{
+					autocompletarValidator.validate();
+				}else
+				{
+					seleccionValida = false;
+				}
+			}
+
+
+			protected function btnBuscar_clickHandler(event:MouseEvent):void
+			{
+				if(cmbCriterios.selectedItem)
+				{
+					var dt:Object = new Object();
+					
+					dt.criterio = cmbCriterios.selectedItem;
+					dt.rowJerarquia = cmbCriterios.selectedItem.campo is ArrayCollection? rowJerarquia: null;
+					dt.autocompletarTexto = autocompletarTexto? autocompletarTexto : null;
+					dt.target = target;
+					
+					dispatchEvent(new AppEvent(ACEPTAR,dt));
+				}
+			}
+
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<mx:StringValidator id="autocompletarValidator" source="{autocompletarTexto}" property="text" required="true"
+							triggerEvent="change"
+							valid="{seleccionValida = true}"
+							invalid="{seleccionValida = false}"
+							requiredFieldError="Debe ingresar un valor para realizar la consulta"
+							/>
+	</fx:Declarations>
+	
+	<s:states>
+		<s:State name="default"/>
+		<s:State name="jerarquia"/>
+		<s:State name="autocompletar"/>
+	</s:states>
+	
+	<s:BorderContainer left="5" right="5" top="5" cornerRadius="5" backgroundAlpha="0.9">
+		<s:layout>
+			<s:VerticalLayout horizontalAlign="center" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5"/>
+		</s:layout>
+		
+		<mx:Grid verticalAlign="middle" horizontalAlign="center" >
+			<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle">
+				<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+					<s:Label text="Buscar Por:"/>
+				</mx:GridItem>
+				<mx:GridItem verticalAlign="middle" width="100%">
+					<s:DropDownList id="cmbCriterios" width="100%"
+									dataProvider="{providerCriterios}"
+									labelField="alias"
+									prompt="Seleccione..."
+									change="cmbCriterios_changeHandler(event)"
+									minWidth="180">
+					</s:DropDownList>
+				</mx:GridItem>
+			</mx:GridRow>
+			
+			<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle" includeIn="autocompletar">
+				<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+					<s:Label text="Valor"/>
+				</mx:GridItem>
+				<mx:GridItem verticalAlign="middle" width="100%">
+					<util:AutocompletarTexto id="autocompletarTexto" width="100%" enter="{btnBuscar.dispatchEvent(new MouseEvent(MouseEvent.CLICK))}"/>
+				</mx:GridItem>
+			</mx:GridRow>
+		</mx:Grid>
+		<mx:Grid verticalAlign="middle" horizontalAlign="center" width="100%" includeIn="jerarquia">
+			<mx:Repeater id="rptrJerarquias" dataProvider="{providerJerarquias}" width="100%">
+				<BusquedaOperativa:RowSeleccionJerarquica id="rowJerarquia" 
+														  item="{rptrJerarquias.currentItem}"
+														  campos="{providerJerarquias}"
+														  currentIndex="{rptrJerarquias.currentIndex}"
+														  width="100%"
+														  seleccionCambiada="rowJerarquia_seleccionCompletaHandler(event)"/>
+			</mx:Repeater>
+		</mx:Grid>
+		<s:Button id="btnBuscar" label="Buscar" visible="{seleccionValida}" includeInLayout="{seleccionValida}"
+				  click="btnBuscar_clickHandler(event)"/>
+	</s:BorderContainer>
+</s:Group>

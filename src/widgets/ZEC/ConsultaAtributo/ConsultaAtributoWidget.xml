@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<configuration>
+	
+	<vigencias>
+		<vigencia 	label="Vigencia_2006" 
+					url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2006/MapServer" 
+					useAMF="true"
+					useproxy="false">
+			<niveles>
+				<nivel 	label="País" 
+						id="8"
+						pk="PAIS_CCDGO"
+						/>
+				<nivel 	label="Departamento" 
+						id="7"
+						pk="DPTO_CCDGO"
+						/>
+				<nivel 	label="Municipio" 
+						id="10"
+						pk="MPIO_CCNCTNDO"
+						/>
+				<nivel 	label="Sección Rural" 
+						id="13"
+						pk="SECR_CCNCTNDO"
+						/>
+				<nivel 	label="Sector Rural" 
+						id="12"
+						pk="SETR_CCNCTNDO"
+						/>
+				<nivel 	label="Cabecera Resto Rural" 
+						id="14"
+						pk="CLAS_CNCTNDO"
+						/>
+				<nivel 	label="Zonas Urbanas" 
+						id="18"
+						pk="CPOB_CCNCTNDO"
+						/>
+				<nivel 	label="Sección Urbana" 
+						id="17"
+						pk="SECU_CCNCTNDO"
+						/>
+				<nivel 	label="Sector Urbano" 
+						id="16"
+						pk="SETU_CCNCTNDO"
+						/>
+				<nivel 	label="Manzana" 
+						id="19"
+						pk="MANZ_CCNCTNDO"
+						/>
+			</niveles>
+		</vigencia>
+		<vigencia 	label="Vigencia_2005" 
+					url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2005/MapServer" 
+					useAMF="true"
+					useproxy="false">
+			<niveles>
+				<nivel 	label="País" 
+						id="8"
+						pk="PAIS_CCDGO"
+						/>
+				<nivel 	label="Departamento" 
+						id="7"
+						pk="DPTO_CCDGO"
+						/>
+				<nivel 	label="Municipio" 
+						id="10"
+						pk="MPIO_CCNCTNDO"
+						/>
+				<nivel 	label="Sección Rural" 
+						id="13"
+						pk="SECR_CCNCTNDO"
+						/>
+				<nivel 	label="Sector Rural" 
+						id="12"
+						pk="SETR_CCNCTNDO"
+						/>
+				<nivel 	label="Zonas Urbanas" 
+						id="18"
+						pk="CPOB_CCNCTNDO"
+						/>
+				<nivel 	label="Sección Urbana" 
+						id="17"
+						pk="SECU_CCNCTNDO"
+						/>
+				<nivel 	label="Sector Urbano" 
+						id="16"
+						pk="SETU_CCNCTNDO"
+						/>
+				<nivel 	label="Manzana" 
+						id="19"
+						pk="MANZ_CCNCTNDO"
+						/>
+			</niveles>
+		</vigencia>
+		<vigencia 	label="Vigencia_2008" 
+					url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2008/MapServer" 
+					useAMF="true"
+					useproxy="false">
+			<niveles>
+				<nivel 	label="País" 
+						id="8"
+						pk="PAIS_CCDGO"
+						/>
+				<nivel 	label="Departamento" 
+						id="7"
+						pk="DPTO_CCDGO"
+						/>
+				<nivel 	label="Municipio" 
+						id="10"
+						pk="MPIO_CCNCTNDO"
+						/>
+				<nivel 	label="Sección Rural" 
+						id="13"
+						pk="SECR_CCNCTNDO"
+						/>
+				<nivel 	label="Sector Rural" 
+						id="12"
+						pk="SETR_CCNCTNDO"
+						/>
+				<nivel 	label="Cabecera Resto Rural" 
+						id="14"
+						pk="CLAS_CNCTNDO"
+						/>
+				<nivel 	label="Zonas Urbanas" 
+						id="18"
+						pk="CPOB_CCNCTNDO"
+						/>
+				<nivel 	label="Sección Urbana" 
+						id="17"
+						pk="SECU_CCNCTNDO"
+						/>
+				<nivel 	label="Sector Urbano" 
+						id="16"
+						pk="SETU_CCNCTNDO"
+						/>
+				<nivel 	label="Manzana" 
+						id="19"
+						pk="MANZ_CCNCTNDO"
+						/>
+			</niveles>
+		</vigencia>
+		<vigencia 	label="Vigencia_2011" 
+					url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2006/MapServer" 
+					useAMF="true"
+					useproxy="false">
+			<niveles>
+				<nivel 	label="País" 
+						id="8"
+						pk="PAIS_CCDGO"
+						/>
+				<nivel 	label="Departamento" 
+						id="7"
+						pk="DPTO_CCDGO"
+						/>
+				<nivel 	label="Municipio" 
+						id="10"
+						pk="MPIO_CCNCTNDO"
+						/>
+				<nivel 	label="Sección Rural" 
+						id="13"
+						pk="SECR_CCNCTNDO"
+						/>
+				<nivel 	label="Sector Rural" 
+						id="12"
+						pk="SETR_CCNCTNDO"
+						/>
+				<nivel 	label="Cabecera Resto Rural" 
+						id="14"
+						pk="CLAS_CNCTNDO"
+						/>
+				<nivel 	label="Zonas Urbanas" 
+						id="18"
+						pk="CPOB_CCNCTNDO"
+						/>
+				<nivel 	label="Sección Urbana" 
+						id="17"
+						pk="SECU_CCNCTNDO"
+						/>
+				<nivel 	label="Sector Urbano" 
+						id="16"
+						pk="SETU_CCNCTNDO"
+						/>
+				<nivel 	label="Manzana" 
+						id="19"
+						pk="MANZ_CCNCTNDO"
+						/>
+			</niveles>
+		</vigencia>
+	</vigencias>
+</configuration>

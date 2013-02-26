@@ -1,0 +1,1006 @@
+<?xml version="1.0" encoding="utf-8"?>
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" 
+				   xmlns:viewer="com.esri.viewer.*" 
+				   layout="absolute"
+				   widgetConfigLoaded="basewidget1_widgetConfigLoadedHandler(event)"
+				   creationComplete="basewidget1_creationCompleteHandler(event)" xmlns:esri="http://www.esri.com/2008/ags" xmlns:layers="com.esri.ags.layers.*">
+	
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.FeatureSet;
+			import com.esri.ags.Graphic;
+			import com.esri.ags.events.FeatureLayerEvent;
+			import com.esri.ags.events.GraphicEvent;
+			import com.esri.ags.events.LayerEvent;
+			import com.esri.ags.geometry.Geometry;
+			import com.esri.ags.geometry.MapPoint;
+			import com.esri.ags.layers.FeatureLayer;
+			import com.esri.ags.layers.Layer;
+			import com.esri.ags.layers.supportClasses.Field;
+			import com.esri.ags.renderers.Renderer;
+			import com.esri.ags.symbols.SimpleFillSymbol;
+			import com.esri.ags.symbols.SimpleLineSymbol;
+			import com.esri.ags.symbols.Symbol;
+			import com.esri.ags.tasks.QueryTask;
+			import com.esri.ags.tasks.supportClasses.Query;
+			import com.esri.ags.utils.JSON;
+			import com.esri.viewer.AppEvent;
+			import com.esri.viewer.ViewerContainer;
+			
+			import gov.dane.util.GraphicsLayerInfoWindowRenderer;
+			import gov.dane.util.TokenUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.core.FlexGlobals;
+			import mx.events.FlexEvent;
+			import mx.formatters.NumberBaseRoundType;
+			import mx.formatters.NumberFormatter;
+			import mx.managers.PopUpManager;
+			import mx.rpc.AsyncResponder;
+			import mx.rpc.Fault;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.utils.HSBColor;
+			import mx.utils.ObjectProxy;
+			
+			import org.vanrijkom.dbf.DbfField;
+			import org.vanrijkom.dbf.DbfHeader;
+			import org.vanrijkom.dbf.DbfRecord;
+			import org.vanrijkom.dbf.DbfTools;
+			
+			import spark.events.IndexChangeEvent;
+			import spark.events.TextOperationEvent;
+			
+			
+			private static const radioTierra:Number = 6378137;
+			private static const diametroTierra:Number = 2 * Math.PI * radioTierra;
+			private static const metrosPorGrado:Number = 1/3600 * diametroTierra / 360;
+			private static const gradosPorMetro:Number = 1/3600 / metrosPorGrado;
+			
+			
+			[Bindable] private var providerCmbNivel:ArrayCollection = new ArrayCollection();
+			
+			[Bindable] private var providerCmbAtributos:ArrayCollection = new ArrayCollection();
+			
+			[Bindable] private var providerAtributosArchivo:ArrayCollection = new ArrayCollection();
+			
+			[Bindable] private var configurado:Boolean = false;
+			
+			[Bindable] private var datosJoin:ArrayCollection;
+			
+			[Bindable] private var clasesJoin:ArrayCollection = new ArrayCollection();
+			
+			[Bindable] private var paso:Number = 1;
+			
+			/**
+			 * Define si el panel que contiene el mensaje de información es visible o no
+			 */
+			[Bindable] private var msgVisible:Boolean = false;
+			
+			
+			private var escalaMinima:Number = 5000000;
+			
+			private var escalaMaxima:Number = 10000;
+			
+			
+			private var fileReference:FileReference;
+			
+			private var dbfByteArray:ByteArray;
+			private var dbfHeader:DbfHeader
+			
+			private var selectedVigencia:Object;
+			
+			
+			private var configuracionClasificacion:ConfiguracionClasificacion;
+			
+			
+			protected function basewidget1_creationCompleteHandler(event:FlexEvent):void
+			{
+				AppEvent.addListener(AppEvent.BASEMAP_SWITCH, basemapMenuClicked);
+				AppEvent.addListener("leyendaJoinChanged", leyendaActualizada);
+			}
+			
+			protected function basewidget1_widgetConfigLoadedHandler(event:Event = null):void
+			{
+				if(configObject)
+				{
+					providerCmbNivel.removeAll();
+					
+					for each(var vigencia:Object in configObject.configuration.vigencias.vigencia)
+					{
+						if(vigencia.label == selectedBasemap())
+						{
+							selectedVigencia = vigencia;
+							
+							if(vigencia.niveles.nivel is ArrayCollection)
+							{
+								providerCmbNivel.addAll(vigencia.niveles.nivel);
+							}else
+							{
+								providerCmbNivel.addItem(vigencia.niveles.nivel);
+							}
+							
+							cmbNivel.selectedIndex = -1;
+							cmbNivel.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-1,-1));
+							break;
+						}
+					}
+				}
+			}
+			
+			/**
+			 * Evento resultado de el cambio del mapa base
+			 **/
+			private function basemapMenuClicked(event:AppEvent):void
+			{
+				if(configurado && btnEliminarClasificacion)
+				{
+					btnEliminarClasificacion.dispatchEvent(new MouseEvent(MouseEvent.CLICK));
+				}
+				basewidget1_widgetConfigLoadedHandler();
+			}
+			
+			/**
+			 * Retorna el nombre del mapa base que se encuentra activo
+			 **/
+			public function selectedBasemap():String
+			{
+				var selectedBasemap:String = "default";
+				
+				for each(var layer:Layer in map.layers)
+				{
+					for each(var basemap:Object in configData.basemaps)
+					{
+						if(layer.id == basemap.label)
+						{
+							if(layer.visible)
+							{
+								selectedBasemap = layer.id;
+							}
+						}
+					}
+				}
+				return selectedBasemap;
+			}
+			
+			
+			/**
+			 * Muestra un mensaje que puede indicar el estado de un proceso o un error
+			 * @param msg mensaje que se va a mostrar. <b>String</b>
+			 * @param swfVisible especifica si se va a mostrar la animación swf (ocupado). <b>Boolean</b> 
+			 */
+			private function showMessage(msg:String, swfVisible:Boolean):void
+			{
+				txtMessage.htmlText = msg;
+				swfMessage.visible = swfVisible;
+				msgVisible = true;
+			}
+			
+			/**
+			 * Oculta el panel que contiene el mensaje de información junto con la animación
+			 */
+			private function clearMessage():void
+			{
+				msgVisible = false;
+			}
+			
+			
+			
+			
+			protected function cmbNivel_changeHandler(event:IndexChangeEvent):void
+			{
+				if(cmbAtributo)
+				{
+					cmbAtributo.selectedIndex = -1;
+					cmbAtributo.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-1,-1));
+				}
+				
+				if(cmbNivel.selectedItem && cmbNivel.selectedItem.id)
+				{
+					paso = 2;
+					
+					var url:String = "";
+					for each(var nivel:ObjectProxy in selectedVigencia.niveles.nivel)
+					{
+						if(nivel.id == cmbNivel.selectedItem.id)
+						{
+							url += selectedVigencia.url + "/" + nivel.id;
+							break;
+						}
+					}
+					
+					if(url)
+					{
+						servicio.resultFormat = "text";
+						servicio.url = url;
+						servicio.send({f:"pjson",op:"informacionCapa",token:TokenUtil.buscarToken(servicio.url)});
+					}
+				}
+			}
+			
+			
+			protected function servicio_resultHandler(event:ResultEvent):void
+			{
+				if(event.token.message.body.op == "informacionCapa")
+				{
+					if(event.result)
+					{
+						var result:Object = com.esri.ags.utils.JSON.decode(event.result.toString());
+						
+						if(result.fields)
+						{
+							providerCmbAtributos.removeAll();
+							
+							for each(var field:Object in result.fields)
+							{
+								if(field.type != Field.TYPE_GLOBAL_ID &&
+									field.type != Field.TYPE_GUID &&
+									field.type != Field.TYPE_OID &&
+									field.type != Field.TYPE_RASTER &&
+									field.type != Field.TYPE_GEOMETRY )
+								{
+									var f:Field = new Field();
+									f.alias = field.alias;
+									f.name = field.name;
+									f.type = field.type;
+									f.domain = field.domain;
+									f.length = field.length;
+									providerCmbAtributos.addItem(f);
+								}
+								
+							}
+						}
+						if(result.maxScale)
+						{
+							escalaMaxima = result.maxScale; 
+						}
+						if(result.minScale)
+						{
+							escalaMinima = result.minScale;
+						}
+					}
+				}
+				
+			}
+			
+			
+			protected function servicio_faultHandler(event:FaultEvent):void
+			{
+				if(event.token.message.body.op == "informacionCapa")
+				{
+					showError("No fué posible encontrar los campos de la capa seleccionada.\n\n\n" + event.message);
+				}
+			}
+			
+			
+			protected function cmbAtributo_changeHandler(event:IndexChangeEvent):void
+			{
+				if(txtArchivo)
+				{
+					txtArchivo.text = "Examinar...";
+					txtArchivo.dispatchEvent(new TextOperationEvent(TextOperationEvent.CHANGE));
+				}
+				if(cmbAtributo.selectedItem)
+				{
+					paso = 3;
+				}
+			}
+			
+			protected function txtArchivo_changeHandler(event:TextOperationEvent):void
+			{
+				if(cmbAtributoArchivo)
+				{
+					cmbAtributoArchivo.selectedIndex = -1;
+					cmbAtributoArchivo.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-1,-1));
+				}
+			}
+			
+			protected function cmbAtributoArchivo_changeHandler(event:IndexChangeEvent):void
+			{
+				if(cmbAtributoArchivo.selectedItem)
+				{
+					paso = 5;
+				}
+				if(cmbCriterio)
+				{
+					cmbCriterio.selectedIndex = -1;
+					cmbCriterio.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-1,-1));
+				}
+			}
+			
+			protected function cmbCriterio_changeHandler(event:IndexChangeEvent):void
+			{
+				if(cmbCriterio.selectedItem)
+				{
+					paso = 6;
+					
+					var tipoVariable:String = String.fromCharCode(cmbCriterio.selectedItem.type);
+					
+					if(tipoVariable.toUpperCase() == "C" ||
+						tipoVariable.toUpperCase() == "D" ||
+						tipoVariable.toUpperCase() == "T" ||
+						tipoVariable.toUpperCase() == "@")
+					{
+						tipoVariable = ConfiguracionClasificacion.TIPO_VARIABLE_DISCRETO;
+					}else
+					{
+						tipoVariable = ConfiguracionClasificacion.TIPO_VARIABLE_CONTINUO;
+					}
+					
+					ConfiguracionClasificacion.tipoVariable = tipoVariable;
+				}
+			}
+			
+			
+			
+			private function examinar():void
+			{
+				fileReference = new FileReference();
+				fileReference.addEventListener(Event.SELECT,selectHandler);
+				
+				fileReference.addEventListener(ProgressEvent.PROGRESS,progressHandler);
+				fileReference.browse([new FileFilter("Archivo dBase (DBF)", "*.dbf")]);
+			}
+			
+			
+			private function selectHandler(event:Event):void
+			{
+				fileReference.addEventListener(Event.COMPLETE,completeHandler);
+				fileReference.addEventListener(IOErrorEvent.IO_ERROR,IOErrorHandler);
+				fileReference.load();
+				showMessage("Cargando: " + event.currentTarget.name, true); 
+				txtArchivo.text = event.currentTarget.name;
+			}
+			
+			
+			private function progressHandler(event:ProgressEvent):void
+			{
+				var nf:NumberFormatter = new NumberFormatter();
+				nf.precision = 2;
+				nf.rounding = NumberBaseRoundType.NEAREST;
+				
+				showMessage("Cargando: " + event.currentTarget.name + " (" + nf.format(event.bytesLoaded/event.bytesTotal*100) + ")%" , true); 
+			}
+			
+			
+			private function IOErrorHandler(event:IOErrorEvent):void
+			{
+				showMessage("Error: " + event.text, false);
+				txtArchivo.text = "Examinar...";
+			}
+			
+			
+			private function completeHandler(event:Event):void
+			{
+				if(!cmbAtributoArchivo.selectedItem)
+				{
+					paso = 4;
+				}
+				
+				clearMessage();
+				
+				dbfByteArray = event.currentTarget.data;
+				
+				if (dbfByteArray && dbfByteArray.length > 0)
+				{
+					buscarCampos();
+				}
+			}
+			
+			
+			private function buscarCampos():void
+			{
+				dbfHeader = new DbfHeader(dbfByteArray);
+				var dbfRecord:DbfRecord;
+				
+				providerAtributosArchivo.removeAll();
+				providerAtributosArchivo.addAll(new ArrayCollection(dbfHeader.fields));
+			}
+			
+			
+			protected function btnConfiguraClasificacion_clickHandler(event:MouseEvent):void
+			{
+				if(configuracionClasificacion)
+				{
+					PopUpManager.removePopUp(configuracionClasificacion);
+				}else
+				{					
+					configuracionClasificacion = new ConfiguracionClasificacion();
+				}
+				
+				configuracionClasificacion.critero = cmbCriterio.labelDisplay.text;
+				configuracionClasificacion.llave = cmbAtributoArchivo.labelDisplay.text;
+				configuracionClasificacion.dbfByteArray = dbfByteArray;
+				configuracionClasificacion.dbfHeader = dbfHeader;
+				
+				configuracionClasificacion.escalaMaxima = escalaMaxima;
+				configuracionClasificacion.escalaMinima = escalaMinima;
+				
+				if(configObject.configuration.generalizacion && configObject.configuration.generalizacion.nivel && configObject.configuration.generalizacion.nivel is ArrayCollection)
+				{
+					configuracionClasificacion.nivelesGeneralizacion = configObject.configuration.generalizacion.nivel;
+					configuracionClasificacion.nivelGeneralizacion = cmbNivel.selectedItem.generalizacion;
+				}
+				
+				configuracionClasificacion.addEventListener(ConfiguracionClasificacion.CLASIFICADO,
+					function(e:AppEvent):void
+					{
+						configurado = true;
+						paso = 6;
+						
+						datosJoin = e.data.datos;
+						
+						clasesJoin.removeAll();
+						clasesJoin.addAll(e.data.clases);
+						
+						cargarServicio(e.data.defaultSymbol);
+						
+						escalaMaxima = configuracionClasificacion.escalaMaxima;
+						escalaMinima = configuracionClasificacion.escalaMinima;
+					});
+				
+				PopUpManager.addPopUp(configuracionClasificacion,Sprite(FlexGlobals.topLevelApplication),true);
+				PopUpManager.centerPopUp(configuracionClasificacion);
+			}
+
+			
+			private function cargarServicio(defaultSymbol:Symbol):void
+			{
+				var url:String = "";
+				var useAMF:Boolean;
+				for each(var nivel:ObjectProxy in selectedVigencia.niveles.nivel)
+				{
+					if(nivel.id == cmbNivel.selectedItem.id)
+					{
+						url += selectedVigencia.url + "/" + nivel.id;
+						useAMF = selectedVigencia.useAMF;
+						break;
+					}
+				}
+				
+				if(url)
+				{
+					var featureLayer:FeatureLayer = new FeatureLayer(url,selectedVigencia.useproxy ? configData.proxyUrl :null,TokenUtil.buscarToken(url));
+				 	
+					featureLayer.addEventListener(LayerEvent.LOAD,featureLayerLoad);
+					featureLayer.addEventListener(FeatureLayerEvent.QUERY_FEATURES_COMPLETE,featureLayer_queryFeaturesCompleteHandler);
+					featureLayer.addEventListener(LayerEvent.UPDATE_END,featureLayer_updateEndHandler);
+					featureLayer.addEventListener(LayerEvent.UPDATE_START,featureLayer_updateStartHandler);
+					featureLayer.addEventListener(GraphicEvent.GRAPHIC_ADD,featureLayer_graphicAddHandler);
+					
+					featureLayer.outFields = [cmbAtributo.selectedItem.name];
+					
+					featureLayer.name = "Información Temática";
+					featureLayer.id = "Información Temática";
+					
+					featureLayer.maxScale = escalaMaxima;
+					featureLayer.minScale = escalaMinima;
+					
+					featureLayer.symbol = defaultSymbol;
+					
+					if(map.getLayer("Información Temática"))
+					{
+						map.removeLayer(map.getLayer("Información Temática"));
+					}
+					
+					map.addLayer(featureLayer);
+					
+					
+					//acercar al primer registro del dbf
+					var query:Query = new Query();
+					var queryTask:QueryTask = new QueryTask(url);
+					
+					query.outSpatialReference = map.spatialReference;
+					query.returnGeometry = true;
+					
+					var sep:String = cmbAtributo.selectedItem.type == Field.TYPE_STRING ? "'" : "";
+					
+					query.where = cmbAtributo.selectedItem.name + " = " + sep + datosJoin[0].llave + sep;
+					
+					var centroX:Number = map.extent.center.x;
+					var centroY:Number = map.extent.center.y;
+					query.maxAllowableOffset = (centroX >= -180 && centroX <= 180 && centroY >= -90 && centroY <= 90) ? gradosPorMetro * ConfiguracionClasificacion.generalizacion : ConfiguracionClasificacion.generalizacion;
+					
+					queryTask.proxyURL = (selectedVigencia.useproxy ? configData.proxyUrl :null);
+					queryTask.useAMF = queryTask.proxyURL? false: useAMF;
+					queryTask.token = TokenUtil.buscarToken(queryTask.url,configData);
+					
+					queryTask.showBusyCursor = true;
+					queryTask.execute(query,
+						new AsyncResponder(
+						function result(featureSet:FeatureSet,token:Object = null):void
+						{
+							if(featureSet.features.length > 0)
+							{
+								if((featureSet.features[0] as Graphic).geometry.type != Geometry.MAPPOINT && (featureSet.features[0] as Graphic).geometry.type != Geometry.MULTIPOINT)
+								{
+									map.centerAt( (featureSet.features[0] as Graphic).geometry.extent.center );
+								}else
+								{
+									map.centerAt( (featureSet.features[0] as Graphic).geometry as MapPoint );
+								}
+								
+								map.scale = escalaMaxima;
+								map.zoomOut();
+							}
+						},
+						function fault(f:Fault,token:Object = null):void
+						{
+							trace("ERROR: No fué posible realizar el acercamiento al finalizar el JOIN:\n\n" + f.message);
+						})
+					);
+					
+				}
+			}
+
+			private function featureLayerLoad(event:LayerEvent):void
+			{
+				//Se evalua si el mapa base se encuentra en coordenadas planas o geográficas.
+				var centroX:Number = map.extent.center.x;
+				var centroY:Number = map.extent.center.y;
+				
+				//Coordenadas geográficas
+				if(centroX >= -180 && centroX <= 180 && centroY >= -90 && centroY <= 90)
+				{
+					(event.layer as FeatureLayer).maxAllowableOffset = gradosPorMetro * ConfiguracionClasificacion.generalizacion;
+				}
+				//Coordenadas planas
+				else
+				{
+					(event.layer as FeatureLayer).maxAllowableOffset = ConfiguracionClasificacion.generalizacion;
+				}
+				
+			}
+			
+
+
+			protected function featureLayer_queryFeaturesCompleteHandler(event:FeatureLayerEvent):void
+			{
+				// TODO Auto-generated method stub
+			}
+
+
+			protected function featureLayer_graphicAddHandler(event:GraphicEvent):void
+			{
+				/*
+				var classFactory:ClassFactory = new ClassFactory(GraphicsLayerInfoWindowRenderer);
+				classFactory.properties = {propiedades:{fields:providerCmbAtributos,attributes:event.graphic.attributes, feature:event.graphic}};
+				event.graphic.infoWindowRenderer = classFactory;
+				*/
+				
+				event.graphic.toolTip = cmbCriterio.selectedItem.name + ": Sin información";
+				
+				if(event.graphic.attributes && cmbAtributo.selectedItem.name && event.graphic.attributes[cmbAtributo.selectedItem.name])
+				{
+					for each(var dato:ObjectProxy in datosJoin)
+					{
+						if(dato.llave == event.graphic.attributes[cmbAtributo.selectedItem.name])
+						{
+							event.graphic.attributes[cmbCriterio.selectedItem.name] = dato.valor;
+							
+							if((ConfiguracionClasificacion.tipoVariable == ConfiguracionClasificacion.TIPO_VARIABLE_CONTINUO ||
+								ConfiguracionClasificacion.tipoVariable == ConfiguracionClasificacion.TIPO_VARIABLE_CONTINUO_VALORES_UNICOS) &&
+								Number(dato.valor))
+							{
+								event.graphic.toolTip = cmbCriterio.selectedItem.name + ": " + Number(dato.valor);
+							}else
+							{
+								event.graphic.toolTip = cmbCriterio.selectedItem.name + ": " + dato.valor;
+							}
+							
+							var clase:ObjectProxy;
+							
+							switch(ConfiguracionClasificacion.tipoVariable)
+							{
+								case ConfiguracionClasificacion.TIPO_VARIABLE_CONTINUO:
+								{
+									for each (clase in clasesJoin)
+									{
+										if(clase.min <= dato.valor && clase.max >= dato.valor)
+										{
+											event.graphic.symbol =  
+												new SimpleFillSymbol(
+													SimpleFillSymbol.STYLE_SOLID,
+													clase.color,
+													0.5,
+													new SimpleLineSymbol(
+														SimpleLineSymbol.STYLE_SOLID,
+														clase.color,
+														1,
+														3
+													)
+												);
+											break;
+										}
+									}
+								}break;
+								case ConfiguracionClasificacion.TIPO_VARIABLE_DISCRETO:
+								{
+									for each (clase in clasesJoin)
+									{
+										if(clase.valor == dato.valor)
+										{
+											event.graphic.symbol =  
+												new SimpleFillSymbol(
+													SimpleFillSymbol.STYLE_SOLID,
+													clase.color,
+													0.5,
+													new SimpleLineSymbol(
+														SimpleLineSymbol.STYLE_SOLID,
+														clase.color,
+														1,
+														3
+													)
+												);
+											break;
+										}
+									}
+								}break;
+								case ConfiguracionClasificacion.TIPO_VARIABLE_CONTINUO_VALORES_UNICOS:
+								{
+									for each (clase in clasesJoin)
+									{
+										if(clase.valor == dato.valor)
+										{
+											event.graphic.symbol =  
+												new SimpleFillSymbol(
+													SimpleFillSymbol.STYLE_SOLID,
+													clase.color,
+													0.5,
+													new SimpleLineSymbol(
+														SimpleLineSymbol.STYLE_SOLID,
+														clase.color,
+														1,
+														3
+													)
+												);
+											break;
+										}
+									}
+								}break;
+							}
+							
+							break;
+						}
+					}
+				}
+			}
+
+			protected function featureLayer_updateEndHandler(event:LayerEvent):void
+			{
+				clearMessage();
+			}
+
+			protected function featureLayer_updateStartHandler(event:LayerEvent):void
+			{
+				showMessage("Actualizando",true);
+			}
+
+			
+			protected function btnEliminarClasificacion_clickHandler(event:MouseEvent):void
+			{
+				configurado = false;
+				paso = 6;
+				map.removeLayer(map.getLayer("Información Temática"));
+				
+				if(configuracionClasificacion.btnEliminarTodos)
+				{
+					configuracionClasificacion.btnEliminarTodos.dispatchEvent(new MouseEvent(MouseEvent.CLICK));
+				}
+			}
+
+			private function leyendaActualizada(event:AppEvent):void
+			{
+				if(map.getLayer("Información Temática"))
+				{
+					(map.getLayer("Información Temática") as FeatureLayer).refresh();
+				}
+			}
+			
+			/**
+			protected function btnClasificar_clickHandler(event:MouseEvent):void
+			{
+				showMessage("Clasificando",true);
+				
+				
+				if(configuracionClasificacion)
+				{
+					PopUpManager.removePopUp(configuracionClasificacion);
+				}else
+				{					
+					configuracionClasificacion = new ConfiguracionClasificacion();
+				}
+				
+				
+				configuracionClasificacion.critero = cmbCriterio.labelDisplay.text;
+				configuracionClasificacion.llave = cmbAtributoArchivo.labelDisplay.text;
+				configuracionClasificacion.dbfByteArray = dbfByteArray;
+				configuracionClasificacion.dbfHeader = dbfHeader;
+				
+				configuracionClasificacion.escalaMaxima = escalaMaxima;
+				configuracionClasificacion.escalaMinima = escalaMinima;
+				
+				if(configObject.configuration.generalizacion && configObject.configuration.generalizacion.nivel && configObject.configuration.generalizacion.nivel is ArrayCollection)
+				{
+					configuracionClasificacion.nivelesGeneralizacion = configObject.configuration.generalizacion.nivel;
+					configuracionClasificacion.nivelGeneralizacion = cmbNivel.selectedItem.generalizacion;
+				}
+				
+				
+				configuracionClasificacion.addEventListener(ConfiguracionClasificacion.VALORES_UNICOS_LEIDOS,
+					function(e:AppEvent):void
+					{
+						if(ConfiguracionClasificacion.tipoVariable == ConfiguracionClasificacion.TIPO_VARIABLE_DISCRETO)
+						{
+							if(configuracionClasificacion.btnAdicionarTodos)
+							{
+								configurarPorDefecto(e.data as ArrayCollection);
+							}else
+							{
+								configuracionClasificacion.addEventListener(ConfiguracionClasificacion.BTN_ADICIONAR_TODOS_CREATION_COMPLETE,
+									function():void{configurarPorDefecto(e.data as ArrayCollection)});
+							}
+						}else if(ConfiguracionClasificacion.tipoVariable == ConfiguracionClasificacion.TIPO_VARIABLE_CONTINUO)
+						{
+							if(configuracionClasificacion.cmbMetodos)
+							{
+								configurarPorDefecto(e.data as ArrayCollection);
+							}else
+							{
+								configuracionClasificacion.addEventListener(ConfiguracionClasificacion.CMB_METODOS_CREATION_COMPLETE,
+									function():void{configurarPorDefecto(e.data as ArrayCollection)});
+							}
+						}
+					});
+				
+				
+				
+				
+				configuracionClasificacion.addEventListener(ConfiguracionClasificacion.CLASIFICADO,
+					function(e:AppEvent):void
+					{
+						configurado = true;
+						paso = 6;
+						
+						datosJoin = e.data.datos;
+						
+						clasesJoin.removeAll();
+						clasesJoin.addAll(e.data.clases);
+						
+						cargarServicio(e.data.defaultSymbol);
+						
+						escalaMaxima = configuracionClasificacion.escalaMaxima;
+						escalaMinima = configuracionClasificacion.escalaMinima;
+						
+						clearMessage();
+					});
+				
+				configuracionClasificacion.x = 0;
+				configuracionClasificacion.y = 0;
+				
+				PopUpManager.addPopUp(configuracionClasificacion,Sprite(FlexGlobals.topLevelApplication),false);
+				
+				
+			}
+			
+			private function configurarPorDefecto(datos:ArrayCollection):void
+			{
+				configuracionClasificacion.addEventListener(ConfiguracionClasificacion.CLASES_ADICIONADAS,
+					function():void
+					{
+						clasificarPorDefecto();
+					});
+				
+				
+				if(ConfiguracionClasificacion.tipoVariable == ConfiguracionClasificacion.TIPO_VARIABLE_DISCRETO)
+				{
+					configuracionClasificacion.btnAdicionarTodos.dispatchEvent(new MouseEvent(MouseEvent.CLICK));
+				}
+				else if(ConfiguracionClasificacion.tipoVariable == ConfiguracionClasificacion.TIPO_VARIABLE_CONTINUO)
+				{
+					if(datos.length <= 15)
+					{
+						configuracionClasificacion.cmbMetodos.selectedIndex = 0;
+						configuracionClasificacion.cmbMetodos.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-1,0));
+						
+						if(configuracionClasificacion.btnAdicionarTodos)
+						{
+							configuracionClasificacion.btnAdicionarTodos.dispatchEvent(new MouseEvent(MouseEvent.CLICK));
+						}
+						else
+						{
+							configuracionClasificacion.addEventListener(ConfiguracionClasificacion.BTN_ADICIONAR_TODOS_CREATION_COMPLETE,
+								function():void
+								{
+									configuracionClasificacion.btnAdicionarTodos.dispatchEvent(new MouseEvent(MouseEvent.CLICK));
+								});
+						}
+					}
+					else
+					{
+						configuracionClasificacion.cmbMetodos.selectedIndex = 1;
+						configuracionClasificacion.cmbMetodos.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-1,1));
+						
+						
+					}
+				}
+				
+			}
+			
+			private function clasificarPorDefecto():void
+			{
+				var provider:ArrayCollection = configuracionClasificacion.providerClases;
+				var ct:ColorTransform = new ColorTransform(1,1,1,1,Math.random()* 0xFF, Math.random()* 0xFF, Math.random()* 0xFF);
+				var hue:Number = HSBColor.convertRGBtoHSB( ct.color ).hue;
+				var intervalos:Number = provider.length;
+				var i:Number;
+				
+				for (i = 0 ; i < intervalos ; i++)
+				{
+					var hsbColor:HSBColor = new HSBColor(hue, (i+1) * (1) / (intervalos) , 1);
+					var color:uint = HSBColor.convertHSBtoRGB(hsbColor.hue,hsbColor.saturation,hsbColor.brightness);
+					var elemento:ObjectProxy = provider.getItemAt(i) as ObjectProxy;
+					
+					elemento.color = color;
+				}
+				
+				configuracionClasificacion.btnAceptar.dispatchEvent(new MouseEvent(MouseEvent.CLICK));
+			}
+			 */
+				
+
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<s:HTTPService id="servicio" showBusyCursor="true" 
+					   result="servicio_resultHandler(event)"
+					   fault="servicio_faultHandler(event)"
+					   method="POST"
+					   />
+		<!--layers:FeatureLayer id="featureLayer" load="featureLayerLoad(event)" 
+							 queryFeaturesComplete="featureLayer_queryFeaturesCompleteHandler(event)"
+							 updateEnd="featureLayer_updateEndHandler(event)"
+							 updateStart="featureLayer_updateStartHandler(event)"
+							 graphicAdd="featureLayer_graphicAddHandler(event)"/-->
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	
+	
+	<viewer:WidgetTemplate id="wTemplate" 
+						   width="450" height="{paso*30 + 100}">
+		<s:BorderContainer cornerRadius="5" top="15" bottom="0" right="0" left="0" backgroundAlpha="0" 
+						   minHeight="50"
+						   >
+			<s:VGroup horizontalCenter="0" verticalCenter="0" verticalAlign="middle" horizontalAlign="center" left="5" top="5" right="5" bottom="5"
+					  >
+				<mx:Grid verticalAlign="middle" horizontalAlign="center" width="100%" 
+						 visible="{!configurado}" includeInLayout="{!configurado}">
+					<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle">
+						<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+							<s:Label text="Nivel de Información"/>
+						</mx:GridItem>
+						<mx:GridItem verticalAlign="middle" width="100%">
+							<s:DropDownList id="cmbNivel" width="100%" 
+											dataProvider="{providerCmbNivel}"
+											prompt="Seleccione..."
+											change="cmbNivel_changeHandler(event)"/>
+						</mx:GridItem>
+					</mx:GridRow>
+					<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle"
+								includeInLayout="{cmbNivel.selectedItem}"
+								visible="{cmbNivel.selectedItem}">
+						<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+							<s:Label text="Atributo de enlace"/>
+						</mx:GridItem>
+						<mx:GridItem verticalAlign="middle" width="100%">
+							<s:DropDownList id="cmbAtributo" width="100%" 
+											dataProvider="{providerCmbAtributos}"
+											prompt="Seleccione..."
+											labelField="alias"
+											change="cmbAtributo_changeHandler(event)"/>
+						</mx:GridItem>
+					</mx:GridRow>
+					<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle"
+								includeInLayout="{cmbAtributo.selectedItem}"
+								visible="{cmbAtributo.selectedItem}">
+						<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+							<s:Label text="Archivo externo"/>
+						</mx:GridItem>
+						<mx:GridItem verticalAlign="middle" width="100%">
+							<s:HGroup width="100%" useHandCursor="true" buttonMode="true">
+								<s:TextInput editable="false" width="100%"
+											 id="txtArchivo"
+											 text="Examinar..." 
+											 useHandCursor="true" buttonMode="true"
+											 selectable="false" click="examinar()"
+											 change="txtArchivo_changeHandler(event)"/>
+								<s:Button label="..." width="30" useHandCursor="true" buttonMode="true" click="examinar()"/>
+							</s:HGroup>
+						</mx:GridItem>
+					</mx:GridRow>
+					<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle"
+								includeInLayout="{txtArchivo.text != 'Examinar...'}"
+								visible="{txtArchivo.text != 'Examinar...'}">
+						<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+							<s:Label text="Atributo de enlace en archivo"/>
+						</mx:GridItem>
+						<mx:GridItem verticalAlign="middle" width="100%">
+							<s:DropDownList id="cmbAtributoArchivo" width="100%" 
+											dataProvider="{providerAtributosArchivo}"
+											labelField="name"
+											prompt="Seleccione..."
+											change="cmbAtributoArchivo_changeHandler(event)"
+											/>
+						</mx:GridItem>
+					</mx:GridRow>
+					<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle"
+								includeInLayout="{cmbAtributoArchivo.selectedItem}"
+								visible="{cmbAtributoArchivo.selectedItem}">
+						<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+							<s:Label text="Clasificar por:"/>
+						</mx:GridItem>
+						<mx:GridItem verticalAlign="middle" width="100%">
+							<s:DropDownList id="cmbCriterio" width="100%" 
+											dataProvider="{providerAtributosArchivo}"
+											labelField="name"
+											prompt="Seleccione..."
+											change="cmbCriterio_changeHandler(event)"
+											/>
+						</mx:GridItem>
+					</mx:GridRow>
+				</mx:Grid>
+				
+				<mx:VBox width="100%" horizontalAlign="center" 
+						 visible="{configurado}"
+						 includeInLayout="{configurado}">
+					<s:Label text="{'Clasificado por: ' + ( cmbCriterio.selectedItem.name ? cmbCriterio.selectedItem.name : 'Sin información')}" fontWeight="bold"/>
+					<mx:DataGrid dataProvider="{clasesJoin}"
+								 height="120"
+								 id="grdClases"
+								 allowMultipleSelection="false"
+								 selectionColor="{getStyle('focusColor')}"
+								 alternatingItemColors="{[getStyle('contentBackgroundColor'),getStyle('contentBackgroundColor')]}"
+								 minWidth="300"
+								 >
+						<mx:columns>
+							<mx:DataGridColumn headerText=""
+											   sortable="false" resizable="false"
+											   dataField="color"
+											   itemRenderer="widgets.DANE.Join.LeyendaClasificacionColorItemRenderer"
+											   width="21"/>
+							<mx:DataGridColumn dataField="valor" headerText="Valores"/>
+						</mx:columns>
+					</mx:DataGrid>
+				</mx:VBox>
+				<s:HGroup horizontalAlign="center">
+					<!--s:Button label="Clasificar" 
+							  id="btnClasificar" 
+							  click="btnClasificar_clickHandler(event)"
+							  includeInLayout="{cmbCriterio.selectedItem &amp;&amp; !configurado}"
+							  visible="{cmbCriterio.selectedItem  &amp;&amp; !configurado}"/-->
+					
+					<s:Button label="Configuración de la clasificación" 
+							  id="btnConfiguraClasificacion" 
+							  click="btnConfiguraClasificacion_clickHandler(event)"
+							  includeInLayout="{cmbCriterio.selectedItem}"
+							  visible="{cmbCriterio.selectedItem}"/>
+					<s:Button label="Borrar la clasificación"
+							  id="btnEliminarClasificacion"
+							  click="btnEliminarClasificacion_clickHandler(event)"
+							  visible="{configurado}"
+							  includeInLayout="{configurado}"
+							  />
+					
+				</s:HGroup>
+				
+				<s:HGroup id="boxMessage" visible="{msgVisible}" includeInLayout="{msgVisible}" width="80%" verticalAlign="middle">
+					<mx:SWFLoader id="swfMessage" source="assets/images/loader.swf" visible="false" />
+					<mx:Text id="txtMessage" text="" styleName="WidgetText" width="90%"/>
+				</s:HGroup>
+			</s:VGroup>
+		</s:BorderContainer>
+	</viewer:WidgetTemplate>
+</viewer:BaseWidget>

@@ -1,0 +1,733 @@
+<?xml version="1.0" encoding="utf-8"?>
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:viewer="com.esri.viewer.*" 
+				   layout="absolute"
+				   creationComplete="UtilWidget_creationCompleteHandler(event)"
+				   widgetConfigLoaded="UtilWidget_widgetConfigLoadedHandler(event)" xmlns:esri="http://www.esri.com/2008/ags" xmlns:tasks="com.esri.ags.tasks.*" xmlns:supportClasses="com.esri.ags.tasks.supportClasses.*">
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.FeatureSet;
+			import com.esri.ags.Graphic;
+			import com.esri.ags.SpatialReference;
+			import com.esri.ags.events.IdentifyEvent;
+			import com.esri.ags.geometry.Geometry;
+			import com.esri.ags.geometry.MapPoint;
+			import com.esri.ags.layers.ArcGISDynamicMapServiceLayer;
+			import com.esri.ags.layers.Layer;
+			import com.esri.ags.layers.supportClasses.Field;
+			import com.esri.ags.layers.supportClasses.LayerDetails;
+			import com.esri.ags.symbols.SimpleFillSymbol;
+			import com.esri.ags.symbols.SimpleLineSymbol;
+			import com.esri.ags.tasks.GeometryService;
+			import com.esri.ags.tasks.GeometryServiceSingleton;
+			import com.esri.ags.tasks.QueryTask;
+			import com.esri.ags.tasks.supportClasses.BufferParameters;
+			import com.esri.ags.tasks.supportClasses.IdentifyParameters;
+			import com.esri.ags.tasks.supportClasses.IdentifyResult;
+			import com.esri.ags.tasks.supportClasses.Query;
+			import com.esri.ags.tools.NavigationTool;
+			import com.esri.viewer.AppEvent;
+			import com.esri.viewer.ViewerContainer;
+			import com.esri.viewer.managers.EventBus;
+			import com.esri.viewer.utils.Hashtable;
+			
+			import gov.dane.util.ConfiguracionRaster;
+			import gov.dane.util.Constantes;
+			import gov.dane.util.TokenUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.core.FlexGlobals;
+			import mx.events.FlexEvent;
+			import mx.managers.CursorManagerPriority;
+			import mx.managers.PopUpManager;
+			import mx.rpc.AsyncResponder;
+			import mx.rpc.AsyncToken;
+			import mx.rpc.Fault;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.utils.ObjectProxy;
+			
+			import spark.events.IndexChangeEvent;
+			
+			
+			/**
+			 * Cola de objetos con las propiedades widget, data. que representa los widgets que estan en proceso de ser abiertos 
+			 * y la información que se les va a enviar una vez se encuentren totalmente cargados
+			 **/
+			private var colaOpenWidgets:Array = new Array();
+			
+			[Embed(source="assets/images/searchicon.png")] private var _identifyCursor:Class;
+
+			private function UtilWidget_creationCompleteHandler(event:FlexEvent):void
+			{
+				AppEvent.addListener(AppEvent.DATA_PUBLISH, sharedDataUpdated);
+				
+				AppEvent.addListener(Constantes.MOSTRAR_CONFIGURACION_RASTER,displayRasterConfiguration);
+				AppEvent.addListener(Constantes.OPERACION_CONSULTAR_RASTER,consultaRaster);
+				
+				AppEvent.addListener(Constantes.VER_ASOCIACIONES,mostrarAsociaciones);
+			}
+
+
+			private function UtilWidget_widgetConfigLoadedHandler(event:Event):void
+			{
+				// TODO Auto-generated method stub
+			}
+			
+			private function sharedDataUpdated(event:AppEvent):void
+			{
+				var data:ArrayCollection = event.data.collection as ArrayCollection;
+				switch(event.data.key)
+				{
+					case Constantes.OPERACION_ABRIR_WIDGET:
+						OpenWidget(data[0].label,data[0].data);
+						break;
+					
+					case Constantes.WIDGET_ABIERTO:
+						widget_OpenHandler(data[0]);
+						break;
+					
+					case Constantes.OPERACION_INFORMACION:
+						if(data[0].enabled)
+						{
+							map.addEventListener(MouseEvent.ROLL_OVER, map_rollOverHandler);
+							map.addEventListener(MouseEvent.ROLL_OUT, map_rollOutHandler);
+							map.addEventListener(MouseEvent.CLICK,map_identifyHandler)
+						}else
+						{
+							map.cursorManager.removeAllCursors();
+							map.removeEventListener(MouseEvent.ROLL_OVER, map_rollOverHandler);
+							map.removeEventListener(MouseEvent.ROLL_OUT, map_rollOutHandler);	
+						}
+						
+						break;
+				}
+			}
+			
+			/**
+			 * Abre el widget especificado en <code>label</code> y le envía la información contenida en <code>data</code> de manera opcional
+			 * 
+			 * @param label Cadena de texto que contiene el nombre del widget que se desea abrir. <b>El nombre debe coincidir exactamente
+			 * con el nombre definido en el archivo <code>config.xml</code></b>
+			 * @param data Información opcional que se le envía al widget y que éste leerá una vez se encuentre totalmente abierto
+			 **/ 
+			private function OpenWidget(label:String,data:Object = null):void
+			{
+				if(label)
+				{
+					for (var k:Number = 0; k < configData.widgets.length; k++)
+					{
+						var lbl:String = configData.widgets[k].label;
+						if (lbl == label)
+						{
+							var isWidgetOpened:Boolean = false;
+							var widgetTable:Hashtable = ViewerContainer.getInstance().widgetManager.widgetTable;
+							for each (var widget:Object in widgetTable.toArray())
+							{
+								if(widget.widgetTitle == label)
+								{
+									isWidgetOpened = true;
+									break;
+								}
+							}
+							if(!isWidgetOpened)
+							{
+								colaOpenWidgets.push({widget:label,data:data});
+							}else
+							{
+								addSharedData(label,new ArrayCollection([data]));
+							}
+							
+							EventBus.instance.dispatchEvent(new AppEvent(AppEvent.WIDGET_RUN,k));
+							break;
+						}
+					}
+				}
+			}
+			
+			private function widget_OpenHandler(widget:String):void
+			{
+				for each(var item:Object in colaOpenWidgets)
+				{
+					if(item.widget == widget)
+					{
+						addSharedData(widget,new ArrayCollection([item.data]));
+					}
+				}
+			}
+			
+			/**
+			 * Retorna el nombre del mapa base que se encuentra activo
+			 **/
+			public function selectedBasemap():String
+			{
+				var selectedBasemap:String;
+				
+				for each(var layer:Layer in map.layers)
+				{
+					for each(var basemap:Object in configData.basemaps)
+					{
+						if(layer.id == basemap.label)
+						{
+							if(layer.visible)
+							{
+								selectedBasemap = layer.id;
+							}
+						}
+					}
+				}
+				return selectedBasemap;
+			}
+			
+			
+			/*/////////////////////////////////////////////////////////////////////////////////////*/
+			/*/////////////////////////////FUNCIONALIDADES DEL IDENTIFY////////////////////////////*/
+			/*/////////////////////////////////////////////////////////////////////////////////////*/
+			
+			/**
+			 * Pone el cursor personalizado para realizar una tarea de identify
+			 **/
+			private function map_rollOverHandler(event:MouseEvent):void
+			{
+				map.cursorManager.setCursor(_identifyCursor, CursorManagerPriority.MEDIUM, -8, -8);
+			}
+			
+			/**
+			 * Restablece el cursor por defecto
+			 **/
+			private function map_rollOutHandler(event:MouseEvent):void
+			{
+				map.cursorManager.removeAllCursors();
+			}
+			 
+			private function map_identifyHandler(event:MouseEvent):void
+			{
+				map.removeEventListener(MouseEvent.CLICK,map_identifyHandler)
+				addSharedData(Constantes.SET_MAP_NAVIGATION,new ArrayCollection([true]));
+				
+				var identifyWindow:IdentifyWindow = new IdentifyWindow();
+				identifyWindow.map = map;
+				identifyWindow.addEventListener(FlexEvent.CREATION_COMPLETE,
+					function():void
+					{
+						identifyWindow.x = event.stageX;
+						identifyWindow.y = event.stageY;
+						
+						identifyWindow.cmbCapas.addEventListener(IndexChangeEvent.CHANGE,
+							function():void
+							{
+								var idParams:IdentifyParameters = new IdentifyParameters();
+								idParams.geometry = map.toMapFromStage(event.stageX,event.stageY);
+								idParams.height = map.height;
+								idParams.width = map.width;
+								idParams.tolerance = 5;
+								idParams.mapExtent = map.extent;
+								idParams.layerIds = [identifyWindow.cmbCapas.selectedItem.id];
+								idParams.layerOption = "all";
+								idParams.returnGeometry = true;
+								
+								identifyTask.url = identifyWindow.cmbCapas.selectedItem.url;
+								identifyTask.proxyURL = identifyWindow.cmbCapas.selectedItem.proxyURL;
+								identifyTask.token = TokenUtil.buscarToken(identifyTask.url,configData);
+								identifyTask.execute(idParams,new AsyncResponder(identifyTask_executeCompleteHandler,identifyTask_faultHandler,identifyWindow.cmbCapas.selectedItem));
+								
+								
+								PopUpManager.removePopUp(identifyWindow);
+							});
+					});
+				PopUpManager.addPopUp(identifyWindow,Sprite(FlexGlobals.topLevelApplication));
+				
+				map.cursorManager.removeAllCursors();
+			}
+
+			protected function identifyTask_executeCompleteHandler(identifyResults:Array, token:Object):void
+			{
+				if(identifyResults.length > 0)
+				{
+					(token.layer as Object).getDetails(token.id,new AsyncResponder(detailsComplete,detailsFault,identifyResults))
+				}else
+				{
+					Alert.show("No se encontraron elementos para la capa seleccionada","No hay resultados",Alert.NONMODAL);
+				}
+			}
+			
+			protected function identifyTask_faultHandler(event:Fault, token:Object):void
+			{
+				Alert.show("No fué posible identificar los elementos para la capa seleccionada.\n\nDetalles:\n" + event.message);
+			}
+			
+			private function detailsComplete(details:LayerDetails,identifyResults:Array):void
+			{
+				var features:Array = new Array();
+				var atributes:Array = new Array();
+				
+				
+				for each (var identifyResult:IdentifyResult in identifyResults)
+				{
+					features.push(identifyResult.feature);
+					
+					var attributes:Object = new Object();
+					for each(var attribute:Field in details.fields)
+					{
+						if(attribute.name.toUpperCase() != "OBJECTID" && attribute.name.toUpperCase() != "SHAPE")
+						{
+							attributes[attribute.name] = identifyResult.feature.attributes[attribute.name] != null ? identifyResult.feature.attributes[attribute.name]: identifyResult.feature.attributes[attribute.alias];
+						}
+					}
+					identifyResult.feature.attributes = attributes;
+					atributes.push(identifyResult.feature.attributes);
+				}
+				
+				var featureSet:FeatureSet = new FeatureSet(features);
+				featureSet.displayFieldName = details.displayField;
+				featureSet.fields = [];
+				
+				var fieldAliases:Object = new Object();
+				for each(var field:Field in details.fields)
+				{
+					if(field.name.toUpperCase() != "OBJECTID" && field.name.toUpperCase() != "SHAPE")
+					{
+						featureSet.fields.push(field);
+						
+						fieldAliases[field.name] = field.alias;
+					}
+				}
+				featureSet.fieldAliases = fieldAliases;
+				
+				addSharedData(Constantes.OPERACION_ABRIR_WIDGET,new ArrayCollection([{label:"Resultados",data:{featureSet:featureSet,token:null}}]));
+			}
+			
+			private function detailsFault(fault:Fault,identifyResults:Array):void
+			{
+				Alert.show("No fué posible consultar la información de la capa seleccionada.\n\nDetalles:\n"+fault.message);
+			}
+			
+			
+			/*/////////////////////////////////////////////////////////////////////////////////////*/
+			/*////////////////////////FUNCIONALIDADES DEL BANCO DE IMÁGENES////////////////////////*/
+			/*/////////////////////////////////////////////////////////////////////////////////////*/
+			
+			private static const ESTADO_CONSULTA_SERVLET_ESPERANDO:String = "estadoConsultaServletEsperando";
+			private static const ESTADO_CONSULTA_SERVLET_OK:String = "estadoConsultaServletOk";
+			private static const ESTADO_CONSULTA_SERVLET_ERROR:String = "estadoConsultaServletError";
+			
+			/**
+			 * Listado de programas por los que se va a consultar. se encuentran definidos en el archivo de configuracion xml
+			 **/
+			private var colaProgramas:Array;
+			
+			private var colaProgramasFault:Array = [];
+			
+			private var colaPeticionesServletRaster:ArrayCollection = new ArrayCollection();
+			
+			/**
+			 * Muestra el panel de configuración de las consultas a la información Raster.
+			 * <p>El llamado se debe hacer a traves del objeto <code>ViewerContainer</code>, disparando un nuevo evento de tipo <code>ConsultaRasterEvent</code>,
+			 * enviando como parámetros: <code>ConsultaRasterEvent.DISPLAY_RASTER_CONFIGURATION</code> y <code>data</code>
+			 * <p>Donde <code>data</code> es una variable de tipo <code>Boolean</code> que establece si se muestra el panel de forma modal
+			 * 
+			 * <p/>Ejemplo: <listing version="3.0">ViewerContainer.dispatchEvent(new ConsultaRasterEvent(ConsultaRasterEvent.DISPLAY_RASTER_CONFIGURATION, true))</listing>
+			 **/
+			private function displayRasterConfiguration(event:AppEvent):void
+			{
+				ConfiguracionRaster.show(event.data);
+			}
+			
+			/**
+			 * Realiza la consulta de las imágenes que están disponibles para la zona contenida en <code>feature</code>
+			 **/
+			private function consultaRaster(event:AppEvent):void
+			{
+				if(event.data is Graphic)
+				{
+					query.geometry = event.data.geometry;
+					
+					if(configObject && configObject.configuration)
+					{
+						AppEvent.dispatch(Constantes.OPERACION_LIMPIAR_RESULTADOS_RASTER);
+						
+						if(configObject.configuration.imageservice is ArrayCollection)
+						{
+							for each(var imageService:Object in configObject.configuration.imageservice)
+							{
+								consultarImageService(imageService, event.data as Graphic);
+							}
+						}else if(configObject.configuration.imageservice)
+						{
+							consultarImageService(configObject.configuration.imageservice, event.data as Graphic);
+						}
+					}
+					/**Método antiguo de consulta
+					var hacerBuffer:Boolean;
+					var colorBuffer:uint;
+					var distanciaBuffer:Number;
+					var token:Object = new Object();
+					
+					//Si no se han cambiado las propiedades de la consulta se toman las que estan por defecto
+					if(ConfiguracionRaster.instancia.chkDibujarAreaInfluencia)
+					{
+						hacerBuffer = ConfiguracionRaster.instancia.chkDibujarAreaInfluencia.selected;
+						colorBuffer = ConfiguracionRaster.instancia.colorPicker.selectedColor;
+						distanciaBuffer = ConfiguracionRaster.instancia.sldrDistancia.value;
+					}else
+					{
+						hacerBuffer = ConfiguracionRaster.instancia.hacerBuffer
+						colorBuffer = ConfiguracionRaster.instancia.colorBuffer;
+						distanciaBuffer = ConfiguracionRaster.instancia.distanciaBuffer;
+					}
+					
+					token.colorBuffer = colorBuffer;
+					token.feature = event.data;
+					
+					if(hacerBuffer)
+					{
+						var bufferParams:BufferParameters = new BufferParameters();
+						bufferParams.geometries = [event.data.geometry];
+						bufferParams.distances = [distanciaBuffer];
+						bufferParams.unit = GeometryService.UNIT_METER;
+						bufferParams.bufferSpatialReference = new SpatialReference(3116);
+						
+						GeometryServiceSingleton.instance.showBusyCursor = true;
+						GeometryServiceSingleton.instance.buffer(bufferParams, new AsyncResponder(bufferRasterResult,bufferRasterFault,token));
+					}else
+					{
+						bufferRasterResult([event.data.geometry],token);
+					}*/
+				}
+			}
+			
+			private function consultarImageService(imagerService:Object,gra:Graphic):void
+			{
+				queryTask.url = imagerService.url;				
+				queryTask.proxyURL = (imagerService.useproxy ? configData.proxyUrl :null);
+				queryTask.useAMF = false;
+				queryTask.token = TokenUtil.buscarToken(queryTask.url,configData);
+				
+				queryTask.execute(query,new AsyncResponder(queryTaskImageService_Result,queryTaskImageService_Fault,imagerService));
+			}
+			
+			
+			private function queryTaskImageService_Result(featureSet:FeatureSet,token:Object = null):void
+			{
+				if(featureSet.features.length == 0)
+				{
+					//Alert.show("La consulta realizada a " + token.label + " no retornó resultados");
+				}else
+				{
+					addSharedData(Constantes.OPERACION_ABRIR_WIDGET,new ArrayCollection([{label:"Resultados Consulta Raster",data:{featureSet:featureSet,servicio:token}}]));
+					//Alert.show(featureSet.features.length + " " + token.label);
+				}
+			}
+			
+			
+			private function queryTaskImageService_Fault(fault:Fault,token:Object = null):void
+			{
+				showError("No fué posible realizar la consulta para " + token.label + "\n\n" + fault.message);
+			}
+			
+			private function bufferRasterResult(geometries:Array , token:Object = null):void
+			{
+				if(geometries.length > 0)
+				{
+					//Ejecutar la consulta de la informacion para cada programa en UtilWidget.XML
+					
+					colaProgramas = new Array();
+					if(configObject.configuration.raster.programas.programa is ArrayCollection)
+					{
+						for each(var programa:Object in configObject.configuration.raster.programas.programa)
+						{
+							colaProgramas.push(programa);
+						}
+					}else
+					{
+						colaProgramas.push(configObject.configuration.raster.programas.programa);
+					}
+					//dibujar los buffers
+					
+					for each (var geometry:Geometry in geometries)
+					{
+						var outlineSym:SimpleLineSymbol = new SimpleLineSymbol("solid",token.colorBuffer, 0.5, 1);
+						var polySym:SimpleFillSymbol = new SimpleFillSymbol("solid", token.colorBuffer, 0.25, outlineSym);
+						var g:Graphic = new Graphic(geometry);
+						g.symbol = polySym;
+						if(token.feature.graphicsLayer)
+							token.feature.graphicsLayer.add(g);
+						
+						consultarSiguiente(g);
+					}
+				}else
+				{
+					bufferRasterFault(null , token);
+				}
+			}
+
+			private function bufferRasterFault(fault:Fault , token:Object = null):void
+			{
+				bufferRasterResult([token.feature.geometry],token);
+			}
+			
+			private function consultarSiguiente(graphic:Graphic):void
+			{
+				if(colaProgramas.length > 0)
+				{
+					var programa:Object = colaProgramas.shift()
+					var query1:Query = new Query();
+					var queryTask1:QueryTask = new QueryTask();
+					var token:Object = {programa:programa , graphic:graphic};
+					query1.outSpatialReference = map.spatialReference;
+					query1.outFields = ["*"];
+					query1.spatialRelationship = Query.SPATIAL_REL_INTERSECTS;
+					query1.returnGeometry = true;
+					query1.geometry = graphic.geometry;
+					queryTask1.url = programa.url.toString();
+					
+					queryTask1.proxyURL = (programa.useproxy ? configData.proxyUrl :null);
+					queryTask1.useAMF = queryTask1.proxyURL? false: true;
+					queryTask1.token = TokenUtil.buscarToken(queryTask1.url,configData);
+					
+					
+					queryTask1.showBusyCursor = true;
+					
+					queryTask1.execute(query1, new AsyncResponder( consultaGeograficaProgramaResult, consultaGeograficaProgramaFault,token)); 
+				}
+				else
+				{
+					finalizarLecturas();
+				}
+			}
+			
+			private function consultaGeograficaProgramaResult(featureSet:FeatureSet, token:Object = null):void
+			{
+				//TODO: eliminar el programa de la cola de programas
+				var resultsPrograma:Array = new Array();
+				
+				servletRaster.url = configObject.configuration.raster.url_servicio_alfanumerico; 
+				
+				for( var i:Number = 0 ; i < featureSet.features.length; i++)
+				{
+					resultsPrograma.push(featureSet.attributes[i][token.programa.atributoLayer.value]);
+				}
+				
+				trace(featureSet.features.length + " features para " + token.programa.nombre);
+				
+				var parametros:Object;
+				
+				//Partir la consulta en grupos de 75 registros, con el fin de no saturar el Servlet que busca en el inventario
+				while(resultsPrograma.length >= 75)
+				{
+					parametros = new Object();
+					parametros[token.programa.nombre] = resultsPrograma.slice(0,75);
+					
+					//Enviar la peticion y añadir el token resultado de la misma a la pila de peticiones enviadas para realizar el control de envios vs llegadas
+					colaPeticionesServletRaster.addItem({token:servletRaster.send(parametros) , estado:ESTADO_CONSULTA_SERVLET_ESPERANDO});
+					
+					resultsPrograma.splice(0,75);
+				}
+				if(resultsPrograma.length > 0)
+				{
+					parametros = new Object();
+					parametros[token.programa.nombre] = resultsPrograma.slice(0,resultsPrograma.length);
+
+					//Enviar la peticion y añadir el token resultado de la misma a la pila de peticiones enviadas para realizar el control de envios vs llegadas
+					colaPeticionesServletRaster.addItem({token:servletRaster.send(parametros) , estado:ESTADO_CONSULTA_SERVLET_ESPERANDO});
+
+					resultsPrograma.splice(0,resultsPrograma.length);
+				}
+				//Consulta el siguiente Programa de la cola de programas
+				consultarSiguiente(token.graphic);
+			}
+			
+			private function consultaGeograficaProgramaFault(info:Object, token:Object = null):void
+			{
+				colaProgramasFault.push(token.programa.nombre);
+				consultarSiguiente(token.graphic);
+			}
+
+			protected function servletRaster_resultHandler(event:ResultEvent):void
+			{
+				for each(var peticion:Object in colaPeticionesServletRaster)
+				{
+					if(peticion.token == event.token)
+					{
+						colaPeticionesServletRaster[colaPeticionesServletRaster.getItemIndex(peticion)].estado = ESTADO_CONSULTA_SERVLET_OK;
+						break;
+					}
+				}
+				
+				var res:Object = new Object();
+				if(event.result.resultados != null)
+				{
+					for(var prop:String in event.result.resultados)
+					{
+						res[prop] =  event.result.resultados[prop];
+						
+						//Eliminar el caracter ; del ID_DANE
+						var campoId:String = "id_dane";
+						if(res[prop] is ObjectProxy)
+						{
+							if(res[prop][campoId])
+							{
+								res[prop][campoId] = res[prop][campoId].toString().slice(0,res[prop][campoId].toString().lastIndexOf(";"));
+							}
+						}else if(res[prop] is Array || res[prop] is ArrayCollection)
+						{
+							for each (var img:Object in res[prop])
+							{
+								if(img && img[campoId])
+								{	
+									img[campoId] = img[campoId].toString().slice(0,img[campoId].toString().lastIndexOf(";"));
+								}
+							}
+						}
+					}
+					addSharedData(Constantes.OPERACION_ABRIR_WIDGET,new ArrayCollection([{label:"Resultados Raster",data:res}]));
+					//addSharedData("Resultados",new ArrayCollection([res,results[1]]));
+					
+				}
+				
+				
+				finalizarLecturas();
+			}
+
+
+			protected function servletRaster_faultHandler(event:FaultEvent):void
+			{
+				for each(var peticion:Object in colaPeticionesServletRaster)
+				{
+					if(peticion.token == event.token)
+					{
+						colaPeticionesServletRaster[colaPeticionesServletRaster.getItemIndex(peticion)].estado = ESTADO_CONSULTA_SERVLET_ERROR;
+						break;
+					}
+				}
+				
+				finalizarLecturas();
+			}
+			
+			private function finalizarLecturas():void
+			{
+				var finalizado:Boolean = true;
+				for each(var peticion:Object in colaPeticionesServletRaster)
+				{
+					if(peticion.estado == ESTADO_CONSULTA_SERVLET_ESPERANDO)
+					{
+						colaPeticionesServletRaster.removeItemAt(colaPeticionesServletRaster.getItemIndex(peticion));
+						finalizado = false;
+						break;
+					}
+				}
+				
+				if(finalizado)
+				{
+					
+				}
+				/* var res:Object = new Object();
+				res.finalizaBusqueda = true;
+				addSharedData("Resultados",new ArrayCollection([res])); */
+				//SiteContainer.getInstance().widgetManager.abrirWidget("Resultados");
+			}
+			
+			/************************************************************************************/
+			/*************************Ver Asociaciones de un elemento****************************/
+			/************************************************************************************/
+			
+			private var asociacionesWindow:AsociacionesWindow;
+			
+			
+			/**
+			 * la configuracion se debe hacer en el archivo popupconfig para una capa determinada.
+			 * <p>
+			 * Ejemplo del contenido del archivo popupconfig
+			 * <listing>
+			 * &lt;medias&gt;
+			 * 	&lt;media type="asociaciones" 
+			 * 		title="Ver Asociaciones"
+			 * 		caption='{"pkGeometria":"MANZ_CCNCTNDO", "pkServicio":"COD_DANE", "urlServicio":"http://dg_est45.dane.gov.co/arcgis/rest/services/GEIH/SanAndres/MapServer/2"}'/&gt;
+		     * 	  &lt;/medias&gt;
+			 * </listing>
+			 **/
+			private function mostrarAsociaciones(event:AppEvent):void
+			{
+				if(event.data && event.data.caption && event.data.graphic)
+				{
+					for (var prop:String in event.data.caption)
+					{
+						if(event.data.caption[prop] is String)
+						{
+							while(event.data.caption[prop].indexOf("}") != -1 && event.data.caption[prop].indexOf("}") != -1)
+							{
+								var att:String = event.data.caption[prop].substring(event.data.caption[prop].indexOf("{") + 1 , event.data.caption[prop].indexOf("}"));
+								var val:Object = event.data.graphic.attributes[att];
+								event.data.caption[prop] = event.data.caption[prop].replace("{" + att + "}" , val);
+							}
+						}
+					}
+					
+					if(event.data.caption.where && event.data.caption.urlServicio)
+					{
+						query.where = event.data.caption.where;
+						query.returnGeometry = false;
+						
+						queryTask.url = event.data.caption.urlServicio;
+
+						queryTask.proxyURL = (event.data.caption.useproxy ? configData.proxyUrl :null);
+						queryTask.useAMF = queryTask.proxyURL? false: event.data.caption.useAMF;
+						queryTask.token = TokenUtil.buscarToken(queryTask.url,configData);
+						
+						
+						queryTask.execute(query, new AsyncResponder(queryTask_Result,queryTask_Fault,event.data));
+						
+					}else
+					{
+						Alert.show("La etiqueta \"caption\" del elemento \"medias\" parece no estar bien formado");
+					}
+				}else
+				{
+					Alert.show("No fué posible encontar la información necesaria para realizar la consulta de las asociaciones");
+				}
+			}
+			
+			
+			
+			private function queryTask_Result(featureSet:FeatureSet,token:Object = null):void
+			{
+				if(asociacionesWindow)
+				{
+					PopUpManager.removePopUp(asociacionesWindow);
+				}
+				
+				asociacionesWindow = new AsociacionesWindow();
+				
+				asociacionesWindow.resultados = featureSet;
+				asociacionesWindow.data = token;
+				
+				PopUpManager.addPopUp(asociacionesWindow,Sprite(FlexGlobals.topLevelApplication));
+				PopUpManager.centerPopUp(asociacionesWindow);
+				//addSharedData(Constantes.OPERACION_ABRIR_WIDGET,new ArrayCollection([{label:"Resultados",data:{featureSet:featureSet,token:null}}]));
+			}
+			
+			private function queryTask_Fault(fault:Fault,token:Object = null):void
+			{
+				showError("No fué posible realizar la consulta\n\n" + fault.message);
+			}
+
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<esri:IdentifyTask id="identifyTask" showBusyCursor="true"/>
+		
+		<tasks:QueryTask id="queryTask" method="POST" showBusyCursor="true"/>
+		<supportClasses:Query id="query" outFields="*"  outSpatialReference="{map.spatialReference}"/>
+		
+		
+		<mx:HTTPService id="servletRaster" 
+						result="servletRaster_resultHandler(event)" 
+						fault="servletRaster_faultHandler(event)" 
+						showBusyCursor="true" 
+						concurrency="multiple"/>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	
+</viewer:BaseWidget>

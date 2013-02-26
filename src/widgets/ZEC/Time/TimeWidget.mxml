@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" 
+				   xmlns:viewer="com.esri.viewer.*" 
+				   layout="absolute"
+				   widgetConfigLoaded="basewidget1_widgetConfigLoadedHandler(event)"
+				   creationComplete="basewidget1_creationCompleteHandler(event)">
+
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.TimeExtent;
+			import com.esri.ags.events.LayerEvent;
+			import com.esri.ags.layers.ArcGISDynamicMapServiceLayer;
+			import com.esri.ags.layers.ArcGISImageServiceLayer;
+			import com.esri.ags.layers.FeatureLayer;
+			import com.esri.ags.layers.Layer;
+			import com.esri.ags.layers.supportClasses.TimeInfo;
+			import com.esri.viewer.AppEvent;
+			import com.esri.viewer.ViewerContainer;
+			
+			import flash.sampler.NewObjectSample;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.FlexEvent;
+			import mx.formatters.DateFormatter;
+			
+			import spark.events.IndexChangeEvent;
+			
+			[Bindable]private var stops:ArrayCollection = new ArrayCollection();
+			
+			protected function basewidget1_creationCompleteHandler(event:FlexEvent):void
+			{
+				AppEvent.addListener("actualizarTiempo",actualizarTiempo);
+			}
+			
+			private function actualizarTiempo(event:AppEvent):void
+			{
+				if(Number(event.data))
+				{
+					buttonBar.selectedIndex = Number(event.data);
+					buttonBar.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-1,Number(event.data)));
+				}
+			}
+			
+			protected function basewidget1_widgetConfigLoadedHandler(event:Event):void
+			{
+				if(configObject)
+				{
+					if(configObject.configuration.timeStops.timeStop is ArrayCollection)
+					{
+						stops.removeAll();
+						
+						for each(var stop:Object in configObject.configuration.timeStops.timeStop)
+						{
+							var date:Date = new Date(stop.year,stop.month - 1 ,stop.date || null,stop.hours || null,stop.minutes || null,stop.seconds || null,stop.ms || null);
+							var df:DateFormatter = new DateFormatter();
+							
+							df.formatString = configObject.configuration.formatString;
+							
+							var dateLabel:Date = new Date(stop.year,stop.month ,stop.date || null,stop.hours || null,stop.minutes || null,stop.seconds || null,stop.ms || null);
+							
+							var label:String = configObject.configuration.label + " " + df.format(dateLabel);
+							
+							stops.addItem({label:label,date:date,complemento:stop.label,config:stop.config});
+							
+							if(stop.inicial == true)
+							{
+								buttonBar.selectedIndex = stops.length-1;
+								buttonBar.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-1,stops.length-1));
+							}
+						}
+						
+					}
+				}
+			}
+			
+			protected function buttonbar1_changeHandler(event:IndexChangeEvent):void
+			{
+				var titulo:String = configObject.configuration.titulo;
+				if(event.newIndex != -1)
+				{
+					titulo += " " + stops[event.newIndex].label.toString().toUpperCase() + " " + stops[event.newIndex].complemento.toString().toUpperCase();
+					
+					var date:Date = stops[event.newIndex].date;
+					var dateEnd:Date = new Date(date.fullYear,date.month + 1);
+						
+					map.timeExtent = new TimeExtent(date,dateEnd);
+					
+					AppEvent.dispatch("reloadConfigWidget",{widgetId:configObject.configuration.widgetId,config:stops[event.newIndex].config});
+				}else
+				{
+					AppEvent.dispatch("reloadConfigWidget",{widgetId:configObject.configuration.widgetId,config:configObject.configuration.defaultConfig});
+					map.timeExtent = null;
+				}
+				AppEvent.dispatch(AppEvent.SET_TITLES,{title:titulo});
+			}
+
+
+			
+
+		]]>
+	</fx:Script>
+
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	
+	<s:ButtonBar dataProvider="{stops}" labelField="label"
+				 id="buttonBar"
+				 change="buttonbar1_changeHandler(event)"
+				 visible="{stops.length >= 2}" 
+				 requireSelection="false"
+				 />
+</viewer:BaseWidget>

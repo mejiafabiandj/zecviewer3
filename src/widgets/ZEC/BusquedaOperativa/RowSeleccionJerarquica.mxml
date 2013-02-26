@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:GridRow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			xmlns:s="library://ns.adobe.com/flex/spark" 
+			xmlns:mx="library://ns.adobe.com/flex/mx"
+			width="100%"
+			verticalAlign="middle"
+			horizontalAlign="center"
+			>
+	
+	<fx:Metadata>
+		/**
+		 * Disparado cuando la selección del algún elemento de la jerarquia cambia 
+		 * @eventType com.esri.viewer.AppEvent
+		 **/
+		[Event (name="seleccionCambiada",type="com.esri.viewer.AppEvent")]
+	</fx:Metadata>
+	<fx:Script>
+		<![CDATA[
+			import com.esri.viewer.AppEvent;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.CollectionEvent;
+			import mx.events.CollectionEventKind;
+			import mx.utils.ObjectProxy;
+			
+			import spark.events.IndexChangeEvent;
+			
+			
+			private var _item:ObjectProxy = new ObjectProxy();
+
+			[Bindable]
+			public function get item():ObjectProxy
+			{
+				return _item;
+			}
+
+			public function set item(value:ObjectProxy):void
+			{
+				_item = value;
+			}
+
+			
+			
+			private var _campos:ArrayCollection = new ArrayCollection;
+
+			[Bindable]
+			public function get campos():ArrayCollection
+			{
+				return _campos;
+			}
+
+			public function set campos(value:ArrayCollection):void
+			{
+				_campos = value;
+			}
+
+
+			
+			private var _currentIndex:Number = -1;
+
+			[Bindable]
+			public function get currentIndex():Number
+			{
+				return _currentIndex;
+			}
+
+			public function set currentIndex(value:Number):void
+			{
+				_currentIndex = value;
+			}
+
+
+
+			protected function cmbJerarquias_changeHandler(event:IndexChangeEvent):void
+			{
+				
+				for (var i:Number = currentIndex + 1; i < campos.length; i++)
+				{
+					var campo:ObjectProxy = campos[i];
+					campo.datos = new ArrayCollection();
+				}
+				
+				if(cmbJerarquias.selectedIndex != -1 && currentIndex < campos.length - 1)
+				{
+					
+					var itemSeleccionado:ObjectProxy = campos[currentIndex].datos[cmbJerarquias.selectedIndex];
+					var nombreCampoHijos:String = campos[currentIndex+1].nombreCampo;
+					
+					if(itemSeleccionado[nombreCampoHijos] is ArrayCollection)
+					{
+						campos[currentIndex+1].datos = itemSeleccionado[nombreCampoHijos];
+					}else if(itemSeleccionado[nombreCampoHijos])
+					{
+						campos[currentIndex+1].datos = new ArrayCollection([itemSeleccionado[nombreCampoHijos]]);
+					}
+				}
+				
+				dispatchEvent(new AppEvent("seleccionCambiada",cmbJerarquias.selectedItem));
+				
+			}
+			
+			private function labelFunction(item:Object):String
+			{
+				return item.nombre || item.valor;
+			}
+
+
+
+
+			protected function arraycollection1_collectionChangeHandler(event:CollectionEvent):void
+			{
+				if(item.datos && item.datos.source != item.datos.source.sortOn("valor"))
+				{
+					item.datos.source = item.datos.source.sortOn("valor");
+				}
+				
+			}
+
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<s:ArrayCollection collectionChange="arraycollection1_collectionChangeHandler(event)">
+			{item.datos.source}
+		</s:ArrayCollection>
+	</fx:Declarations>
+	<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+		<s:Label text="{item.alias}"/>
+	</mx:GridItem>
+	<mx:GridItem width="100%" verticalAlign="middle" horizontalAlign="center">
+		<s:DropDownList width="100%" dataProvider="{item.datos}"
+						id="cmbJerarquias"
+						change="cmbJerarquias_changeHandler(event)"
+						prompt="Seleccione..."
+						labelFunction="labelFunction"/>
+	</mx:GridItem>
+	
+</mx:GridRow>

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				autoDrawBackground="true" width="100%"
+				click="itemrenderer1_clickHandler(event)"
+				useHandCursor="true"
+				buttonMode="true"
+				>
+
+	<fx:Metadata>
+		[Event(name="menuItemClick", type="AppEvent")]
+	</fx:Metadata>
+	<fx:Script>
+		<![CDATA[
+			import com.esri.viewer.AppEvent;
+			import com.esri.viewer.ViewerContainer;
+			protected function itemrenderer1_clickHandler(event:MouseEvent):void
+			{
+				var info:Object = data;
+				info.event = event;
+				AppEvent.dispatch("menuItemClick",info);
+			}
+		]]>
+	</fx:Script>
+
+	
+	<s:Group minHeight="40" minWidth="40" width="100%">
+		<mx:Image source="assets/images/ExpandGrupo.png" width="20" height="20" visible="{data.children}" top="20" right="5"/>
+		<s:VGroup horizontalAlign="center" width="100%">
+			<mx:Image width="40" height="40" source="{data.data.icon}"/>
+			<mx:Text text="{data.label}" minWidth="80" maxWidth="100" width="100%" 
+					 textAlign="center" selectable="false"
+					 useHandCursor="true" buttonMode="true"
+					 
+					 />
+		</s:VGroup>
+	</s:Group>
+</s:ItemRenderer>

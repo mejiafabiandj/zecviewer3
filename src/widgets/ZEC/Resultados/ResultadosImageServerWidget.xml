@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="iso-8859-1" ?>
+<configuration>
+	<jerarquia>ProductName</jerarquia>
+	<label>Name</label>
+	<urlInventario>http://190.25.231.241:8399/arcgis/rest/services/Imagenes/Inventario_Raster/MapServer/14</urlInventario>
+	<useproxy>false</useproxy>
+	<campoIdInventario>INVENTARIOS.INVE_ELEMENTO_RASTER.ELRA_CID_DANE</campoIdInventario>
+	<urlPDF>http://190.25.231.241:8030/RASTER/CreatePDFServlet</urlPDF>
+</configuration>

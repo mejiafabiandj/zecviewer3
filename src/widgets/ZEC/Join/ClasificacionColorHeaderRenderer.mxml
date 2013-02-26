@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								  xmlns:s="library://ns.adobe.com/flex/spark" 
+								  xmlns:mx="library://ns.adobe.com/flex/mx" 
+								  focusEnabled="true"
+								  accentColor="{getStyle('backgroundColor')}"
+								  creationComplete="mxadvanceddatagriditemrenderer1_creationCompleteHandler(event)">
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.DataGrid;
+			import mx.events.CollectionEvent;
+			import mx.events.CollectionEventKind;
+			import mx.events.ColorPickerEvent;
+			import mx.events.FlexEvent;
+			import mx.utils.HSBColor;
+			import mx.utils.ObjectProxy;
+
+			public static var colorSeleccionado:uint;
+			
+			protected function pkrColor_changeHandler(event:ColorPickerEvent):void
+			{
+				colorSeleccionado = pkrColor.selectedColor;
+				if(owner is DataGrid)
+				{
+					var provider:ArrayCollection = (owner as DataGrid).dataProvider as ArrayCollection;
+					
+					var hue:Number = HSBColor.convertRGBtoHSB(pkrColor.selectedColor).hue;
+					var intervalos:Number = provider.length;
+					
+					var i:Number;
+					
+					for (i = 0 ; i < intervalos ; i++)
+					{
+						var hsbColor:HSBColor = new HSBColor(hue, (i+1) * (1) / (intervalos) , 1);
+						var color:uint = HSBColor.convertHSBtoRGB(hsbColor.hue,hsbColor.saturation,hsbColor.brightness);
+						var elemento:ObjectProxy = provider.getItemAt(i) as ObjectProxy;
+						
+						elemento.color = color;
+					}
+				}
+			}
+
+
+			protected function mxadvanceddatagriditemrenderer1_creationCompleteHandler(event:FlexEvent):void
+			{
+				if(owner is DataGrid)
+				{
+					var ct:ColorTransform = new ColorTransform(1,1,1,1,Math.random()* 0xFF, Math.random()* 0xFF, Math.random()* 0xFF);
+					pkrColor.selectedColor = ct.color;
+					pkrColor.dispatchEvent(new ColorPickerEvent(ColorPickerEvent.CHANGE,false,false,-1,ct.color));
+					
+					var provider:ArrayCollection = (owner as DataGrid).dataProvider as ArrayCollection;
+					
+					pkrColor.enabled = provider.length > 0;
+					
+					provider.addEventListener(CollectionEvent.COLLECTION_CHANGE,
+						function(e:CollectionEvent):void
+						{
+							pkrColor.enabled = provider.length > 0;
+							if(e.kind != CollectionEventKind.UPDATE)
+							{
+								pkrColor.dispatchEvent(new ColorPickerEvent(ColorPickerEvent.CHANGE,false,false,-1,colorSeleccionado));
+							}
+						});
+					
+				}
+			}
+
+		]]>
+	</fx:Script>
+	<mx:ColorPicker id="pkrColor" change="pkrColor_changeHandler(event)"
+					/>
+	<!--s:Label id="lblData" top="0" left="0" right="0" bottom="0" text="{listData.label}" /-->
+</s:MXDataGridItemRenderer>

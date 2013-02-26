@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+	<titulo>CENSO DE EDIFICACIONES - PILOTO BOGOTÁ</titulo>
+	<label>Mes</label>
+	<formatString>MM</formatString>
+	
+	<!---Id base 0 del widget de consulta operativa-->
+	<widgetId>0</widgetId>
+	
+	<defaultConfig>http://190.25.231.241:8030/JSegOp/Muestra?op=ceedPilotoBogota&accion=leer</defaultConfig>
+	
+	<timeStops>	<!--Deben existir mas de dos timeStop-->
+		<timeStop year="2012" month="01" label="" config="http://190.25.231.241:8030/JSegOp/Muestra?op=ceedPilotoBogota&accion=leer&mes=01&ano=2012"/>
+		<timeStop year="2012" month="02" label="" config="http://190.25.231.241:8030/JSegOp/Muestra?op=ceedPilotoBogota&accion=leer&mes=02&ano=2012"/>
+		<timeStop inicial="true" year="2012" month="03" label="" config="http://190.25.231.241:8030/JSegOp/Muestra?op=ceedPilotoBogota&accion=leer&mes=03&ano=2012"/>
+	</timeStops>
+</configuration>

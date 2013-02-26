@@ -1,0 +1,549 @@
+<?xml version="1.0" encoding="utf-8"?>
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" 
+				   xmlns:viewer="com.esri.viewer.*" 
+				   layout="absolute"
+				   widgetConfigLoaded="init(event)" 
+				   xmlns:util="gov.dane.util.*" 
+				   xmlns:BusquedaOperativa="widgets.DANE.BusquedaOperativa.*"
+				   currentStateChange="currentStateChangeHandler(event)" 
+				   xmlns:esri="http://www.esri.com/2008/ags"
+				   currentState="default"
+				   creationComplete="basewidget1_creationCompleteHandler(event)" 
+				   xmlns:supportClasses="com.esri.ags.tasks.supportClasses.*" 
+				   xmlns:tasks="com.esri.ags.tasks.*">
+
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.FeatureSet;
+			import com.esri.ags.utils.JSONUtil;
+			import com.esri.viewer.AppEvent;
+			import com.esri.viewer.ViewerContainer;
+			import com.esri.viewer.WidgetStates;
+			
+			import gov.dane.util.AlertInfo;
+			import gov.dane.util.Constantes;
+			import gov.dane.util.TokenUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.events.StateChangeEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.AsyncResponder;
+			import mx.rpc.Fault;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.utils.Base64Decoder;
+			import mx.utils.Base64Encoder;
+			import mx.utils.ObjectProxy;
+			
+			import spark.events.IndexChangeEvent;
+			
+			[Embed(source="assets/images/loader.swf")] private var esperando:Class;
+			
+			[Bindable] private var providerCriterios:ArrayCollection = new ArrayCollection();
+			
+			[Bindable] private var providerJerarquias:ArrayCollection = new ArrayCollection();
+			
+			[Bindable] private var seleccionValida:Boolean = false;
+			
+			[Bindable] private var actualizarMuestra:Boolean = false;
+			
+			protected function init(event:Event):void
+			{
+				currentState = "default";
+				providerCriterios.removeAll();
+				
+				if(configObject && configObject.configuration )
+				{
+					if(configObject.configuration.criterios)
+					{
+						
+						if(configObject.configuration.criterios.criterio is ArrayCollection)
+						{
+							providerCriterios.addAll(configObject.configuration.criterios.criterio as ArrayCollection);
+						}else if(configObject.configuration.criterios.criterio)
+						{
+							providerCriterios.addItem(configObject.configuration.criterios.criterio);
+						}
+					}else
+					{
+						Alert.show("El archivo de configuración no contiene criterios para realizar consultas sobre las capas operativas");
+					}
+				}else
+				{
+					Alert.show("La muestra no ha sido actualizada. Solo un administrador puede actualizar la muestra");	
+				}
+				
+				
+			}
+			
+			protected function basewidget1_creationCompleteHandler(event:FlexEvent):void
+			{
+				AppEvent.addListener("reloadConfigWidget",reloadConfigWidget);
+				
+				if(configData && configData.data && configData.data.actualizarMuestra)
+				{
+					actualizarMuestra = configData.data.actualizarMuestra.value == "true";
+				}
+			}
+			
+			/**
+			 * Volver a leer en tiempo de ejecución el archivo de configuración del widget
+			 **/
+			protected function reloadConfigWidget(event:AppEvent):void
+			{
+				if(event.data.widgetId == widgetId)
+				{
+					
+					if(event.data.config.lastIndexOf("&ts") != -1)
+					{
+						var i:Number = event.data.config.lastIndexOf("&ts");
+						var f:Number = event.data.config.lastIndexOf("&");
+						f = f <= i ? int.MAX_VALUE: f;
+						
+						event.data.config = event.data.config.replace(event.data.config.substring(i,f),"");
+					}
+					
+					if(event.data.config.lastIndexOf("?") != -1)
+					{
+						event.data.config += "&ts=" + Math.random();
+					}else
+					{
+						event.data.config += "?ts=" + Math.random();
+					}
+					
+					config = event.data.config;
+					
+					//Cuando se utiliza proxy se debe establecer la variable configXML en false, y el parametro waitForCreationComplete de setInfoConfig en false
+					configXML = null;
+					setInfoConfig(event.data.config,false);
+				}
+			}
+			
+
+			protected function cmbCriterios_changeHandler(event:IndexChangeEvent):void
+			{
+				if(event.newIndex != -1)
+				{
+					if(cmbCriterios.selectedItem.campo is ArrayCollection || cmbCriterios.selectedItem.campo.combo)
+					{
+						currentState = "jerarquia";
+						
+						providerJerarquias.removeAll()
+						if(cmbCriterios.selectedItem.campo is ArrayCollection)
+						{
+							providerJerarquias.addAll(cmbCriterios.selectedItem.campo as ArrayCollection);
+						}else if (cmbCriterios.selectedItem.campo)
+						{
+							providerJerarquias.addItem(cmbCriterios.selectedItem.campo);
+						}
+						
+						if(!cmbCriterios.selectedItem.valores)
+						{
+							showError("No hay valores para llenar los criterios de la consulta: " +cmbCriterios.selectedItem.alias);
+							//return;
+						}else
+						{
+							var valores:Object = cmbCriterios.selectedItem.valores;
+							var nombreCampo:String;
+							
+							if(cmbCriterios.selectedItem.campo.hasOwnProperty("length"))
+							{
+								nombreCampo = cmbCriterios.selectedItem.campo[0].nombreCampo;
+								
+								if(valores[nombreCampo] is ArrayCollection)
+								{
+									cmbCriterios.selectedItem.campo[0].datos = valores[nombreCampo];
+								}else if(valores[nombreCampo])
+								{
+									cmbCriterios.selectedItem.campo[0].datos = new ArrayCollection([valores[nombreCampo]]);
+								}
+							}
+							else
+							{
+								nombreCampo = cmbCriterios.selectedItem.campo.nombreCampo;
+								
+								if(valores[nombreCampo] is ArrayCollection)
+								{
+									cmbCriterios.selectedItem.campo.datos = valores[nombreCampo];
+								}else if(valores[nombreCampo])
+								{
+									cmbCriterios.selectedItem.campo.datos = new ArrayCollection([valores[nombreCampo]]);
+								}
+							}
+						}
+						
+					}else if(cmbCriterios.selectedItem.campo)
+					{
+						//poner los valores por defecto del estado Jerarquia
+						if(rowJerarquia)
+						{
+							for (var i:Number = rowJerarquia.length - 1 ; i >= 0 ; i--)
+							{
+								var r:RowSeleccionJerarquica = rowJerarquia[i];
+								r.item.datos = new ArrayCollection();
+							}
+							
+							providerJerarquias = new ArrayCollection();
+							
+						}
+						
+						var opciones:Array = [];
+						if(cmbCriterios.selectedItem.valores)
+						{
+							for each (var valor:ObjectProxy in cmbCriterios.selectedItem.valores[cmbCriterios.selectedItem.campo.nombreCampo])
+							{
+								opciones.push(valor.valor);
+							}
+						}
+						currentState = "autocompletar";
+						autocompletarTexto.opciones = opciones;
+					}
+				}else
+				{
+					currentState = "default";
+				}
+				
+				validarSeleccion();
+			}
+
+			protected function rowJerarquia_seleccionCompletaHandler(event:AppEvent):void
+			{
+				validarSeleccion();
+			}
+			
+			private function validarSeleccion():void
+			{
+				if(currentState == "jerarquia")
+				{
+					if(rowJerarquia)
+					{
+						var itemsSeleccionadosOk:Boolean = true;
+						
+						for (var i:Number = rowJerarquia.length - 1 ; i >= 0 ; i--)
+						{
+							var r:RowSeleccionJerarquica = rowJerarquia[i];
+							if(!r.cmbJerarquias.selectedItem)
+							{
+								itemsSeleccionadosOk = false;
+								break;
+							}
+						}
+						
+						seleccionValida = itemsSeleccionadosOk;
+					}
+				}else if(currentState == "autocompletar")
+				{
+					autocompletarValidator.validate();
+				}else
+				{
+					seleccionValida = false;
+				}
+			}
+
+
+			protected function currentStateChangeHandler(event:StateChangeEvent):void
+			{
+				validarSeleccion();
+			}
+
+
+			protected function btnBuscar_clickHandler(event:MouseEvent):void
+			{
+				if(cmbCriterios.selectedItem)
+				{
+					servicio.url = cmbCriterios.selectedItem.urlCapaOperativa;
+					servicio.send({f:"json",op:"informacionCapa",token:TokenUtil.buscarToken(servicio.url,configData)});
+				}
+			}
+
+
+			protected function servicio_resultHandler(event:ResultEvent):void
+			{
+				if(event.token.message.body.op == "informacionCapa")
+				{
+					var result:Object = JSONUtil.decode(event.result.toString());
+					var useAMF:Boolean = result.currentVersion >= 10;
+					var where:String = "";
+					var separador:String = "";
+					var q:String;
+					var s:String;
+					var c:String;
+					var ff:String = "*";
+					
+					if(cmbCriterios.selectedItem.campo is ArrayCollection)
+					{
+						for each(var campo:ObjectProxy in cmbCriterios.selectedItem.campo)
+						{
+							var row:RowSeleccionJerarquica = rowJerarquia[cmbCriterios.selectedItem.campo.getItemIndex(campo)];
+							if(row.cmbJerarquias.selectedItem.valor && row.cmbJerarquias.selectedItem.valor != "null")
+							{
+								
+								q = (campo.numerico?"":"'");
+								c = (campo.numerico?"":"%");
+								s = (campo.numerico?" = ":" LIKE ");
+																
+								where += separador + " ( " + campo.nombreCampo + s + q + c + row.cmbJerarquias.selectedItem.valor + c + q;
+								if(!campo.numerico)
+								{
+									where += " OR " + campo.nombreCampo + s + q + ff + row.cmbJerarquias.selectedItem.valor + ff + q + " ) ";
+								}else
+								{
+									where += " ) ";
+								}
+								separador = " and ";
+							}
+						}
+					}else if(cmbCriterios.selectedItem.campo.combo)
+					{
+						q = (cmbCriterios.selectedItem.campo.numerico?"":"'");
+						c = (cmbCriterios.selectedItem.campo.numerico?"":"%");
+						s = (cmbCriterios.selectedItem.campo.numerico?" = ":" LIKE ");
+						
+						where += separador + " ( " + cmbCriterios.selectedItem.campo.nombreCampo + s + q + c + rowJerarquia[0].cmbJerarquias.selectedItem.valor + c + q;
+						
+						if(!cmbCriterios.selectedItem.campo.numerico)
+						{
+							where += " OR " + cmbCriterios.selectedItem.campo.nombreCampo + s + q + ff + rowJerarquia[0].cmbJerarquias.selectedItem.valor + ff + q + " ) ";
+						}else
+						{
+							where += " ) ";
+						}
+					}
+					else if(cmbCriterios.selectedItem.campo)
+					{
+						q = (cmbCriterios.selectedItem.campo.numerico?"":"'");  
+						c = (cmbCriterios.selectedItem.campo.numerico?"":"%");
+						s = (cmbCriterios.selectedItem.campo.numerico?" = ":" LIKE ");
+						
+						where += separador + " ( " + cmbCriterios.selectedItem.campo.nombreCampo + s + q + c + autocompletarTexto.text + c + q;
+						
+						if(!cmbCriterios.selectedItem.campo.numerico)
+						{
+							where += " OR " + cmbCriterios.selectedItem.campo.nombreCampo + s + q + ff + autocompletarTexto.text + ff + q + " ) ";
+						}else
+						{
+							where += " ) ";
+						}
+						
+					}
+					
+					query.outFields = ["*"];
+					query.where = where;
+					query.timeExtent = map.timeExtent;
+					
+					queryTask.url = cmbCriterios.selectedItem.urlCapaOperativa;
+					queryTask.proxyURL = (cmbCriterios.selectedItem.useProxy ? configData.proxyUrl :null);
+					queryTask.useAMF = queryTask.proxyURL? false: useAMF;
+					queryTask.token = TokenUtil.buscarToken(queryTask.url,configData);
+					
+					queryTask.execute(query,new AsyncResponder(queryTask_Result,queryTask_Fault));
+				}
+				else if(event.token.message.body.accion == "actualizar")
+				{
+					PopUpManager.removePopUp(alertActualizar);
+					
+					var url:String = config;
+					
+					if(url.lastIndexOf("&ts") != -1)
+					{
+						var i:Number = url.lastIndexOf("&ts");
+						var f:Number = url.lastIndexOf("&");
+						f = f <= i ? int.MAX_VALUE: f;
+						
+						url = url.replace(url.substring(i,f),"");
+					}
+					
+					if(url.lastIndexOf("?") != -1)
+					{
+						url += "&ts=" + Math.random();
+					}else
+					{
+						url += "?ts=" + Math.random();
+					}
+					
+					AppEvent.dispatch("reloadConfigWidget",{widgetId:widgetId,config:url});
+				}
+			}
+
+
+			protected function servicio_faultHandler(event:FaultEvent):void
+			{
+				if(event.token.message.body.op == "informacionCapa")
+				{
+					Alert.show("No fué posible consultar el metadato de la capa asociada al criterio seleccionado\n\n\n" + event.message);
+				}else if(event.token.message.body.accion == "actualizar")
+				{
+					Alert.show("No fué posible actualizar la muestra operativa \n\n" + event.message);
+					PopUpManager.removePopUp(alertActualizar);
+				}
+			}
+			
+			private function queryTask_Result(featureSet:FeatureSet,token:Object = null):void
+			{
+				if(featureSet.features.length == 0)
+				{
+					Alert.show("La consulta realizada no retornó resultados");
+				}else
+				{
+					setState(WidgetStates.WIDGET_MINIMIZED);
+					addSharedData(Constantes.OPERACION_ABRIR_WIDGET,new ArrayCollection([{label:"Resultados",data:{featureSet:featureSet,token:null}}]));
+				}
+			}
+			
+			private function queryTask_Fault(fault:Fault,token:Object = null):void
+			{
+				showError("No fué posible realizar la consulta\n\n" + fault.message);
+			}
+
+
+			protected function wTemplate_minimizedHandler(event:Event):void
+			{
+				cmbCriterios.selectedIndex = -1;
+				cmbCriterios.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-1,-1));
+			}
+
+
+			protected function btnActualizarMuestra_clickHandler(event:MouseEvent):void
+			{
+				if(configData.data && configData.data.actualizarMuestra && configData.data.actualizarMuestra.urlActualizar)
+				{
+					Alert.show("La operación de actualizar puede tardar varios minutos, desea continuar?","Actializar Muestra",Alert.YES | Alert.NO,null,
+						function(e:CloseEvent):void
+						{
+							if(e.detail == Alert.YES)
+							{
+								var mes:String = "";
+								var anio:String = "";
+								if(config.indexOf("mes") != -1 && config.indexOf("ano") != -1)
+								{
+									mes = config.substring(config.indexOf("mes") + 4,config.indexOf("&",config.indexOf("mes")));
+									anio = config.substring(config.indexOf("ano") + 4,config.indexOf("&",config.indexOf("ano")));
+								}
+								
+								
+								servicio.url = configData.data.actualizarMuestra.urlActualizar;
+								servicio.send(
+									{
+										accion:"actualizar",
+										op:configData.data.actualizarMuestra.idAplicacion,
+										control: new Date().time,
+										mes:mes,
+										ano:anio
+									});
+								
+								alertActualizar = Alert.show("Actualizando muestra","",4,null,null,esperando);
+							}
+						});
+				}
+			}
+			
+			private var alertActualizar:Alert;
+
+
+		]]>
+	</fx:Script>
+
+	<fx:Declarations>
+		<s:HTTPService id="servicio" method="POST" showBusyCursor="true" 
+					   result="servicio_resultHandler(event)"
+					   fault="servicio_faultHandler(event)" requestTimeout="-1" concurrency="multiple" 
+					   resultFormat="text"/> 
+		
+		<mx:StringValidator id="autocompletarValidator" source="{autocompletarTexto}" property="text" required="true"
+							triggerEvent="change"
+							valid="{seleccionValida = true}"
+							invalid="{seleccionValida = false}"
+							requiredFieldError="Debe ingresar un valor para realizar la consulta"
+							/>
+		
+		<supportClasses:Query id="query" returnGeometry="true" 
+					outSpatialReference="{map.spatialReference}"
+					/>
+		<tasks:QueryTask id="queryTask" method="POST" showBusyCursor="true" />
+	</fx:Declarations>
+	
+	<viewer:states>
+		<s:State name="default"/>
+		<s:State name="jerarquia"/>
+		<s:State name="autocompletar"/>
+	</viewer:states>
+	
+	<viewer:WidgetTemplate id="wTemplate"
+						   height.default="120"
+						   height.jerarquia="{((rowJerarquia.getItemAt(0)).height)*providerJerarquias.length + (80 + (actualizarMuestra ? 40 : 0))}"
+						   height.autocompletar="{150 + (actualizarMuestra ? 40 : 0)}"
+						   minimized="wTemplate_minimizedHandler(event)"
+						   >
+		<s:VGroup id="contenedor"
+				  horizontalCenter="0" verticalCenter="0" 
+				  verticalAlign="middle" 
+				  horizontalAlign="center"
+				  width="100%"
+				  height="100%"
+				  minHeight="50">
+			
+			<s:VGroup visible="{actualizarMuestra}" 
+					  includeInLayout="{actualizarMuestra}"
+					  width="100%"
+					  horizontalAlign="center">
+				<s:HGroup width="100%">
+					<mx:Spacer width="5"/>
+					<mx:LinkButton label="Actualizar Muestra" 
+								   icon="@Embed(source='assets/images/refresh.png')"
+								   toolTip="Actualiza en el sistema la información de la muestra operativa"
+								   id="btnActualizarMuestra"
+								   click="btnActualizarMuestra_clickHandler(event)"/>
+				</s:HGroup>
+				<s:Line  width="90%" >
+					<s:stroke>
+						<s:SolidColorStroke color="{getStyle('focusColor')}"/>
+					</s:stroke>
+				</s:Line>
+				<mx:Spacer height="100%"/>
+			</s:VGroup>
+			
+			<mx:Grid verticalAlign="middle" horizontalAlign="center" width="100%">
+				<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle">
+					<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+						<s:Label text="Buscar Por:"/>
+					</mx:GridItem>
+					<mx:GridItem verticalAlign="middle" width="100%">
+						<s:DropDownList id="cmbCriterios" width="100%"
+										dataProvider="{providerCriterios}"
+										labelField="alias"
+										prompt="Seleccione..."
+										change="cmbCriterios_changeHandler(event)">
+						</s:DropDownList>
+					</mx:GridItem>
+				</mx:GridRow>
+				
+				<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle" includeIn="autocompletar">
+					<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+						<s:Label text="Valor"/>
+					</mx:GridItem>
+					<mx:GridItem verticalAlign="middle" width="100%">
+						<util:AutocompletarTexto id="autocompletarTexto" width="100%" enter="{btnBuscar.dispatchEvent(new MouseEvent(MouseEvent.CLICK))}"/>
+					</mx:GridItem>
+				</mx:GridRow>
+			</mx:Grid>
+			<mx:Grid verticalAlign="middle" horizontalAlign="center" width="100%" includeIn="jerarquia">
+				<mx:Repeater id="rptrJerarquias" dataProvider="{providerJerarquias}" width="100%">
+					<BusquedaOperativa:RowSeleccionJerarquica id="rowJerarquia" 
+															  item="{rptrJerarquias.currentItem}"
+															  campos="{providerJerarquias}"
+															  currentIndex="{rptrJerarquias.currentIndex}"
+															  width="100%"
+															  
+															  seleccionCambiada="rowJerarquia_seleccionCompletaHandler(event)"/>
+				</mx:Repeater>
+			</mx:Grid>
+			<s:Button id="btnBuscar" label="Buscar" visible="{seleccionValida}" includeInLayout="{seleccionValida}"
+					  click="btnBuscar_clickHandler(event)"/>
+		</s:VGroup>
+	</viewer:WidgetTemplate>
+</viewer:BaseWidget>

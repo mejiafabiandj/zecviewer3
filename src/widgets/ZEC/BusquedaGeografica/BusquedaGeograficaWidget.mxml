@@ -1,0 +1,349 @@
+<?xml version="1.0" encoding="utf-8"?>
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" 
+				   xmlns:viewer="com.esri.viewer.*" 
+				   layout="absolute"
+				   creationComplete="BusquedaGeografica_creationCompleteHandler(event)"
+				   widgetConfigLoaded="BusquedaGeografica_widgetConfigLoadedHandler(event)" xmlns:esri="http://www.esri.com/2008/ags">
+	
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.FeatureSet;
+			import com.esri.ags.Graphic;
+			import com.esri.ags.SpatialReference;
+			import com.esri.ags.events.DrawEvent;
+			import com.esri.ags.geometry.Geometry;
+			import com.esri.ags.geometry.MapPoint;
+			import com.esri.ags.layers.GraphicsLayer;
+			import com.esri.ags.symbols.SimpleFillSymbol;
+			import com.esri.ags.symbols.SimpleLineSymbol;
+			import com.esri.ags.symbols.SimpleMarkerSymbol;
+			import com.esri.ags.tools.DrawTool;
+			import com.esri.ags.tools.NavigationTool;
+			import com.esri.viewer.WidgetStates;
+			
+			import gov.dane.util.Constantes;
+			import gov.dane.util.TokenUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.FlexEvent;
+			import mx.rpc.AsyncResponder;
+			import mx.rpc.Fault;
+			
+			import spark.events.IndexChangeEvent;
+			
+			
+			private const ANCHO_LINEA:Number = 2;
+			private const ANCHO_PUNTO:Number = 10;
+			private const LABEL_PUNTO:String = "Punto";
+			private const LABEL_LINEA:String = "Línea";
+			private const LABEL_POLIG:String = "Polígono";
+			private const COLOR_GEOMETRIA:uint = 0x990000;
+			
+			
+			
+			
+			[Bindable] private var providerCriterios:ArrayCollection = new ArrayCollection();
+			
+			private var graphicsLayer:GraphicsLayer = new GraphicsLayer();
+			private var drawMode:String;
+			
+			protected function BusquedaGeografica_creationCompleteHandler(event:FlexEvent):void
+			{
+				graphicsLayer.id = "Geometría dibujada";
+				graphicsLayer.name = "Geometría dibujada";
+				
+			}
+			
+			protected function BusquedaGeografica_widgetConfigLoadedHandler(event:Event):void
+			{
+				if(configObject)
+				{
+					if(configObject.configuration.criterios)
+					{
+						providerCriterios.removeAll();
+						
+						if(configObject.configuration.criterios.criterio is ArrayCollection)
+						{
+							providerCriterios.addAll(configObject.configuration.criterios.criterio);
+						}else if(configObject.configuration.criterios.criterio)
+						{
+							providerCriterios.addItem(configObject.configuration.criterios.criterio);
+							cmbCriterios.selectedIndex = 0;
+							cmbCriterios.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-1,0));
+						}
+					}
+				}
+				
+			}
+			
+			//============================METODOS DE EFECTOS VISUALES============================//
+			/**
+			 * Desactivar la visibilidad del dibujo cuando se cierre el widget
+			 */
+			private function widgetClosedHandler(event:Event):void
+			{
+				setMapNavigation(null, null);
+				map.removeLayer(graphicsLayer);
+			}
+			
+			/**
+			 * Desactivar la visibilidad del dibujo cuando se minimice el widget
+			 */
+			private function widgetMinimizedHandler(event:Event):void
+			{
+				//graphicsLayer.visible = false;
+				setMapNavigation(null, null);
+				map.removeLayer(graphicsLayer);
+			}
+			
+			/**
+			 * Activa la visibilidad del dibujo cuando se abre el widget
+			 */
+			private function widgetOpenedHandler(event:Event):void
+			{	
+				map.addLayer(graphicsLayer);
+			}
+			
+			
+			
+			//============================METODOS DE CONSULTA GEOGRÁFICA============================//
+			/**
+			 * Realiza el cambio entre tipo de geometria del dibujo
+			 */
+			private function activateDrawTool(value:String, mode:String):void
+			{
+				drawMode = mode;
+				var label:String;
+				
+				//Texto que se muestra en "current action"
+				switch (value)
+				{
+					case DrawTool.MAPPOINT:
+					{
+						label = "Buscar punto";
+						break;
+					}
+					case DrawTool.POLYLINE:
+					{
+						label = "Buscar Linea";
+						break;
+					}
+					case DrawTool.POLYGON:
+					{
+						label = "Buscar Polígono";
+						break;
+					}
+				}
+				setMapAction(value, label, null,drawEnd);
+			}
+			
+			/**
+			 * Añadir el dibujo como un nuevo layer
+			 */ 
+			private function drawEnd(event:DrawEvent):void
+			{
+				this.cursorManager.setBusyCursor(); //pone el cursor como ocupado
+				
+				var outSR:SpatialReference = map.spatialReference;
+				var geom:Geometry = event.graphic.geometry;	//geometria seleccionada para el dibujo
+				var gra:Graphic = new Graphic(geom);
+				var puntos:Array;
+				var punto:MapPoint;
+				
+				graphicsLayer.clear();
+				
+				switch (geom.type)  
+				{         
+					case Geometry.MAPPOINT:
+					{
+						var ptSym:SimpleMarkerSymbol = new SimpleMarkerSymbol("circle", ANCHO_PUNTO, COLOR_GEOMETRIA);
+						punto = geom as MapPoint;
+						gra.symbol = ptSym;
+						
+						break;
+					}
+						
+					case Geometry.POLYLINE:
+					{
+						var lineSym:SimpleLineSymbol = new SimpleLineSymbol("solid",COLOR_GEOMETRIA, 1, ANCHO_LINEA);
+						gra.symbol = lineSym;
+						
+						break;
+					}
+					case Geometry.POLYGON:
+					{
+						var outlineSym:SimpleLineSymbol = new SimpleLineSymbol("solid",COLOR_GEOMETRIA, 1, ANCHO_LINEA);
+						var polySym:SimpleFillSymbol = new SimpleFillSymbol("solid", COLOR_GEOMETRIA, 0.25, outlineSym);
+						gra.symbol = polySym;
+						
+						break;
+					}
+					default: 
+					{
+						//geomQuery = null; 
+						break;
+					}
+				}
+				this.cursorManager.removeBusyCursor();
+				
+				//añadir el gráfico de la geometria dibujada como un layer
+				graphicsLayer.add(gra);
+				
+				buscar(gra);
+				
+				setMapNavigation(NavigationTool.PAN,"Mover Mapa");
+				
+			}
+			
+			/**
+			 * Elimina el dibujo anterior
+			 */
+			private function limpiarDibujo():void
+			{
+				graphicsLayer.clear();
+				//addSharedData("Resultados",new ArrayCollection([{titulo: "No hay resultados"}]));
+			}
+			
+			
+			/**
+			 * Cambiar el aspecto visual de la imagen mientras el mouse se encuentra sobre ella
+			 */
+			private function onMouseOverImage(event:MouseEvent):void{
+				(event.currentTarget as Image).alpha = 0.8;
+			}
+			
+			/**
+			 * Restablecer el aspecto visual de la imagen cuando el mouse salga de ella
+			 */
+			private function onMouseOutImage(event:MouseEvent):void{
+				(event.currentTarget as Image).alpha = 1;
+			}
+			
+			
+			private function buscar(gra:Graphic):void
+			{
+				if(cmbCriterios.selectedItem)
+				{
+					query.outFields = ["*"];
+					query.where = cmbCriterios.selectedItem.where ? cmbCriterios.selectedItem.where : "1=1";
+					query.timeExtent = map.timeExtent;
+					query.geometry = gra.geometry;
+					query.spatialRelationship = Query.SPATIAL_REL_INTERSECTS;
+					
+					queryTask.url = cmbCriterios.selectedItem.url;
+					queryTask.proxyURL = (cmbCriterios.selectedItem.useProxy ? configData.proxyUrl :null);
+					queryTask.useAMF = queryTask.proxyURL? false: cmbCriterios.selectedItem.useAMF;
+					queryTask.token = TokenUtil.buscarToken(queryTask.url,configData);
+					
+					queryTask.execute(query,new AsyncResponder(queryTask_Result,queryTask_Fault));
+				}
+			}
+			
+			private function queryTask_Result(featureSet:FeatureSet,token:Object = null):void
+			{
+				if(featureSet.features.length == 0)
+				{
+					Alert.show("La consulta realizada no retornó resultados");
+				}else
+				{
+					//setState(WidgetStates.WIDGET_MINIMIZED);
+					addSharedData(Constantes.OPERACION_ABRIR_WIDGET,new ArrayCollection([{label:"Resultados",data:{featureSet:featureSet,token:null}}]));
+				}
+			}
+			
+			private function queryTask_Fault(fault:Fault,token:Object = null):void
+			{
+				showError("No fué posible realizar la consulta\n\n" + fault.message);
+			}
+
+			
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+		
+		<esri:Query id="query" returnGeometry="true" 
+							  outSpatialReference="{map.spatialReference}"
+							  />
+		<esri:QueryTask id="queryTask" method="POST" showBusyCursor="true" />
+	</fx:Declarations>
+	
+	<viewer:WidgetTemplate id="wTemplate"
+						   minimized="widgetMinimizedHandler(event)"
+						   open="widgetOpenedHandler(event)"
+						   closed="widgetClosedHandler(event)"
+						   >
+		<s:BorderContainer cornerRadius="5" top="15" bottom="0" right="0" left="0" backgroundAlpha="0" 
+						   minHeight="50">
+			<s:VGroup horizontalCenter="0" verticalCenter="0" verticalAlign="middle" 
+					  horizontalAlign="center" left="5" top="5" right="5" bottom="5"
+					  >
+				<mx:Grid width="100%">
+					<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle" >
+						<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+							<s:Label text="Buscar:"/>
+						</mx:GridItem>
+						<mx:GridItem verticalAlign="middle" width="100%">
+							<s:DropDownList id="cmbCriterios" dataProvider="{providerCriterios}" labelField="alias" width="100%" 
+											prompt="Seleccione..."/>
+						</mx:GridItem>
+					</mx:GridRow>
+					<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle" visible="{cmbCriterios.selectedItem}" includeInLayout="{cmbCriterios.selectedItem}">
+						<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+							<s:Label text="Geometría:"/>
+						</mx:GridItem>
+						<mx:GridItem verticalAlign="middle" width="100%">
+							<s:HGroup width="100%" verticalAlign="middle">
+								<mx:Image click="{activateDrawTool(DrawTool.MAPPOINT, LABEL_PUNTO)}" 
+										  source="assets/images/i_draw_point.png" 
+										  useHandCursor="true" 
+										  buttonMode="true" 
+										  toolTip="Punto" 
+										  width="40" 
+										  height="40" 
+										  mouseOver="{onMouseOverImage(event)}" 
+										  mouseOut="{onMouseOutImage(event)}"
+										  />
+								<mx:Image click="{activateDrawTool(DrawTool.POLYLINE, LABEL_LINEA)}" 
+										  source="assets/images/i_draw_line.png" 
+										  useHandCursor="true" 
+										  buttonMode="true" 
+										  toolTip="Línea" 
+										  width="40" 
+										  height="40" 
+										  mouseOver="{onMouseOverImage(event)}" 
+										  mouseOut="{onMouseOutImage(event)}"
+										  />
+								<mx:Image click="{activateDrawTool(DrawTool.POLYGON, LABEL_POLIG)}" 
+										  source="assets/images/i_draw_poly.png" 
+										  useHandCursor="true" 
+										  buttonMode="true" 
+										  toolTip="Polígono" 
+										  width="40" 
+										  height="40" 
+										  mouseOver="{onMouseOverImage(event)}" 
+										  mouseOut="{onMouseOutImage(event)}"
+										  />
+								<mx:VRule width="11" height="35"/>
+								<mx:Image click="{limpiarDibujo()}" 
+										  source="assets/images/i_clear.png" 
+										  useHandCursor="true" 
+										  buttonMode="true" 
+										  toolTip="Limpiar búsqueda" 
+										  width="40" 
+										  height="40" 
+										  mouseOver="{onMouseOverImage(event)}" 
+										  mouseOut="{onMouseOutImage(event)}"
+										  />
+							</s:HGroup>
+						</mx:GridItem>
+					</mx:GridRow>
+				</mx:Grid>
+			</s:VGroup>
+			
+		</s:BorderContainer>
+	</viewer:WidgetTemplate>
+</viewer:BaseWidget>

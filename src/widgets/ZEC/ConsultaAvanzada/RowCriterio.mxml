@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:GridRow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			xmlns:s="library://ns.adobe.com/flex/spark" 
+			xmlns:mx="library://ns.adobe.com/flex/mx"
+			width="100%"
+			verticalAlign="middle"
+			horizontalAlign="center"
+			creationComplete="gridrow1_creationCompleteHandler(event)">
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.layers.supportClasses.Field;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.FlexEvent;
+			
+			import spark.events.IndexChangeEvent;
+			import spark.events.TextOperationEvent;
+			
+			[Bindable] private var operadoresAlfanumericos:ArrayCollection = new ArrayCollection(["Contiene","Igual","Diferente","Comienza por","Termina en"]);
+			[Bindable] private var operadoresNumericos:ArrayCollection = new ArrayCollection(["Igual","Mayor","Menor","Mayor o Igual","Menor o Igual"]);
+			
+			[Bindable] public var item:Object;
+			
+			[Bindable] private var criterioIsNumeric:Boolean = false;
+
+			protected function gridrow1_creationCompleteHandler(event:FlexEvent):void
+			{
+				if(cmbAtributo && item.indexAtributo >= 0)
+				{
+					cmbAtributo.selectedIndex = item.indexAtributo;
+					cmbAtributo.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-2,item.indexAtributo));
+				}
+				
+				if(txtValor && item.valor)
+				{
+					txtValor.text = item.valor;
+				}
+				
+				validator.validate();
+			}
+
+			protected function cmbAtributo_changeHandler(event:IndexChangeEvent):void
+			{
+				item.atributo = cmbAtributo.selectedItem;
+				item.indexAtributo = cmbAtributo.selectedIndex;
+				var tipo:String = cmbAtributo.selectedItem.type; 
+				
+				cmbOperador.dataProvider = new ArrayCollection();
+				
+				//Establecer el dominio de operadores según el tipo de dato
+				if(tipo == Field.TYPE_STRING || tipo == Field.TYPE_XML)
+				{
+					cmbOperador.dataProvider = operadoresAlfanumericos;
+				}else if(	tipo == Field.TYPE_DATE ||
+							tipo == Field.TYPE_DOUBLE ||
+							tipo == Field.TYPE_GLOBAL_ID ||
+							tipo == Field.TYPE_GUID ||	
+							tipo == Field.TYPE_INTEGER ||
+							tipo == Field.TYPE_OID ||
+							tipo == Field.TYPE_SINGLE ||
+							tipo == Field.TYPE_SMALL_INTEGER)
+				{
+					criterioIsNumeric = true;
+					cmbOperador.dataProvider = operadoresNumericos;
+				}else
+				{
+					criterioIsNumeric = false;
+					Alert.show("El tipo de dato: " + tipo + " No cuenta con un dominio de operadores definido, por favor informe de este error");
+				}
+				
+				if(item.indexOperador >= 0 && event.oldIndex == -2)
+				{
+					cmbOperador.selectedIndex = item.indexOperador;
+					cmbOperador.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-2,item.indexOperador));
+				}else
+				{
+					item.operador = null;
+					item.indexOperador = null;
+				}
+			}
+
+
+			protected function grdEliminar_clickHandler(event:MouseEvent):void
+			{
+				ConsultaAvanzadaWidget.getInstance().providerGrdCriterios.removeItemAt(ConsultaAvanzadaWidget.getInstance().providerGrdCriterios.getItemIndex(item));
+				ConsultaAvanzadaWidget.getInstance().wTemplate.height = ConsultaAvanzadaWidget.getInstance().wTemplate.height > 250 ? ConsultaAvanzadaWidget.getInstance().wTemplate.height - 28 :  ConsultaAvanzadaWidget.getInstance().wTemplate.height;
+				
+				if(ConsultaAvanzadaWidget.getInstance().providerGrdCriterios.length == 0)
+				{
+					ConsultaAvanzadaWidget.getInstance().providerGrdCriterios.addItem({});	
+				}
+			}
+
+
+			protected function cmbOperador_changeHandler(event:IndexChangeEvent):void
+			{
+				item.operador = cmbOperador.selectedItem;
+				item.indexOperador = cmbOperador.selectedIndex;
+				
+			}
+
+
+			protected function txtValor_changeHandler(event:TextOperationEvent):void
+			{
+				item.valor = txtValor.text;
+			}
+
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<mx:Validator id="validator" source="{txtValor}" property="text" triggerEvent="change" required="true" requiredFieldError="Debe ingresar un valor" />
+	</fx:Declarations>
+	<mx:GridItem width="100%" verticalAlign="middle" horizontalAlign="center">
+		<s:DropDownList id="cmbAtributo" width="100%" minWidth="200" dataProvider="{ConsultaAvanzadaWidget.providerFields}"
+						labelField="alias"
+						selectionColor="{getStyle('rollOverColor')}"
+						prompt="Seleccione..."
+						change="cmbAtributo_changeHandler(event)"/>
+	</mx:GridItem>
+	<mx:GridItem width="100%" verticalAlign="middle" horizontalAlign="center">
+		<s:DropDownList id="cmbOperador" width="100%" selectionColor="{getStyle('rollOverColor')}"
+						selectedIndex="{item.indexAtributo}"
+						prompt="Seleccione..."
+						change="cmbOperador_changeHandler(event)"/>
+	</mx:GridItem>
+	<mx:GridItem width="100%" verticalAlign="middle" horizontalAlign="center">
+		<s:TextInput id="txtValor" width="100%"
+					 change="txtValor_changeHandler(event)"/>
+	</mx:GridItem>
+	<mx:GridItem id="grdEliminar" width="30" verticalAlign="middle" horizontalAlign="center" 
+				 useHandCursor="true" buttonMode="true" 
+				 click="grdEliminar_clickHandler(event)"
+				 toolTip="Eliminar criterio">
+		<mx:Image source="assets/images/delete.png"/>
+	</mx:GridItem>
+</mx:GridRow>

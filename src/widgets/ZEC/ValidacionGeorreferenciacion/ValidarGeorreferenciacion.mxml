@@ -1,0 +1,580 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:ValidacionGeorreferenciacion="widgets.DANE.ValidacionGeorreferenciacion.*" xmlns:esri="http://www.esri.com/2008/ags"
+		 >
+	<fx:Script>
+		<![CDATA[
+			import com.as3xls.xls.ExcelFile;
+			import com.as3xls.xls.Sheet;
+			import com.esri.ags.Graphic;
+			import com.esri.ags.Map;
+			import com.esri.ags.events.MapEvent;
+			import com.esri.ags.events.QueryEvent;
+			import com.esri.ags.geometry.Geometry;
+			import com.esri.ags.layers.FeatureLayer;
+			import com.esri.ags.layers.GraphicsLayer;
+			import com.esri.ags.layers.Layer;
+			import com.esri.ags.layers.supportClasses.FeatureCollection;
+			import com.esri.ags.layers.supportClasses.Field;
+			import com.esri.ags.layers.supportClasses.LayerDetails;
+			import com.esri.ags.tasks.QueryTask;
+			import com.esri.ags.utils.JSON;
+			import com.esri.ags.webmap.PopUpRenderer;
+			import com.esri.ags.webmap.supportClasses.PopUpInfo;
+			import com.esri.viewer.ConfigData;
+			
+			import gov.dane.util.TokenUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.http.HTTPService;
+			import mx.utils.ObjectProxy;
+			
+			import spark.events.IndexChangeEvent;
+			
+			[Bindable] private var providerCmbNivel:ArrayCollection = new ArrayCollection();
+			[Bindable] private var providercmbAtributoAValidar:ArrayCollection = new ArrayCollection();
+			
+			[Bindable] private var providerGrdResultados:ArrayCollection = new ArrayCollection();
+			
+			
+			private var selectedVigencia:Object;
+			
+			/**
+			 * Listado de mapas base definidos en el archivo de configuración principal <code>configData.basemaps</code>
+			 **/
+			public var baseMaps:Array;
+			
+			[Bindable]public var proxyUrl:String;
+			
+			private var _configObject:Object;
+
+			/**
+			 * Se debe asignar primero la propiedad <code>baseMaps</code>
+			 **/
+			[Bindable]public function get configObject():Object
+			{
+				return _configObject;
+			}
+
+			public function set configObject(value:Object):void
+			{
+				_configObject = value;
+				configurarNiveles();
+			}
+
+			
+			private var _map:Map;
+
+			[Bindable]public function get map():Map
+			{
+				return _map;
+			}
+
+			public function set map(value:Map):void
+			{
+				_map = value;
+				
+				map.removeEventListener(MapEvent.LAYER_ADD,actualizarCapas);
+				map.addEventListener(MapEvent.LAYER_ADD,actualizarCapas);
+				
+				map.removeEventListener(MapEvent.LAYER_REMOVE,actualizarCapas);
+				map.addEventListener(MapEvent.LAYER_REMOVE,actualizarCapas);
+				
+				map.removeEventListener(MapEvent.LAYER_REORDER,actualizarCapas);
+				map.addEventListener(MapEvent.LAYER_REORDER,actualizarCapas);
+				
+				map.removeEventListener(MapEvent.LAYER_REMOVE_ALL,actualizarCapas);
+				map.addEventListener(MapEvent.LAYER_REMOVE_ALL,actualizarCapas);
+				
+				actualizarCapas();
+			}
+			
+			
+			private function actualizarCapas(event:MapEvent=null):void
+			{
+				if(event && event.type == MapEvent.LAYER_REORDER)
+				{
+					providerCmbCapas.removeAll();
+				}
+				
+				providerCmbCapas.source = map.layers.toArray();
+				
+			}
+			
+			
+			/**
+			 * Retorna el nombre del mapa base que se encuentra activo
+			 **/
+			public function selectedBasemap():String
+			{
+				var selectedBasemap:String;
+				
+				for each(var layer:Layer in map.layers)
+				{
+					for each(var basemap:Object in baseMaps)
+					{
+						if(layer.id == basemap.label)
+						{
+							if(layer.visible)
+							{
+								selectedBasemap = layer.id;
+							}
+						}
+					}
+				}
+				return selectedBasemap;
+			}
+			
+			
+			public function configurarNiveles():void
+			{
+				if(configObject)
+				{
+					providerCmbNivel.removeAll();
+					
+					for each(var vigencia:Object in configObject.configuration.vigencias.vigencia)
+					{
+						if(vigencia.label == selectedBasemap())
+						{
+							selectedVigencia = vigencia;
+							
+							if(vigencia.niveles.nivel is ArrayCollection)
+							{
+								providerCmbNivel.addAll(vigencia.niveles.nivel);
+							}else
+							{
+								providerCmbNivel.addItem(vigencia.niveles.nivel);
+							}
+							
+							cmbNivel.selectedIndex = -1;
+							cmbNivel.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-1,-1));
+							break;
+						}
+					}
+				}
+				
+			}
+			
+			protected function servicio_resultHandler(event:ResultEvent):void
+			{
+				if(event.token.message.body.op == "informacionCapa")
+				{
+					if(event.result)
+					{
+						var result:Object = JSON.decode(event.result.toString());
+						
+						if(result.fields is Array)
+						{
+							providerCmbAtributos.source = result.fields;
+						}
+					}
+				}
+				
+			}
+			
+			protected function servicio_faultHandler(event:FaultEvent):void
+			{
+				Alert.show("No fué posible realizar la consulta.\n\n" + event.message);
+			}
+			
+			private function filtroCapas(item:Object):Boolean
+			{
+				if(item.className == "FeatureLayer" || item.className == "GraphicsLayer")
+				{
+					return true;
+				}
+				return false;
+			}
+			
+			
+			private function filtroTipoCampo(item:Object):Boolean
+			{
+				if( item.name.toLocaleUpperCase().lastIndexOf("OBJECTID") != -1 )
+				{
+					return false;
+				}else 
+				{
+					if((item.type == Field.TYPE_GEOMETRY || 
+						item.type == Field.TYPE_RASTER))
+					{
+						return false;
+					}else
+					{
+						return true;
+					}
+				}
+			}
+			
+			
+			protected function cmbCapas_changeHandler(event:IndexChangeEvent):void
+			{
+				if(cmbCapas.selectedItem)
+				{
+					providercmbAtributoAValidar.removeAll();
+					
+					switch(cmbCapas.selectedItem.className)
+					{
+						case "GraphicsLayer":
+						{
+							var graphicsLayer:GraphicsLayer = cmbCapas.selectedItem;
+							
+							if(graphicsLayer.graphicProvider.length	> 0)
+							{
+								var elemento:Graphic = graphicsLayer.graphicProvider.getItemAt(0);
+								if(elemento.attributes)
+								{
+									for (var att:String in elemento.attributes)
+									{
+										providercmbAtributoAValidar.addItem(new ObjectProxy({alias:att,name:att}));
+									}
+								}
+							}
+						}break;
+						case "FeatureLayer":
+						{
+							var featureLayer:FeatureLayer = cmbCapas.selectedItem;
+							
+							if(featureLayer.layerDetails)
+							{
+								for each (var field:Field in featureLayer.layerDetails.fields)
+								{
+									if( field.name.toLocaleUpperCase().lastIndexOf("OBJECTID") != -1 || field.name.toLocaleUpperCase() == "FID")
+									{
+										continue;
+									}else 
+									{
+										if((field.type == Field.TYPE_GEOMETRY || 
+											field.type == Field.TYPE_RASTER))
+										{
+											continue
+										}else
+										{
+											providercmbAtributoAValidar.addItem(field);
+										}
+									}
+								}
+							}
+						}break;
+					}
+				}
+			}
+			
+			
+			protected function cmbNivel_changeHandler(event:IndexChangeEvent):void
+			{
+				if(cmbNivel.selectedItem && selectedVigencia)
+				{
+					providerCmbAtributos.removeAll();
+					
+					servicio.url = selectedVigencia.url + "/" + cmbNivel.selectedItem.id;
+					servicio.resultFormat = mx.rpc.http.HTTPService.RESULT_FORMAT_TEXT;
+					servicio.send(
+						{
+							f:"json",
+							token:TokenUtil.buscarToken(selectedVigencia.url),
+							op:"informacionCapa"
+						});
+				}
+			}
+			
+			
+			protected function cmbAtributos_changeHandler(event:IndexChangeEvent):void
+			{
+				// TODO Auto-generated method stub
+				
+			}
+			
+			
+			protected function cmbAtributoAValidar_changeHandler(event:IndexChangeEvent):void
+			{
+				// TODO Auto-generated method stub
+				
+			}
+			
+			protected function btnValidar_clickHandler(event:MouseEvent):void
+			{
+				validador.validar(cmbCapas.selectedItem, cmbAtributoAValidar.selectedItem, selectedVigencia, cmbNivel.selectedItem, cmbAtributos.selectedItem);
+			}
+			
+			
+			
+			protected function validador_executeCompleteHandler(event:QueryEvent):void
+			{
+				
+				resultadosValidacionFeatureLayer.featureCollection = null;
+				
+				if(event.count > 0)
+				{
+					switch(event.featureSet.features[0].geometry.type)
+					{
+						case Geometry.MAPPOINT:
+						{
+							infoCorrecto.symbol = puntoCorrecto;
+							infoIncorrecto.symbol = puntoIncorrecto;
+							resultadosRenderer.defaultSymbol = puntoDefault;
+						}break;
+						case Geometry.POLYLINE:
+						{
+							infoCorrecto.symbol = lineaCorrecto;
+							infoIncorrecto.symbol = lineaIncorrecto;
+							resultadosRenderer.defaultSymbol = lineaDefault;
+						}break;
+						case Geometry.POLYGON:
+						{
+							infoCorrecto.symbol = poligonoCorrecto;
+							infoIncorrecto.symbol = poligonoIncorrecto;
+							resultadosRenderer.defaultSymbol = poligonoDefault;
+						}break;
+					}
+					
+					var popUpInfo:PopUpInfo = new PopUpInfo();
+					
+					if(event.featureSet.features[0])
+					{
+						var attributos:Object = event.featureSet.features[0].attributes;
+						var descripcion:String = "";
+						var lista:Array = [];
+						var att:String;
+						
+						for (att in attributos)
+						{
+							lista.push(att);
+						}
+						
+						lista = lista.sort();
+						for each(att in lista)
+						{
+							descripcion += "<li><i>" + att + ":</i> {" + att + "}</li>";
+						}
+						
+						popUpInfo.description = descripcion;
+					}
+					
+					var popUpRenderer:ClassFactory = new ClassFactory(PopUpRenderer);
+					popUpRenderer.properties = { popUpInfo: popUpInfo };
+					
+					resultadosValidacionFeatureLayer.infoWindowRenderer = popUpRenderer;
+					resultadosValidacionFeatureLayer.featureCollection = new FeatureCollection(event.featureSet,new LayerDetails());
+					
+					currentState = "reporte";
+				}
+			}
+			
+			protected function validador_faultHandler(event:FaultEvent):void
+			{
+				Alert.show("Algunos elementos no se pudieron validar correctamente \n\n" + event.message);
+			}
+			
+			protected function btnVolver_clickHandler(event:MouseEvent):void
+			{
+				
+				resultadosValidacionFeatureLayer.featureCollection = null;
+				currentState = "parametros";
+				
+			}
+			
+			protected function btnReporte_clickHandler(event:MouseEvent):void
+			{
+				var sheet:Sheet = new Sheet();
+				var dataProviderCollection:ArrayCollection = new ArrayCollection(resultadosValidacionFeatureLayer.featureCollection.featureSet.attributes);
+				var rowCount:int = dataProviderCollection.length;
+				var columns:Array = [];
+				var i:int = 0;
+				
+				for (var att:String in dataProviderCollection.getItemAt(0))
+				{
+					columns.push(att);
+				}
+				
+				sheet.resize(rowCount + 1,columns.length);
+				for each (var field:String in columns){
+					sheet.setCell(0,i,field);
+					i++;
+				}
+				
+				for(var r:int=0; r < rowCount; r++)
+				{
+					var record:Object = dataProviderCollection.getItemAt(r);
+					
+					insertRecordInSheet(r+1,sheet,record,columns);
+				}
+				
+				var xls:ExcelFile = new ExcelFile();
+				
+				xls.sheets.addItem(sheet);
+				
+				var bytes:ByteArray = xls.saveToByteArray();
+				var fr:FileReference = new FileReference();
+				fr.addEventListener(Event.COMPLETE,
+					function():void
+					{
+						Alert.show("Archivo descargado","Finalizado");
+					});
+				fr.addEventListener(IOErrorEvent.IO_ERROR,
+					function():void
+					{
+						Alert.show("Error al guardar el archivo","Finalizado");
+					});
+				fr.addEventListener(SecurityErrorEvent.SECURITY_ERROR,
+					function():void
+					{
+						Alert.show("Error al guardar el archivo","Finalizado");
+					});
+				fr.save(bytes,"Reporte Validación.xls");
+			}
+			
+			private function insertRecordInSheet(row:int,sheet:Sheet,record:Object,colums:Array):void
+			{
+				var colCount:int = colums.length;
+				for(var c:int; c < colCount; c++)
+				{
+					var i:int = 0;
+					for each(var field:String in colums){
+						for each (var value:String in record){
+							try
+							{
+								if (record[field].toString() == value)
+									sheet.setCell(row,i,value);
+							}catch(e:Error)
+							{
+								sheet.setCell(row,i,"");
+							}
+						}
+						i++;
+					}
+				}
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<ValidacionGeorreferenciacion:Validador id="validador" executeComplete="validador_executeCompleteHandler(event)" fault="validador_faultHandler(event)"
+												proxyUrl="{proxyUrl}"/>
+		
+		<s:ArrayCollection id="providerCmbCapas" filterFunction="filtroCapas"/>
+		<s:ArrayCollection id="providerCmbAtributos" filterFunction="filtroTipoCampo"/>
+		
+		<s:HTTPService id="servicio" showBusyCursor="true" 
+					   fault="servicio_faultHandler(event)" 
+					   result="servicio_resultHandler(event)"
+					   method="POST"/>
+		
+		<esri:FeatureLayer id="resultadosValidacionFeatureLayer" name="Resultados Validación Georreferenciación" renderer="{resultadosRenderer}"/>
+		
+		
+		<esri:UniqueValueRenderer id="resultadosRenderer" field="{Validador.ATTRIBUTO_GEORREFERENCIACION_VALIDA}" 
+								  defaultLabel="No Evaluado">
+			<esri:UniqueValueInfo id="infoCorrecto" description="Georreferenciación Correcta" label="Georreferenciación Correcta" 
+								  value="{Validador.VALOR_GEORREFERENCIACION_VALIDA}"/>
+			<esri:UniqueValueInfo id="infoIncorrecto" description="Georreferenciación Inorrecta" label="Georreferenciación incorrecta" 
+								  value="{Validador.VALOR_GEORREFERENCIACION_NO_VALIDA}"/>
+		</esri:UniqueValueRenderer>
+		
+		<esri:SimpleFillSymbol id="poligonoDefault" color="0x878787" style="solid" alpha="0.7" outline="{lineaDefault}"/>
+		<esri:SimpleFillSymbol id="poligonoCorrecto" color="0x0ca417" style="solid" alpha="0.7" outline="{lineaCorrecto}"/>
+		<esri:SimpleFillSymbol id="poligonoIncorrecto" color="0xdd0d0d" style="solid" alpha="0.7" outline="{lineaIncorrecto}"/>
+		
+		<esri:SimpleLineSymbol id="lineaDefault" color="0x878787" style="solid" width="3"/>
+		<esri:SimpleLineSymbol id="lineaCorrecto" color="0x0ca417" style="solid" width="3"/>
+		<esri:SimpleLineSymbol id="lineaIncorrecto" color="0xdd0d0d" style="solid" width="3"/>
+							   
+		<esri:SimpleMarkerSymbol id="puntoDefault" color="0x878787" style="circle" alpha="0.7" outline="{lineaDefault}" size="20"/>
+		<esri:SimpleMarkerSymbol id="puntoCorrecto" color="0x0ca417" style="circle" alpha="0.7" outline="{lineaCorrecto}" size="20"/>
+		<esri:SimpleMarkerSymbol id="puntoIncorrecto" color="0xdd0d0d" style="circle" alpha="0.7" outline="{lineaIncorrecto}" size="20"/>
+	</fx:Declarations>
+	
+	<s:states>
+		<s:State name="parametros"/>
+		<s:State name="reporte"/>
+	</s:states>
+	
+	<mx:VBox maxHeight="{this.height}" verticalScrollPolicy="auto" height="100%" width="100%" horizontalAlign="center">
+		<mx:Grid verticalAlign="middle" horizontalAlign="center" width="100%" includeIn="parametros">
+			<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle">
+				<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+					<s:Label text="Capa a validar"/>
+				</mx:GridItem>
+				<mx:GridItem verticalAlign="middle" width="100%">
+					<s:DropDownList id="cmbCapas" width="100%" 
+									dataProvider="{providerCmbCapas}"
+									labelField="name"
+									prompt="Seleccione..."
+									change="cmbCapas_changeHandler(event)"/>
+				</mx:GridItem>
+			</mx:GridRow>
+			
+			<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle" visible="{cmbCapas.selectedItem}" includeInLayout="{cmbCapas.selectedItem}">
+				<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+					<s:Label text="Atributo de enlace"/>
+				</mx:GridItem>
+				<mx:GridItem verticalAlign="middle" width="100%">
+					<s:DropDownList id="cmbAtributoAValidar" width="100%" 
+									dataProvider="{providercmbAtributoAValidar}"
+									labelField="alias"
+									prompt="Seleccione..."
+									change="cmbAtributoAValidar_changeHandler(event)"/>
+				</mx:GridItem>
+			</mx:GridRow>
+			
+			<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle">
+				<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+					<s:Label text="Nivel de Información"/>
+				</mx:GridItem>
+				<mx:GridItem verticalAlign="middle" width="100%">
+					<s:DropDownList id="cmbNivel" width="100%" 
+									dataProvider="{providerCmbNivel}"
+									prompt="Seleccione..."
+									change="cmbNivel_changeHandler(event)"/>
+				</mx:GridItem>
+			</mx:GridRow>
+			
+			<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle" visible="{cmbNivel.selectedItem}" includeInLayout="{cmbNivel.selectedItem}">
+				<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+					<s:Label text="Atributo de enlace"/>
+				</mx:GridItem>
+				<mx:GridItem verticalAlign="middle" width="100%">
+					<s:DropDownList id="cmbAtributos" width="100%" 
+									dataProvider="{providerCmbAtributos}"
+									labelField="alias"
+									prompt="Seleccione..."
+									change="cmbAtributos_changeHandler(event)"/>
+				</mx:GridItem>
+			</mx:GridRow>
+		</mx:Grid>
+		<s:Button id="btnValidar" label="Validar" click="btnValidar_clickHandler(event)" 
+				  visible="{cmbAtributoAValidar.selectedItem &amp;&amp; cmbAtributos.selectedItem}" 
+				  includeInLayout="{cmbAtributoAValidar.selectedItem &amp;&amp; cmbAtributos.selectedItem}"
+				  includeIn="parametros"/>
+		
+		<s:HGroup width="100%" includeIn="reporte">
+			<mx:LinkButton id="btnVolver" label="Volver" 
+						   click="btnVolver_clickHandler(event)"
+						   toolTip="Editar los parámetros de la validación"
+						   icon="@Embed(source='assets/images/w_close_red2.png')"/>
+			
+			<mx:LinkButton id="btnReporte" label="Generar reporte de los resultados" 
+						   click="btnReporte_clickHandler(event)"
+						   toolTip="Generar reporte de los resultados"
+						   icon="@Embed(source='assets/images/download_layer.png')"/>
+		</s:HGroup>
+		
+		<s:Group id="contReporte" includeIn="reporte"
+				  width="100%" height="100%">
+			<s:DataGrid id="grdResultados" dataProvider="{new ArrayCollection(resultadosValidacionFeatureLayer.featureCollection.featureSet.attributes)}" 
+						maxHeight="{contReporte.height}"
+						maxWidth="{contReporte.width}" left="0" right="0" top="0" bottom="0">
+				<s:columns>
+					<s:ArrayList>					
+						<s:GridColumn dataField="{cmbAtributoAValidar.selectedItem.name}" headerText="Elemento"/>
+						<s:GridColumn dataField="{Validador.ATTRIBUTO_TITULO_GEORREFERENCIACION}" headerText="Resultado" itemRenderer="widgets.DANE.ValidacionGeorreferenciacion.GridResultadosTextoItemRenderer"/>
+					</s:ArrayList>
+				</s:columns>
+			</s:DataGrid>
+		</s:Group>
+		
+	</mx:VBox>
+</s:Group>

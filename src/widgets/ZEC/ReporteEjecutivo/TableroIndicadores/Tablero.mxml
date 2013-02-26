@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" 
+		 xmlns:esri="http://www.esri.com/2008/ags" 
+		 xmlns:local="*" width="100%" height="100%" xmlns:TableroIndicadores="widgets.DANE.ReporteEjecutivo.TableroIndicadores.*">
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.geometry.Extent;
+			import com.esri.ags.layers.ArcGISDynamicMapServiceLayer;
+			import com.esri.ags.layers.GraphicsLayer;
+			
+			import flashx.textLayout.factory.TruncationOptions;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.ComboBase;
+			import mx.controls.ComboBox;
+			import mx.events.DropdownEvent;
+			import mx.events.FlexEvent;
+			import mx.managers.CursorManager;
+			
+						
+			[Embed(source='assets/images/loader.gif')]
+			[Bindable]
+			public var loader:Class ;
+			
+			public static const LAYER_ID:String="TI";
+			public static const LAYER_NAME:String="Tablero de Indicadores";
+			
+			/** 
+			 * graphicsLayer 
+			 */
+			private var _graphicsLayer:GraphicsLayer;
+			public function get graphicsLayer():GraphicsLayer{ return _graphicsLayer; }
+			public function set graphicsLayer(value:GraphicsLayer):void{ _graphicsLayer = value; }
+			
+			/** Lista de configuraciones de reportes */
+			private var cconf:CCofiguracion;
+			private function get configuracion():CCofiguracion{ return cconf; }
+			public function set configuracion(value:Object):void{
+				cconf = new CCofiguracion(value);
+			}
+			
+			/** Configuración del reporte actual */
+			private var cact:Object = null;
+			
+			/** Filtros actuales */
+			private var filtros_actuales:Object = {};
+			
+			private function amsg(t:String):void{
+				/*
+				this.msg.text = t+this.msg.text;
+				contmsg.height = 100;
+				contmsg.visible = true;
+				//*/
+			}
+			
+			private function clearFiltros(filtro:Object):void{
+				if(filtro!=null){
+					if(filtro.hasOwnProperty("tipo")){
+						if(filtro.tipo == "D"){
+							filtro.value = "";
+						}
+					}else{
+						filtro.value = "";
+					}
+					if(filtro.hasOwnProperty("filtro")){
+						this.clearFiltros(filtro.filtro);
+					}
+				}
+			}
+			
+			public function actualizar(nombre:String="", index:Number=-1):void{
+				CursorManager.setBusyCursor();
+				this.amsg("Iniciando...\nCargando la configuración...");
+				if(this.cconf != null){
+					this.amsg("OK\n");
+					this.createSelectorReportes(index);
+					this.amsg("Obteniendo la configuración del reporte solicitado...");
+					this.cact = this.cconf.getConfigReport(nombre);
+					this.filtros_actuales = {};
+					if(this.cact.hasOwnProperty("filtro")){
+						this.clearFiltros(this.cact.filtro);
+					}
+					this.amsg("OK\n");
+					if(this.cact.hasOwnProperty("alfanumerico")){
+						var q:CQuery=null;
+						if(this.cact.hasOwnProperty("geografico")){
+							this.amsg("Obteniendo los datos alfanumericos...");
+							q = new CQuery(this.cact["alfanumerico"], this.successAlfa, false);
+						}else{
+							this.amsg("Obteniendo los datos alfanumericos y geograficos...");
+							q = new CQuery(this.cact["alfanumerico"], successGeo, true);
+						}
+					}
+					this.mapa.removeAllLayers();
+					// Se carga los mapas base
+					var indexLayer:Number=0;
+					if(this.cact.hasOwnProperty("mapasBase")){
+						for each(var c:Object in this.cact.mapasBase){
+							var mapaBase:ArcGISDynamicMapServiceLayer = new ArcGISDynamicMapServiceLayer(c.url);
+							if(c.hasOwnProperty("key")){
+								mapaBase.token = c.key;
+							}
+							mapaBase.alpha = 0.8;
+							mapa.addLayer(mapaBase,indexLayer);
+							indexLayer++;
+						}
+					}
+					this.graphicsLayer = new GraphicsLayer();
+					this.graphicsLayer.id= LAYER_ID;
+					this.graphicsLayer.name = LAYER_NAME;
+					this.graphicsLayer.alpha = 1;
+					this.mapa.addLayer(this.graphicsLayer,indexLayer);
+				}else{
+					this.amsg("Error, no hay configuración\n");
+				}
+			}
+			
+			public function successAlfa(data:Provider):void{
+				this.amsg("OK\n");
+				this.amsg("Obteniendo los datos geograficos...");
+				var q:CQuery = new CQuery(this.cact["geografico"], this.successGeo, true, data, true);
+			}
+			
+			public function successGeo(data:Provider):void{
+				this.amsg("OK\n");
+				if(this.cact["alfanumerico"].hasOwnProperty("outFields")){
+					var campos:Array = [];
+					for each(var o:Object in this.cact.alfanumerico.outFields){
+						if(!(o is String)){
+							campos.push(o);
+						}	
+					}
+					this.amsg("Generando los nuevos campos solicitados...");
+					data.newsFields(campos);
+					this.amsg("OK\n");
+					filtros.clear();
+					if(this.cact.hasOwnProperty("filtro")){
+						this.amsg("Generando los combos de filtros...");
+						filtros.data = data;
+						filtros.config = this.cact.filtro;
+						filtros.callback = this.actualizoFiltro;
+						filtros.actualizar(true);
+						this.amsg("OK\n");
+					}
+					this.FiltrarYAgrupar(data);
+				}
+			}
+			
+			public function actualizoFiltro(cfg:Object, data:Provider, id_target:String):void{
+				CursorManager.setBusyCursor();
+				this.filtros_actuales = cfg;
+				this.FiltrarYAgrupar(data);
+				filtros.actualizar();
+			}
+			
+			private function FiltrarYAgrupar(data:Provider):void{
+				
+				if(this.filtros_actuales.hasOwnProperty("field")&&this.filtros_actuales.hasOwnProperty("value")){
+					this.amsg("Filtrando los datos...");
+					data.filter(this.filtros_actuales, true);
+					this.amsg("OK\n");
+				}
+				if(this.cact.hasOwnProperty("tabla")){
+					if(this.cact["tabla"].hasOwnProperty("groupby")){
+						this.amsg("Agrupando los datos...");
+						for each(var grp:String in this.cact.tabla.groupby){
+							data.groupBy(grp);
+						}
+						this.amsg("OK\n");
+					}
+					var campos:Array = [];
+					if(this.cact["tabla"].hasOwnProperty("columnas")){
+						campos = this.cact.tabla.columnas.source;
+					}
+					this.amsg("Actualizando los datos de la tabla...");
+					if(this.cact["tabla"].hasOwnProperty("descargar")){
+						tabla.descargar = this.cact["tabla"].descargar;
+					}else{
+						tabla.descargar = true;
+					}
+					tabla.init(data.toArrayCollection(), campos);
+					this.amsg("OK\n");
+					
+					var configmap:Object=null;
+					this.amsg("Obteniendo la configuración del mapa...");
+					if(this.cact.hasOwnProperty("alfanumerico")){
+						if(this.cact.hasOwnProperty("geografico")){
+							if(this.cact["geografico"].hasOwnProperty("configMapa")){
+								configmap = this.cact.geografico.configMapa;
+							}else{
+								if(this.cact["alfanumerico"].hasOwnProperty("configMapa")){
+									configmap = this.cact.alfanumerico.configMapa;
+								}
+							}
+						}else{
+							if(this.cact["alfanumerico"].hasOwnProperty("configMapa")){
+								configmap = this.cact.alfanumerico.configMapa;
+							}
+						}
+					}
+					if(configmap != null){
+						this.amsg("OK\n");
+					}else{
+						this.amsg("Error\n");
+					}
+					this.amsg("Dibujando geometrias...");
+					var dibujante:Render = new Render();
+					var extent_actual:Extent = dibujante.render(data, this.graphicsLayer, configmap, this.cact.alfanumerico);
+					this.amsg("OK\n");
+					this.amsg("Ajustando extent...");
+					mapa.extent = extent_actual;
+					this.amsg("OK\n");
+				}
+				CursorManager.removeBusyCursor();
+			}
+			
+			private function createSelectorReportes(index:Number):void{
+				var o:Object = this.cconf.getListReports();
+				var d:ArrayCollection = o.lista as ArrayCollection;
+				if(d.length>1){
+					var combo:ComboBox = new ComboBox();
+					combo.dataProvider = d;
+					combo.selectedIndex = index > -1? index : o.index;
+					combo.addEventListener( DropdownEvent.CLOSE, changeReport);
+					this.contSelReportes.addElement(combo);
+				}
+			}
+			
+			private function changeReport(event:Event):void{
+				this.actualizar((event.currentTarget as ComboBase).selectedItem.toString(), (event.currentTarget as ComboBase).selectedIndex);
+			}
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<s:layout>
+		<s:VerticalLayout>
+		</s:VerticalLayout>
+	</s:layout>
+	<s:Group id="contSelReportes" width="100%" >
+	</s:Group>
+	<s:Scroller id="contmsg" height="0" width="100%" visible="false">
+		<s:Group height="100%" width="100%" >
+			<s:Label id="msg" visible="true" />
+		</s:Group>
+	</s:Scroller>
+	<s:BorderContainer borderColor="0x3b3b3b" backgroundColor="0xffffff" width="100%" height="45%" visible="true" backgroundAlpha="1" >
+		<esri:Map id="mapa" width="100%" height="100%" />
+	</s:BorderContainer>
+	<TableroIndicadores:Filtros id="filtros" width="100%" />
+	<TableroIndicadores:ADataTable id="tabla" visible="true" width="100%" height="50%"/>
+</s:Group>

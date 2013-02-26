@@ -1,0 +1,191 @@
+<?xml version="1.0" ?>
+<configuration>
+    <info>widgets/Samples/ThematicQuery/InfoColumnChartWidget.swf</info>
+
+	<usebasemaps>false</usebasemaps>
+    <useoperationallayers>true</useoperationallayers>
+    <respectcurrentmapscale>true</respectcurrentmapscale>
+    
+    <excludelayer>Thematic Selection Layer</excludelayer>
+    <excludelayer>Límites</excludelayer>
+
+	<herramientas>
+		<herramienta label="Medir"
+            icon="assets/images/i_measure.png"
+            config="widgets/DANE/Medir/MedirWidget.xml"
+            url="widgets/DANE/Medir/MedirWidget.swf"/>
+        <herramienta label="Imprimir"
+            icon="assets/images/i_print.png"
+            config="widgets/Print/PrintWidget.xml"
+            url="widgets/Print/PrintWidget.swf"/>
+		<herramienta label="Marcadores"
+            icon="assets/images/i_bookmark.png"
+            config="widgets/Bookmark/BookmarkWidget.xml"
+            url="widgets/Bookmark/BookmarkWidget.swf"
+            height="350"/>
+	</herramientas>
+
+	<activarPrimerTema>false</activarPrimerTema>
+	<group labelref="Demografía">
+		
+		<subgroup labelref="Distribución de la población">
+			<theme labelref="Total de población 1993">
+		    	<query layer="0">
+		           <listfields>
+		                <field name="" alias="Municipio" />
+		           </listfields>
+		       </query>
+		    </theme>
+		    <theme labelref="Total de población 2005">
+		    	<query layer="0">
+		           <listfields>
+		                <field name="" alias="Municipio" />
+		           </listfields>
+		       </query>
+		    </theme>
+		    <theme labelref="Total de población en cabecera">
+		    	<query layer="0">
+		           <listfields>
+		                <field name="" alias="Municipio" />
+		           </listfields>
+		       </query>
+		    </theme>
+		    <theme labelref="Total de población resto 1993">
+		    	<query layer="0">
+		           <listfields>
+		                <field name="" alias="Municipio" />
+		           </listfields>
+		       </query>
+		    </theme>
+		    <theme labelref="Total de población resto 2005">
+		    	<query layer="0">
+		           <listfields>
+		                <field name="" alias="Municipio" />
+		           </listfields>
+		       </query>
+		    </theme>
+		</subgroup>
+		
+		<subgroup labelref="Densidad de población">
+			<theme labelref="Densidad de población total 1993"
+		    	   >
+		    	<query layer="0">
+		           <listfields>
+		                <field name="MPIO_CNMBR" alias="Municipio" />
+						<field name="MPIO_CCDGO" alias="Código de Municipio" />
+		           </listfields>
+		       </query>
+		    </theme>
+		    <theme labelref="Densidad de población total" compararlabelref="Densidad de población total 1993">
+				<query layer="0">
+					<listfields>
+						<field name="COD_DPTO" alias="Código Departamento" />
+						<field name="NOM_DPTO" alias="Departamento" />
+						<field name="MPIO_CCDGO" alias="Código de Municipio" />
+						<field name="FIRST_NOM" alias="Municipio" />
+						<field name="DensidadPoblacionCabecera2010_km2" alias="Densidad de población cabecera en Km2" />
+						<field name="DensidadPoblacionResto2010_Km2" alias="Densidad de población resto en Km2" />
+						<field name="DensidadPoblacionGeneral_Km2" alias="Densidad de población general en Km2" />
+					</listfields>
+					<columnchartfields>
+						<field name="DensidadPoblacionCabecera2010_km2" alias="Cabecera" />
+						<field name="DensidadPoblacionResto2010_Km2" alias="Resto" />
+						<field name="DensidadPoblacionGeneral_Km2" alias="General" />
+					</columnchartfields>
+				</query>
+			</theme>
+			<theme labelref="Densidad de poblacion Resto 1993">
+		    	<query layer="0">
+		           <listfields>
+		                <field name="MPIO_CNMBR" alias="Municipio" />
+		           </listfields>
+		       </query>
+		    </theme>
+		    <theme labelref="Densidad de poblacion Resto 2005">
+		    	<query layer="0">
+		           <listfields>
+		                <field name="FIRST_NOM" alias="Municipio" />
+		           </listfields>
+		       </query>
+		    </theme>	
+			
+		</subgroup>
+		
+		
+		<subgroup labelref="Población por gurpos de edad">
+			<theme labelref="Población menor a 15 años">
+		    	<query layer="0">
+		           <listfields>
+		                <field name="" alias="Municipio" />
+		           </listfields>
+		       </query>
+		    </theme>
+		    <theme labelref="Población entre 15 y 59 años">
+		    	<query layer="0">
+		           <listfields>
+		                <field name="" alias="Municipio" />
+		           </listfields>
+		       </query>
+		    </theme>
+		    <theme labelref="Población mas de 59 años">
+		    	<query layer="0">
+		           <listfields>
+		                <field name="" alias="Municipio" />
+		           </listfields>
+		       </query>
+		    </theme>
+		</subgroup>
+		
+		
+	    <subgroup labelref="Dinámicas demográficas">
+	    	<theme labelref="Mujeres por estado conyugal entre 15 y 49 años">
+		    	<query layer="0">
+		           <listfields>
+		                <field name="" alias="Municipio" />
+		           </listfields>
+		       </query>
+		    </theme>
+		    <theme labelref="Tasa neta de migración por necesidad de educación">
+		    	<query layer="0">
+		           <listfields>
+		                <field name="" alias="Municipio" />
+		           </listfields>
+		       </query>
+		    </theme>
+		    <theme labelref="Población que vivía en otro país">
+		    	<query layer="0">
+		           <listfields>
+		                <field name="" alias="Municipio" />
+		           </listfields>
+		       </query>
+		    </theme>
+		    <theme labelref="Tasa de mortalidad infantil">
+		    	<query layer="0">
+		           <listfields>
+		                <field name="" alias="Municipio" />
+		           </listfields>
+		       </query>
+		    </theme>
+	    </subgroup>
+	    
+	</group>
+	
+	<!--group labelref="Económico">
+		<theme labelref="Establecimientos manufactureros por agrupación">
+	    	<query layer="1">
+	           <listfields>
+	                <field name="FIRST_NOM" alias="Municipio" />
+	           </listfields>
+	       </query>
+	    </theme>
+	    <theme labelref="Producción bruta manufacturera por agrupación">
+	    	<query layer="1">
+	           <listfields>
+	                <field name="FIRST_NOM" alias="Municipio" />
+	           </listfields>
+	       </query>
+	    </theme>
+    </group-->
+	
+    
+</configuration>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+						  xmlns:s="library://ns.adobe.com/flex/spark" 
+						  xmlns:mx="library://ns.adobe.com/flex/mx" 
+						  focusEnabled="true"
+						  enabled="{data.tipo == 'featureLayer'}"
+						  >
+
+	<fx:Script>
+		<![CDATA[
+			
+			protected function image1_clickHandler(event:MouseEvent):void
+			{
+				data.descargar = true;
+			}
+		]]>
+	</fx:Script>
+
+	
+	<mx:Image source="assets/images/download_layer.png" 
+			  width="20" height="20" 
+			  horizontalCenter="0" verticalCenter="0"
+			  useHandCursor="true"
+			  buttonMode="true"
+			  toolTip="{enabled ? 'Descargar como SHP' : 'Opción no disponible para servicios completos, solo para capas individuales'}"
+			  click="image1_clickHandler(event)"
+			  
+			  />
+	<!--s:Label id="lblData" top="0" left="0" right="0" bottom="0" text="{dataGridListData.label}" /-->
+</s:MXDataGridItemRenderer>

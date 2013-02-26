@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+	<titulo>ENCUESTA CULTURA</titulo>
+	<label>Etapa</label>
+	<formatString>YYMM</formatString>
+	
+	<widgetId>0</widgetId>
+	
+	<defaultConfig>http://190.25.231.241:8030/JSegOp/Muestra?op=cultura&accion=leer</defaultConfig>
+	
+	<timeStops>	<!--Deben existir mas de dos timeStop-->
+		<timeStop year="2011" month="09" label="SEPTIEMBRE DE 2011" config="http://190.25.231.241:8030/JSegOp/Muestra?op=cultura&accion=leer&mes=09&ano=2011"/>
+		<timeStop year="2011" month="10" label="OCTUBRE DE 2011" config="http://190.25.231.241:8030/JSegOp/Muestra?op=cultura&accion=leer&mes=10&ano=2011"/>
+	</timeStops>
+</configuration>

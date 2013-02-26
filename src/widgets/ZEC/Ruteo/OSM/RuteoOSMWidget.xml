@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<configuration>
+	<urlreverse>http://nominatim.openstreetmap.org/reverse/</urlreverse>
+	<urlroute>http://yournavigation.org/api/dev/route.php</urlroute>
+	<urljava>http://190.25.231.241:8030/JOSM/OSM</urljava>
+</configuration>

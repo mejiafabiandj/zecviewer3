@@ -1,0 +1,56 @@
+<?xml version="1.0" ?>
+<!--
+////////////////////////////////////////////////////////////////////////////////
+//
+// Read more about ArcGIS Viewer for Flex - http://links.esri.com/flexviewer
+//
+////////////////////////////////////////////////////////////////////////////////
+-->
+<configuration>
+    <title></title>
+    <subtitle></subtitle>
+    <logo>assets/images/logo.png</logo>
+    <style>
+<!--         <colors>0xffffff,0x333333,0x101010,0x0,0xffffff</colors> -->
+        <colors>0xffffff,0x333333,0x8e013b,0x8e013b,0xffffff</colors>
+        <alpha>0.8</alpha>
+    </style>
+    <!-- replace the following url with your own geometryservice -->
+    <geometryservice url="http://tasks.arcgisonline.com/ArcGIS/rest/services/Geometry/GeometryServer" />
+
+    <!-- UI elements -->
+    <widget left="10"  top="50"    config="widgets/Navigation/NavigationWidget.xml" url="widgets/Navigation/NavigationWidget.swf"/>
+    <widget right="0" bottom="0"   config="widgets/OverviewMap/OverviewMapWidget.xml" url="widgets/OverviewMap/OverviewMapWidget.swf"/>
+    <widget right="20" top="55"    config="widgets/ZEC/Herramientas/MapSwitcherWidget_Temas.xml" url="widgets/MapSwitcher/MapSwitcherWidget.swf"/>
+    <widget left="0"   top="0"     config="widgets/ZEC/Encabezado/EncabezadoWidget.xml" url="widgets/ZEC/Encabezado/EncabezadoWidget.swf"/>
+    <widget left="0" bottom="0"    config="widgets/Coordinate/CoordinateWidget.xml" url="widgets/Coordinate/CoordinateWidget.swf"/>
+    <widget left="0" bottom="0"    config="widgets/GoogleAnalytics/GoogleAnalyticsWidget.xml" url="widgets/GoogleAnalytics/GoogleAnalyticsWidget.swf"/>
+
+
+    <map wraparound180="true" 
+    	 initialextent="-10167000 -487000 -6057000 1391000" 
+    	 fullextent="-10167000 -487000 -6057000 1391000"
+    	 top="40" addarcgisbasemaps="true"
+    	 esrilogovisible="false"
+    	 >
+        <operationallayers>
+            
+			
+		</operationallayers>
+    </map>
+
+    <!-- widgets organized into widget containers that manage close/open etc -->
+    <!-- supported layout property options: horizontal(default)|float|vertical|fix-->
+    
+    <widgetcontainer layout="float">
+        
+           
+    </widgetcontainer>
+    
+    <widgetcontainer paneltype="left" initialstate="open" size="350">
+    	<widget label="Herramientas"
+                config="widgets/ZEC/Herramientas/HerramientasWidget.xml"
+                url="widgets/ZEC/Herramientas/HerramientasWidget.swf"/>
+	</widgetcontainer>
+    
+</configuration>

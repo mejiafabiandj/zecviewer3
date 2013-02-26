@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+   <layer url="http://dg_est45.dane.gov.co/arcgis/rest/services/Unidades_Economicas/BOG_Unidades/MapServer/12" 
+    	   useproxy="false"
+		   useAMF = "false"
+    	   label="Censo de Edificaciones: Otros"
+    	   visible="false"
+    	   alpha="1"
+    	   borderColor="0x686868"
+    	   backgroundColor="0x5C8944"
+    	   textColor="0xFFFFFF"
+    	   textSize="12"
+    	   outFields="DIREOBRA,ESTRATO,ANO_CENSO"
+    	   />
+    <layer url="http://dg_est45.dane.gov.co/arcgis/rest/services/Unidades_Economicas/BOG_Unidades/MapServer/9" 
+    	   useproxy="false"
+		   useAMF = "false"
+    	   label="Censo de Edificaciones: Servicios"
+    	   visible="false"
+    	   alpha="1"
+    	   borderColor="0xFF0000"
+    	   backgroundColor="0x6677CD"
+    	   textColor="0xFFFFFF"
+    	   textSize="12"
+    	   outFields="DIREOBRA,ESTRATO,DEST_NMG,ANO_CENSO"
+    	   />
+     <layer url="http://dg_est45.dane.gov.co/arcgis/rest/services/Unidades_Economicas/BOG_Unidades/MapServer/11" 
+    	   useproxy="false"
+		   useAMF = "false"
+    	   label="Censo de Edificaciones: Comercio"
+    	   visible="false"
+    	   alpha="1"
+    	   borderColor="0x0000FF"
+    	   backgroundColor="0xDE00E6"
+    	   textColor="0xFFFFFF"
+    	   textSize="12"
+    	   outFields="DIREOBRA,ESTRATO,DEST_NMG,ANO_CENSO"
+    	   />
+ 
+ 	<layer url="http://dg_est45.dane.gov.co/arcgis/rest/services/Unidades_Economicas/BOG_Unidades/MapServer/6"
+ 		   useproxy="false"
+		   useAMF = "false" 
+    	   label="Fuentes ICCP-ICCV"
+    	   visible="true"
+    	   alpha="1"
+    	   borderColor="0xAEC0FE"
+    	   backgroundColor="0x005CE6"
+    	   textColor="0xFFFFFF"
+    	   textSize="12"
+    	   outFields="COD_FUNICO,nombrefte,Fuente,COD_DANE,AG,LOCALIDAD,MZ_ESTRATOCLS_RCLASI"
+    	   />
+    	   
+	<layer url="http://dg_est45.dane.gov.co/arcgis/rest/services/Unidades_Economicas/BOG_Unidades/MapServer/7"
+		   useproxy="false"
+		   useAMF = "false" 
+    	   label="Fuentes IPC"
+    	   visible="true"
+    	   alpha="1"
+    	   borderColor="0x653863"
+    	   backgroundColor="0x70A800"
+    	   textColor="0xFFFFFF"
+    	   textSize="12"
+    	   outFields="COD_FUNICO,nombrefte,Fuente,DIR_NORMAL,COD_DANE,AG,LOCALIDAD,MZ_ESTRATO,CLS_RCLASI"
+    	   >
+    	   <!--groupField name="LOCALIDAD" 
+    	   			   alias="Localidad" 
+    	   			   defaultValue="Otros"
+    	   			   values="ANTONIO NARIÑO,BARRIOS UNIDOS,BOSA,CIUDAD BOLIVAR,CHAPINERO,ENGATIVA,FONTIBON,KENNEDY,LA CANDELARIA,LOS MARTIRES,PUENTE ARANDA,RAFAEL URIBE,SAN CRISTOBAL,SANTA FE,SUBA,TEUSAQUILLO,TUNJUELITO,USAQUEN,USME" 
+    	   			   /-->
+    </layer>
+  
+	
+</configuration>

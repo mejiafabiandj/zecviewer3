@@ -1,0 +1,3190 @@
+<?xml version="1.0" encoding="utf-8"?>
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" 
+				   xmlns:viewer="com.esri.viewer.*" 
+				   layout="absolute" width="500" height="470"
+				   creationComplete="initializeHandler(event)"
+				   widgetConfigLoaded="init()" 
+				   xmlns:esri="http://www.esri.com/2008/ags" 
+				   xmlns:Resultados="gov.DANE.widgets.Resultados.*">
+	<fx:Declarations>
+		<!--Objetos utilizados para dibujar los resultados seleccionados-->
+		<esri:QueryTask id="queryTask" showBusyCursor="true" useAMF="true"/>
+		<esri:Query id="query" returnGeometry="true" />
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.FeatureSet;
+			import com.esri.ags.Graphic;
+			import com.esri.ags.SpatialReference;
+			import com.esri.ags.events.GeometryServiceEvent;
+			import com.esri.ags.events.GraphicEvent;
+			import com.esri.ags.events.LayerEvent;
+			import com.esri.ags.events.ZoomEvent;
+			import com.esri.ags.geometry.Extent;
+			import com.esri.ags.geometry.Geometry;
+			import com.esri.ags.geometry.MapPoint;
+			import com.esri.ags.geometry.Polygon;
+			import com.esri.ags.geometry.Polyline;
+			import com.esri.ags.layers.GraphicsLayer;
+			import com.esri.ags.layers.Layer;
+			import com.esri.ags.layers.supportClasses.Field;
+			import com.esri.ags.symbols.SimpleFillSymbol;
+			import com.esri.ags.symbols.SimpleLineSymbol;
+			import com.esri.ags.symbols.SimpleMarkerSymbol;
+			import com.esri.ags.symbols.TextSymbol;
+			import com.esri.ags.tasks.GeometryService;
+			import com.esri.ags.tasks.GeometryServiceSingleton;
+			import com.esri.ags.tasks.supportClasses.BufferParameters;
+			import com.esri.ags.tasks.supportClasses.ProjectParameters;
+			import com.esri.viewer.AppEvent;
+			import com.esri.viewer.IBaseWidget;
+			import com.esri.viewer.ViewerContainer;
+			import com.esri.viewer.WidgetStates;
+			import com.esri.viewer.managers.EventBus;
+			import com.esri.viewer.managers.WidgetManager;
+			import com.esri.viewer.utils.Hashtable;
+			
+			import gov.dane.util.Constantes;
+			import gov.dane.util.GraphicsLayerInfoWindowRenderer;
+			import gov.dane.util.TokenUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.Menu;
+			import mx.core.DragSource;
+			import mx.core.IUIComponent;
+			import mx.events.CloseEvent;
+			import mx.events.DragEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.events.MenuEvent;
+			import mx.managers.DragManager;
+			import mx.managers.PopUpManager;
+			import mx.messaging.channels.StreamingAMFChannel;
+			import mx.rpc.AsyncResponder;
+			import mx.rpc.Fault;
+			import mx.rpc.IResponder;
+			import mx.rpc.events.FaultEvent;
+			import mx.utils.ObjectProxy;
+			
+			import org.alivepdf.colors.RGBColor;
+			import org.alivepdf.data.Grid;
+			import org.alivepdf.data.GridColumn;
+			import org.alivepdf.display.Display;
+			import org.alivepdf.display.PageMode;
+			import org.alivepdf.drawing.Joint;
+			import org.alivepdf.events.PageEvent;
+			import org.alivepdf.fonts.CoreFont;
+			import org.alivepdf.layout.Layout;
+			import org.alivepdf.layout.Orientation;
+			import org.alivepdf.layout.Resize;
+			import org.alivepdf.layout.Size;
+			import org.alivepdf.layout.Unit;
+			import org.alivepdf.pdf.PDF;
+			import org.alivepdf.saving.Download;
+			import org.alivepdf.saving.Method;
+			
+			import spark.events.TextOperationEvent;
+			import spark.layouts.BasicLayout;
+			import spark.layouts.supportClasses.LayoutBase;
+			
+			import widgets.DANE.Resultados.ResultadosRaster.VistaPrevia;
+			
+			
+			/**
+			 * Contiene la dirección relativa de los íconos
+			 */
+			private const ICON_URL:String = "assets/images/";
+			
+			
+			//--------------------------------------------------------------------------
+			//
+			//  Variables para visualizar los resultados de la búsqueda
+			//
+			//--------------------------------------------------------------------------
+			
+			/**
+			 * Imagen que se visualizará junto con cada una de las imágenes que resulten de una consulta
+			 **/
+			[Bindable] [Embed(source="assets/images/i_camera_small.png")] public var imgFoto:Class;
+			
+			[Embed(source="assets/images/pointer_details.png")] private var infoCursorSymbol:Class;
+
+			/**
+			 * <p>
+			 * Objeto en el que se almacenarán los resultados de la consulta. 
+			 * </p>
+			 * 
+			 * <p>
+			 * Este objeto es enviado al interior de un ArrayColection en el item 0 y debe contener las propiedades:
+			 * Alos, Landsat, Spot...
+			 * </p>
+			 * 
+			 * <p>
+			 * Estos objetos deben ser ArrayColeection con objetos ObjetProxy o un solo objeto ObjetProxy 
+			 * que contiene como atributos la información de las imágenes encontradas
+			 * </p>
+			 **/
+			[Bindable] private var resultados:Object;
+			
+			
+			[Bindable] private var providerGrdResultados:ArrayCollection = new ArrayCollection();
+			
+			/**
+			 * <p>Contiene los detalles de una imagen seleccionada. </p>
+			 * <p>Se encuentra atada directamente al DataGrid en donde se visualizan las propiedades de la imagen.</p>
+			 * <p>cada item debe contener las propiedades data y label, label será el nombre de la propiedad y label su contenido</p>
+			 **/
+			[Bindable] private var detalles:ArrayCollection;
+			
+			/**
+			 * Variable que almacena la información en formato XML de la imagen seleccionada
+			 */
+			[Bindable] private var itemSeleccionado:Object;
+			
+			/**
+			 * Variable que define si existe algun item seleccionado y hablilita las funcionalidades del popUpButton
+			 */
+			[Bindable] private var hasItemSeleccionado:Boolean;
+			
+			/**
+			 * Define si el panel que contiene el mensaje de información es visible o no
+			 */
+			[Bindable] private var msgVisible:Boolean = false;
+			
+			/**
+			 * Define si la imagen que le permite al usuario visualizar los resultados está visible o no
+			 */
+			[Bindable] private var  imgVerResultadosVisible:Boolean = false;
+			
+			/**
+			 * Contiene el listado de items que cumplen con el filtro realizado por el usuario
+			 */
+			[Bindable] private var itemsFiltrados:ArrayCollection = new ArrayCollection();
+			
+			/**
+			 * El el indice del actual item en el filtro, se usa para navegar entre resultados
+			 */
+			[Bindable] private var indiceFiltrado:Number = -1; 
+			
+			
+			//--------------------------------------------------------------------------
+			//
+			//  Variables para realizar las tareas con una imágen seleccionada
+			//
+			//--------------------------------------------------------------------------
+			
+			/**
+			 * Elemento de tipo GraphisLayer en el que se dibuja la la grilla a la que corresponde o el icono del centro de foto de la imagen seleccionada
+			 */
+			private var graphicsLayer:GraphicsLayer = new GraphicsLayer();;
+			
+			/**
+			 * Menú asociado al PopUpButton, contiene el listado de las tareas que se pueden realizar con una imagen seleccionada
+			 */
+			private var myMenu:Menu;
+			
+			/**
+			 * Variable que se utiliza para establecer si es la primera vez que se ejecuta el método <code>sharedDataUpdated()</code>
+			 * esto con el fin de no mostrar el mensaje "cargando" cuando se abra el widget manualmente
+			 */
+			private var inicio:Boolean = true;
+			
+			/**
+			 * Cola de programas producto de una consulta en espera de ser leidos e incluidos en el listado de resultados 
+			 */
+			private var colaProgramas:Array = new Array();
+			
+			/**
+			 * Contiene el nombre del widget wue abrió el panel de resultados
+			 */
+			private var widgetParent:String;
+			
+			//--------------------------------------------------------------------------
+			//
+			//  Variables para el funcionamiento del carrito
+			//
+			//--------------------------------------------------------------------------
+			
+			/**
+			 * Variable que contiene los elementos que se arrastran al carrito.
+			 * <p>cada item debe contener: </p>
+			 * <p>label <code>String</code> (el nombre del sistema)</p>
+			 * <p>visible <code>Boolean</code> (define si el layer asociado al item es visible)</p>
+			 * <p>color <code>uint</code> (color de la capa. opcional)</p>
+			 * <p>transparencia <code>Number</code> (numero entre 0 y 1 que define el grado de transparencia de la capa)</p>
+			 * <p>children <code>Array</code> (conjunto de sub elementos o nodos hijos del actual elemento)</p>
+			 */
+			[Bindable] private var providerCarrito:ArrayCollection = new ArrayCollection();
+			
+			/**
+			 * Lista los layers del carrito y su estado de visibilidad <code>Boolean</code>
+			 */
+			private var visibilidadLayers:Array;
+			
+			/**
+			 * contiene la información del item seleccionado del carrito para la creación del PDF <code>Object</code>
+			 */
+			private var itemSeleccionadoCarrito:Object;
+			
+			/**
+			 * Imagen de encabezado para archivos PDF
+			 */
+			public var imgHeader:Loader = new Loader();
+			
+			/**
+			 * Imagen de pie de página para archivos PDF
+			 */
+			public var imgFooter:Loader = new Loader();
+			
+			
+			
+			/**
+			 * Listado de programas configurados en el archivo xml
+			 **/
+			public var programas:ArrayCollection;
+			//private var tmpMetadatos:Object;
+			
+			//--------------------------------------------------------------------------
+			//
+			//  Metodos generales
+			//
+			//--------------------------------------------------------------------------
+			
+			/**
+			 * Realiza la carga de los componentes necesarios cuando se termine de crear el widget
+			 */
+			private function init():void
+			{	
+				graphicsLayer.id = "graphicsLayerResultadosWidget";
+				graphicsLayer.name = "graphicsLayerResultadosWidget";
+				
+				map.addLayer(graphicsLayer);
+				
+							
+				//Iconos para cambiar el modo de selección 
+				//wTemplate.addTitlebarButton( ICON_URL + "i_table.png", "Mostrar Resultados", mostrarResultados,true);
+				//wTemplate.addTitlebarButton( ICON_URL + "i_details.png", "Mostrar detalles", mostrarDetalles,true);
+				wTemplate.addTitlebarButton( ICON_URL + "i_clear2.png", "Eliminar resultados", limpiarResultados,false);
+				wTemplate.addTitlebarButton( ICON_URL + "pdf.png", "Generar reporte", generaReporte,false);
+				
+				
+				
+				//inicializa los componetes necesarios para el funcionamiento del popUp Button
+				myMenu = new Menu();
+				var dp:Object = [
+					{label: "Acercar"}, 
+					{label: "Limpiar"},
+					{label: "Ver Metadato"},
+					{label: "Vista previa"}, 
+					{label: "Cargar servicio"}, 
+					{label: "Ver URL del Servicio"}];        
+				myMenu.dataProvider = dp;
+				myMenu.selectedIndex = 0;
+				popB.popUp = myMenu;
+				myMenu.addEventListener("itemClick", itemClickHandler);
+				popB.label = myMenu.dataProvider[myMenu.selectedIndex].label;
+				
+				imgHeader.load(new URLRequest("assets/images/header.png"));
+				imgFooter.load(new URLRequest("assets/images/footer.png"));
+				
+				//Al cerrar manualmente el widget, Abrir el widget que lo abrió originalmente
+				wTemplate.closeButton.addEventListener(MouseEvent.CLICK,
+					function():void
+					{
+						abrirParent();
+						widgetParent = null;
+					});
+				
+				programas = new ArrayCollection();
+				
+				if(configObject.configuration.programas)
+				{
+					if(configObject.configuration.programas.programa is ArrayCollection)
+					{
+						programas.addAll(configObject.configuration.programas.programa);
+					}else if(configObject.configuration.programas.programa)
+					{
+						programas.addItem(configObject.configuration.programas.programa);
+					}
+				}else
+				{
+					Alert.show("No hay programas predefinidos en el archivo de configuración");
+				}
+			}
+			
+			protected function initializeHandler(event:Event):void
+			{
+				AppEvent.addListener(AppEvent.DATA_PUBLISH, sharedDataUpdated);
+				addSharedData(Constantes.WIDGET_ABIERTO,new ArrayCollection([widgetTitle]));
+			}
+
+			
+			/**
+			 * Activa la visibilidad del dibujo cuando el widget esta maximizado
+			 * @param <b>event</b> objeto de tipo <b>Event</b> que contiene la información del evento 
+			 */
+			private function widgetMaximizedHandler(event:Event):void
+			{
+				graphicsLayer.visible = true;
+				
+			}
+			
+			/**
+			 * Desactivar la visibilidad del dibujo cuando se minimice el widget
+			 * @param <b>event</b> objeto de tipo <b>Event</b> que contiene la información del evento 
+			 */
+			private function widgetMinimizedHandler(event:Event):void
+			{
+				setMapNavigation(null, null);
+			}
+			
+			/**
+			 * Desactivar la visibilidad del dibujo cuando se cierre el widget
+			 * @param <b>event</b> objeto de tipo <b>Event</b> que contiene la información del evento 
+			 */
+			private function widgetClosedHandler(event:Event):void
+			{
+				//this.showInfoWindow(null);
+				ViewerContainer.getInstance().mapManager.m_infoPopup.visible = false;
+				graphicsLayer.visible = false;
+				setMapNavigation(null, null);
+			}
+			
+			/**
+			 * Cuando se cierra el widget, abre el widget que lo abrió originalmente
+			 */
+			private function abrirParent():void
+			{
+				if(widgetParent)
+				{
+					for (var k:Number = 0; k < configData.widgets.length; k++)
+					{
+						var lbl:String = configData.widgets[k].label;
+						if (lbl == widgetParent)
+						{
+							EventBus.instance.dispatchEvent(new AppEvent(AppEvent.WIDGET_RUN,k));
+							break;
+						}
+					}
+				}
+			}
+			
+			/**
+			 * Efecto Cambiar visualización a "Selección Geográfica"
+			 */
+			private function mostrarResultados():void
+			{
+				imgVerResultadosVisible = false;
+				viewstack.selectedIndex = 0;
+				clearMessage();
+				//WidgetEffects.flipWidget(this, viewstack, "selectedIndex", 0, 400);
+			}
+			
+			/**
+			 * Efecto Cambiar visualización a "Ver Resultados"
+			 */
+			private function mostrarDetalles():void
+			{
+				imgVerResultadosVisible = true;
+				//showMessage("Buscando detalles",true);
+				obtenerDetalles(itemSeleccionado);
+				viewstack.selectedIndex = 1;
+				//WidgetEffects.flipWidget(this, viewstack, "selectedIndex", 1, 400);
+			}
+			
+			/**
+			 * Muestra un mensaje que puede indicar el estado de un proceso o un error
+			 * @param msg mensaje que se va a mostrar. <b>String</b>
+			 * @param swfVisible especifica si se va a mostrar la animación swf (ocupado). <b>Boolean</b> 
+			 */
+			private function showMessage(msg:String, swfVisible:Boolean):void
+			{
+				txtMessage.htmlText = msg;
+				swfMessage.visible = swfVisible;
+				msgVisible = true;
+			}
+			
+			/**
+			 * Oculta el panel que contiene el mensaje de información junto con la animación
+			 */
+			private function clearMessage():void
+			{
+				msgVisible = false;
+			}
+			
+			/**
+			 * Añadir los resultados en el tree
+			 * @param <b>event</b> objeto de tipo <b>AppEvent</b> que contiene la información del evento y la información compartida 
+			 */
+			private function sharedDataUpdated(event:com.esri.viewer.AppEvent):void
+			{
+				var data:ArrayCollection = event.data.collection as ArrayCollection;
+				/* if(event.data.key == "ListoMetadatos")
+				{
+					if(tmpMetadatos)
+					{
+						addSharedData("Metadatos",new ArrayCollection(tmpMetadatos as Array));
+						tmpMetadatos = null;
+					}
+				} */
+				if(event.data.key == "ListoServicioImagen")
+				{
+					cargarServicio();
+				}
+				if(event.data.key == widgetTitle)
+				{
+				
+					try
+					{
+						mostrarResultados();
+						resultados = data[0];
+						try
+						{
+							widgetParent = data[1]
+						}
+						catch(err:Error)
+						{
+							widgetParent = null;
+						}
+						ViewerContainer.getInstance().mapManager.m_infoPopup.visible = false;
+						//this.showInfoWindow(null);
+						
+						//cerrar el widget que realizó la consulta
+						if(widgetParent)
+						{
+							for (var k:Number = 0; k < configData.widgets.length; k++)
+							{
+								var lbl:String = configData.widgets[k].label;
+								if (lbl == widgetParent)
+								{
+									ViewerContainer.getInstance().widgetManager.getWidget(k).setState(WidgetStates.WIDGET_MINIMIZED);
+								}
+							}
+						}
+						
+						//Añadir los resultados enviados a la cola para ser leidos
+						for( var propiedad:String in resultados)
+						{
+							if(propiedad != "buscando" && propiedad != "finalizaBusqueda")
+							{
+								colaProgramas.push({programa:propiedad , resultados: resultados[propiedad]});
+							}
+						}	
+						
+						//Es llamado desde todos los widgets antes de realizar la consulta
+						if(resultados.buscando)
+						{
+							showMessage("Cargando los resultados",true);
+							graphicsLayer.clear();
+							
+							providerGrdResultados = new ArrayCollection();
+							
+							//Poner los valores por defecto del filtro de resultados
+							itemsFiltrados.removeAll();
+							indiceFiltrado = -1;
+						}
+						else if(resultados.finalizaBusqueda)
+						{
+							finalizarLectura();
+							//clearMessage();
+						}
+						else
+						{
+							leerColaProgramas();
+							//leerResultados();
+						}
+					}
+					catch(e:Error)
+					{
+						finalizarLectura();
+					}
+					finally{
+						
+					}
+				}
+			}
+			//------------------------Agrupar los resultados segun criterios establecidos
+			private var Criterios:Array = ["programa","fecha_toma"];
+			private var AliasCriterios:Array = ["SISTEMA","FECHA DE TOMA"];
+			
+			
+			/**
+			 * Método recursivo que toma una cola de programas y las procesa para agruparlas según ciertos criterios
+			 */
+			private function leerColaProgramas():void
+			{
+				if(colaProgramas.length > 0)
+				{
+					var programa:Object = colaProgramas.shift();
+					
+					var resultados:ArrayCollection = new ArrayCollection();
+					var resultado:Object;
+					
+					if(programa.resultados is ObjectProxy){
+						resultados.addItem(leerObjectProxy(programa.resultados));
+					}
+					else if(programa.resultados is ArrayCollection){
+						for (var j:Number = 0; j < (programa.resultados as ArrayCollection).length; j++){
+							resultados.addItem(leerObjectProxy(programa.resultados[j] as ObjectProxy));
+						}
+					}
+					//Si el programa contenía elementos es necesario agruparlos seguún los criterios
+					if(programa.resultados != null)
+					{
+						agruparResultados(resultados,programa.programa,0,providerGrdResultados);
+					}
+					if(colaProgramas.length > 0)
+					{
+						leerColaProgramas();
+					}
+				}
+			}
+			
+			/**
+			 * Método recursivo que agrupa los items contenidos en el objeto <code>ArrayCollection</code> <b>resultados</b>, segun el criterio <b>labelCriterio</b> <code>String</code>,
+			 * poniendo los resultados de forma jerarquica al nivel <b>nCriterio</b> <code>Number</code>, como hijos de <b>parent</b> <code>ArrayCollection</code>
+			 * @param resultados, objeto de tipo <code>ArrayCollection</code> que contiene los elementos a ser agrupados
+			 * @param labelCriterio, objeto de tipo <code>String</code> que contiene el label del grupo
+			 * @param nCriterio, objeto de tipo <code>Number</code> que indica el índice del criterio por el cual se va a buscar. <code>Criterios</code>
+			 * @param parent, objeto de tipo <code>ArrayCollection</code> al cual se van a incluir los elementos agrupados provenientes de <code>resultados</code>
+			 */
+			private function agruparResultados(resultados:ArrayCollection,labelCriterio:String,nCriterio:Number,parent:ArrayCollection, herencia:String = ""):void
+			{
+				var nuevaHerencia:String = herencia;
+				nuevaHerencia = herencia != "" ? herencia + "," + labelCriterio : labelCriterio;
+				if(nCriterio < Criterios.length)
+				{
+					var resultado:Object;
+					var hasCriterio:Boolean = false;
+					var i:Number;
+					var label:String;
+					
+					for(i = 0; i < parent.length; i++)
+					{
+						if(labelCriterio == parent[i].label)
+						{
+							for each (resultado in resultados)
+							{
+								
+								//Si hay mas criterios por los cuales agrupar
+								if(nCriterio + 1 < Criterios.length)
+								{
+									
+									label = AliasCriterios[nCriterio + 1] + ": " + (resultado[Criterios[nCriterio+1]] != null ? resultado[Criterios[nCriterio+1]] : "Sin información")
+									agruparResultados(new ArrayCollection([resultado]),label,nCriterio+1,parent[i].children, nuevaHerencia);
+								}else
+								{
+									resultado.herencia = nuevaHerencia;
+									parent[i].children.addItem(resultado);
+								}
+							}
+							hasCriterio = true;
+							break; 
+						}
+					}
+					if(!hasCriterio)
+					{
+						label = labelCriterio;
+						parent.addItem({label:label, children:new ArrayCollection(), herencia:herencia});
+						for each (resultado in resultados)
+						{
+							//Si hay mas criterios
+							if(nCriterio + 1 < Criterios.length)
+							{
+								label = AliasCriterios[nCriterio + 1] + ": " + ( resultado[Criterios[nCriterio+1]] != null ? resultado[Criterios[nCriterio+1]] : "Sin información");
+								agruparResultados(new ArrayCollection([resultado]),label,nCriterio+1,parent[parent.length-1].children, nuevaHerencia);
+							}
+							else
+							{
+								resultado.herencia = nuevaHerencia; 
+								parent[parent.length-1].children.addItem(resultado);
+							}
+						}
+					}
+				}
+			}
+			
+			/**
+			 * Toma la información contenida en un <b>ObjectProxy</b> y la almacena en un <b>Objecy</b> 
+			 * al que se le asignan las propiedades label, icon y las demas propiedades del <code>ObjectProxi</code> original
+			 * @param resultado, objeto de tipo <b>ObjectProxy</b> que contiene la información de una imagen
+			 * @return Object, objeto de tipo <b>Object</b> equivalente al <b>ObjectProxy</b> ingresado
+			 */
+			private function leerObjectProxy(resultado:ObjectProxy):Object{
+				var item:Object = new Object;
+				
+				//Añadir el icono
+				item.icon=imgFoto;
+				
+				//Añadir label
+				if(resultado.imagen != null){
+					item.label = resultado.imagen;
+				}else{
+					item.label = resultado.pathrow_codigo + " / " + resultado.fecha_toma;
+				}
+				
+				//Añadir las demas propiedades del ObjectProxy
+				for (var prop:* in resultado) {
+					item[prop] = resultado[prop];
+				}
+				return item;
+			} 
+			
+			
+			//-----------------------fin agrupar---------------------//
+			
+			
+			/**
+			 * Muesta un mensaje de informacion al usuario y deja de mostrar el mensaje de "cargando resultados"
+			 */
+			private function finalizarLectura():void{
+				clearMessage();
+				showMessage("Arrastre algun item del listado de resultados al carrito para generar reportes",false);
+			}
+			
+			/**
+			 * Mostrar la información de la imagen seleccionada en el tree
+			 */
+			private function verItemInfo(event:Event):void
+			{
+				if(grdResultados.selectedItem)
+				{
+					var resultado:Object = grdResultados.selectedItem;
+					if (!resultado.children)
+					{
+						itemSeleccionado = resultado;
+						hasItemSeleccionado = true;
+						//mostrarDetalles(new MouseEvent(MouseEvent.CLICK));
+						buscaGeometriaItemSeleccionado();
+					}
+					else
+					{
+						hasItemSeleccionado = false;
+					}
+				}
+			}
+			
+			/**
+			 * Elimina el listado de resultados de la consulta y los detalles de una posible imagen seleccionada
+			 */
+			private function limpiarResultados():void{
+				
+				providerGrdResultados = new ArrayCollection();
+				graphicsLayer.clear();
+				itemSeleccionado = null;
+				hasItemSeleccionado = false;
+				detalles = new ArrayCollection();
+				//finalizarLectura();
+				clearMessage();
+				//this.showInfoWindow(null);
+				ViewerContainer.getInstance().mapManager.m_infoPopup.visible = false;
+				
+				itemsFiltrados.removeAll();
+				indiceFiltrado = -1;
+			}
+			
+			/**
+			 * Cambia el tamaño de la imagen mientras el mouse se encuentre sobre ella
+			 */
+			private function onMouseOverImage(event:MouseEvent):void{
+				(event.currentTarget as Image).width += 5;
+				(event.currentTarget as Image).height += 5;
+			}
+			
+			/**
+			 * Restaura el tamaño de la imagen cuando el mouse deje de estar sobre ella
+			 */ 
+			private function onMouseOutImage(event:MouseEvent):void{
+				(event.currentTarget as Image).width -= 5;
+				(event.currentTarget as Image).height -= 5;
+			}
+			
+			/**
+			 * Toma la información contenida en <code>itemSeleccionado</code> y la transforma para almacenarla en 
+			 * el arrayColection <code>detalles<code> para que la información de la imagen seleccionada sea visible
+			 */
+			private function obtenerDetalles(resultado:Object):void
+			{
+				if(resultado != null)
+				{
+					detalles = new ArrayCollection();
+					
+					for (var prop:* in resultado) {
+						if(prop != "label" && prop != "icon")
+						{
+							if(resultado[prop])
+							{
+								var data:String = resultado[prop].toString(); 
+								detalles.addItem({label:[prop],data:data});
+							}
+						}
+					}
+				}
+				
+				if(detalles == new ArrayCollection())
+				{
+					detalles.addItem({data:"No hay información disponible",label:""});
+				}
+				//clearMessage();
+			}
+			
+			/**
+			 * Evento producido por la imagen GenerarReporte
+			 */
+			private function generaReporte():void
+			{
+				if(providerGrdResultados.length > 0)
+				{
+					generaPDF(providerGrdResultados,"Reporte de la consulta");
+				}
+				else
+				{
+					showMessage("No hay informacion para generar el reporte",false);
+				}
+			}
+			
+			/**
+			 * Crea un archivo en formato pdf que contiene el listado de los resultados de una consulta
+			 */
+			private function generaPDF(datos:ArrayCollection,titulo:String):void
+			{
+				var pdf:PDF = new PDF(Orientation.PORTRAIT, Unit.MM, Size.LETTER );
+				
+				pdf.addEventListener(PageEvent.ADDED,
+					function(ev:PageEvent):void
+					{
+						(ev.currentTarget as PDF).addImage(imgHeader,null,0,-20);
+						(ev.currentTarget as PDF).addImage(imgFooter,null,0,(ev.currentTarget as PDF).getMargins().height);
+					}
+				);
+				pdf.setMargins(10,30,20,20);
+				
+				pdf.setDisplayMode ( Display.REAL); 
+				pdf.addPage();
+				
+				//El tipo de letra Helvetica es equivalente a Arial
+				pdf.setFont(new CoreFont("Helvetica-BoldOblique"),18);
+				pdf.writeText(18,"REPORTE DE LA CONSULTA\n\n");
+				
+				escribirItem(datos);
+				
+				function escribirItem(item:Object, nivel:Number=0):void
+				{
+					var tab:String = "";
+					for(var i:Number = 0; i < nivel; i++) tab+="\t";
+					
+					if(item is ArrayCollection)
+					{
+						for each(var subItem:Object in item)
+						{
+							if(subItem.children)
+							{
+								pdf.setFont(new CoreFont("Helvetica-Bold"),14 - nivel*2);
+								pdf.addBookmark(subItem.label,nivel);		//se añade un marcador en el archivo PDf para facilitar la navegación
+								pdf.writeText(14 - nivel*2,tab + subItem.label + " (" + subItem.children.length + " Resultados)\n");
+								escribirItem(subItem.children,nivel+1);
+							}
+							else
+							{
+								escribirItem(subItem,nivel+1);
+							}
+						}
+					}
+					else
+					{
+						pdf.setFont(new CoreFont("Helvetica"),14 - nivel*2);
+						pdf.writeText(14 - nivel*2, tab + item.label + "\n");
+					}
+				}
+				
+				//pdf.addImage(map);
+				//pdf.addText(lista.toString(),10,10);
+				pdf.save( Method.REMOTE, configObject.configuration.urlPDF, Download.ATTACHMENT, titulo + ".pdf" );
+			}
+			
+			/**
+			 * Realiza la consulta de la geometría del item seleccionado en el treeResultados
+			 */
+			private function buscaGeometriaItemSeleccionado():void
+			{
+				query.outFields = ["*"];
+				query.outSpatialReference = map.spatialReference;
+				queryTask.url = null;
+				query.where = null;
+				
+				//Obtiene la información necesaria para realizar la consulta desde el archivo XML de configuración
+				var programa:String = itemSeleccionado.programa;
+				var programaSeleccionado:ObjectProxy;
+				for each(var prog:ObjectProxy in configObject.configuration.programas.programa)
+				{
+					if(prog.nombre == programa)
+					{
+						programaSeleccionado = prog;
+						break;
+					}
+				}
+				
+				obtenerDetalles(itemSeleccionado);
+				
+				if(programaSeleccionado)
+				{
+					var path:String = itemSeleccionado[programaSeleccionado.atributoInventario];
+					
+					if( programaSeleccionado.atributoLayer.numerico)
+					{
+						query.where = programaSeleccionado.atributoLayer + " = " + path + "";
+					}
+					else
+					{
+						query.where = programaSeleccionado.atributoLayer + " = '" + path + "'";
+					}
+					
+					queryTask.url = programaSeleccionado.url;
+					
+					queryTask.proxyURL = (programaSeleccionado.useproxy ? configData.proxyUrl :null);
+					queryTask.useAMF = queryTask.proxyURL? false: programaSeleccionado.useAMF;
+					queryTask.token = TokenUtil.buscarToken(queryTask.url,configData);
+					
+				}
+				if(queryTask.url != null)
+				{
+					graphicsLayer.clear();
+					//this.showInfoWindow(null);
+					ViewerContainer.getInstance().mapManager.m_infoPopup.visible = false;
+					queryTask.execute(query, new AsyncResponder( dibujaGeometriaItemSeleccionado, onFaultbuscaGeometriaItemSeleccionado));
+				}
+				else
+				{
+					showMessage("No fué posible dibujar la geometría del elemento seleccionado",false);
+				}
+			}
+			
+			private function dibujaGeometriaItemSeleccionado(featureSet:FeatureSet, token:Object = null):void
+			{
+				var gra:Graphic;
+				for( var i:Number = 0 ; i < featureSet.features.length; i++)
+				{
+					gra = featureSet.features[i] as Graphic;
+					switch(gra.geometry.type)
+					{
+						case Geometry.MAPPOINT:
+						{
+							//proyectar el centro de foto a coordenadas planas para construir el cubrimiento aproximado
+							var pp:ProjectParameters = new ProjectParameters();
+							pp.geometries = [gra.geometry];
+							pp.outSpatialReference = new SpatialReference(3116);
+							GeometryServiceSingleton.instance.project(pp,new AsyncResponder(projectPointComplete,projectPointFault,gra));
+							
+							//hacerBuffer(gra,gra.attributes.ESCALA);
+							var ptSym:SimpleMarkerSymbol = new SimpleMarkerSymbol("circle", 10, 0x00FFFF);
+							gra.symbol = ptSym;
+							mostrarGraphicAttributes(gra);
+							
+						}break;
+						case Geometry.POLYLINE:
+						{
+							var lineSym:SimpleLineSymbol = new SimpleLineSymbol("solid", 0x00FFFF, 1, 2);
+							gra.symbol = lineSym;
+							mostrarGraphicAttributes(gra);
+							
+							zoomToGeometria(gra.geometry);
+						}break;
+						case Geometry.POLYGON:
+						{
+							var outlineSym:SimpleLineSymbol = new SimpleLineSymbol("solid",0x00FFFF, 1, 2);
+							var polySym:SimpleFillSymbol = new SimpleFillSymbol("solid", 0x00FFFF, 0.25, outlineSym);
+							gra.symbol = polySym;
+							
+							gra.attributes = new Object();
+							for each (var atri:Object in detalles)
+							{
+								gra.attributes[atri.label] = atri.data					
+							}
+							mostrarGraphicAttributes(gra);
+							
+							zoomToGeometria(gra.geometry);
+						}break;
+					}
+					
+					
+					//Asigna el tip para el grafico
+					var classFactory:ClassFactory = new ClassFactory(GraphicsLayerInfoWindowRenderer);
+					var fields:ArrayCollection = new ArrayCollection();
+					for (var prop:String in gra.attributes)
+					{
+						if(prop != "mx_internal_uid" && prop != "herencia")
+						{
+							var field:Field = new Field();
+							field.alias = prop.replace("_"," ");
+							field.name = prop;
+							field.type = Field.TYPE_STRING;
+							fields.addItem(field);
+						}
+					}
+					classFactory.properties = {propiedades:{fields:fields,attributes:gra.attributes, feature:gra}};
+					gra.infoWindowRenderer = classFactory;
+					
+					var infoWindowContent:GraphicsLayerInfoWindowRenderer = new GraphicsLayerInfoWindowRenderer();
+					infoWindowContent.propiedades = {fields:fields,attributes:gra.attributes , feature:gra};
+					map.infoWindowContent = infoWindowContent;
+					map.infoWindow.show(getGeomCenter(gra));
+					
+					graphicsLayer.add(gra);
+				}
+				
+				zoomToGeometria(gra.geometry);
+				
+			}
+			
+			/**
+			 * Resultado de la proyeccion de un punto a coordenadas planas para generar su ucbrimiento aproximado
+			 */
+			private function projectPointComplete(results:Array, token:Object):void
+			{
+				//Dibujar el cubrimiento aproximado de la imagen con orientación
+				for each (var geo:Geometry in results)
+				{
+					
+					var x:Number = (geo as MapPoint).x;
+					var y:Number = (geo as MapPoint).y;
+					var az:Number = token.attributes.AZIMUT;
+					var e:Number = token.attributes.ESCALA;
+					
+					var x1:Number,x2:Number,x3:Number,x4:Number;
+					var y1:Number,y2:Number,y3:Number,y4:Number;
+					var diag:Number = Math.sqrt(2)*(0.115)*e;
+					
+					x1 = diag*Math.sin((az-45)*Math.PI/180) + x;
+					x2 = diag*Math.sin((az+45)*Math.PI/180) + x;
+					x3 = diag*Math.sin((az+135)*Math.PI/180) + x;
+					x4 = diag*Math.sin((az+225)*Math.PI/180) + x;
+					
+					y1 = diag*Math.cos((az-45)*Math.PI/180) + y;
+					y2 = diag*Math.cos((az+45)*Math.PI/180) + y;
+					y3 = diag*Math.cos((az+135)*Math.PI/180) + y;
+					y4 = diag*Math.cos((az+225)*Math.PI/180) + y;
+					
+					var p1:MapPoint = new MapPoint(x1,y1,geo.spatialReference);
+					var p2:MapPoint = new MapPoint(x2,y2,geo.spatialReference);
+					var p3:MapPoint = new MapPoint(x3,y3,geo.spatialReference);
+					var p4:MapPoint = new MapPoint(x4,y4,geo.spatialReference);
+					var rings:Array = new Array([p1,p2,p3,p4,p1]);
+					var pol:Polygon = new Polygon(rings,geo.spatialReference);
+					
+					var grap:Graphic = new Graphic(pol,null,token.attributes);
+					
+					//Proyectar el poligono al sistema de referencia del mapa base
+					var pp:ProjectParameters = new ProjectParameters();
+					pp.geometries = [grap.geometry];
+					pp.outSpatialReference = map.spatialReference;
+					GeometryServiceSingleton.instance.project(pp,new AsyncResponder(projectCubrimientoFotoComplete,projectPointFault,grap));
+					
+					//mostrarGraphicAttributes(gra);
+				}
+			}
+			
+			/**
+			 * Proyectar un arreglo de graficos al sistema de referencia del mapa base, se dibuja el elemento y se hace un acercamiento
+			 */
+			private function projectCubrimientoFotoComplete(results:Array, token:Object):void
+			{
+				for each (var geo:Geometry in results)
+				{
+					var outlineSym:SimpleLineSymbol = new SimpleLineSymbol("solid",0x00FFFF, 1, 2);
+					var polySym:SimpleFillSymbol = new SimpleFillSymbol("solid", 0x00FFFF, 0.25, outlineSym);
+					var gra:Graphic = new Graphic(geo,null,token.attributes);
+					gra.symbol = polySym;
+					graphicsLayer.add(gra);
+					zoomToGeometria(gra.geometry);
+				}
+			}
+			
+			private function projectPointFault(fault:FaultEvent,token:Object):void
+			{
+				showMessage("El cubrimiento aproximado del centro de foto seleccionado no se pudo dibujar",false);
+			}
+			
+			private function zoomToGeometria(geo:Geometry):void
+			{
+				if(geo.type == Geometry.MAPPOINT)
+				{
+					map.centerAt(geo as MapPoint);
+				}
+				else if(geo.type == Geometry.POLYLINE || geo.type == Geometry.POLYGON)
+				{
+					map.extent = geo.extent;
+					if (!map.extent.contains(geo))
+					{
+						map.level--;
+					}
+				}
+			}
+			
+			private function mostrarGraphicAttributes(gra:Graphic):void
+			{
+				var content:String = "";
+				var title:String = "ITEM SELECCIONADO";
+				var point:MapPoint = getGeomCenter(gra);
+				
+				for(var att:String in gra.attributes)
+				{
+					if(att != "mx_internal_uid" && att != "herencia")
+					{
+						content += att + ": " + gra.attributes[att] + "\n";
+					}
+				}
+				var infoData:Object = 
+					{
+						icon: "assets/images/Red_glow.swf",
+						icon: null,
+						title: title, 
+						content: content, 
+						link: null, 
+						point: point,
+						geometry: gra.geometry
+					};
+				showInfoWindow(infoData);
+				ViewerContainer.getInstance().mapManager.m_infoPopup.infoIcon.visible = true;
+			}
+			
+			
+			private function onFaultbuscaGeometriaItemSeleccionado(info:Object, token:Object = null):void
+			{
+				showMessage("No fué posible dibujar la geometría del elemento seleccionado",false);
+			}
+			
+			/**
+			 * Obtener el centroide de una geometría
+			 */
+			private function getGeomCenter(gra:Graphic):MapPoint {
+				var pt:MapPoint;
+				switch (gra.geometry.type)
+				{
+					case Geometry.MAPPOINT: {
+						pt = gra.geometry as MapPoint;
+						break;
+					}
+					case Geometry.POLYLINE: {
+						var pl:Polyline = gra.geometry as Polyline;
+						var pathCount:Number = pl.paths.length;
+						var pathIndex:int = int((pathCount / 2) - 1);
+						var midPath:Array = pl.paths[pathIndex];
+						var ptCount:Number = midPath.length;
+						var ptIndex:int = int((ptCount / 2) - 1);
+						pt = pl.getPoint(pathIndex, ptIndex);
+						break;
+					}
+					case Geometry.POLYGON: {
+						var poly:Polygon = gra.geometry as Polygon;
+						pt = poly.extent.center;
+						break;
+					}
+				}
+				return pt;
+			}
+			
+			/**
+			 * Realizar un buffer sobre una geometria con una distancia determinada
+			 */ 
+			private function hacerBuffer(gra:Graphic,distancia:Number):void
+			{
+				var myLastFeature:Graphic = gra;
+				var bufferParameters:BufferParameters = new BufferParameters();
+				bufferParameters.geometries = [myLastFeature];
+				bufferParameters.distances = [distancia*0.115];	//El tamaño de las fotografías es 23x23 cm
+				bufferParameters.unit = GeometryService.UNIT_METER;
+				bufferParameters.bufferSpatialReference = new SpatialReference(3116); //102100//30800
+				
+				GeometryServiceSingleton.instance.showBusyCursor = true;
+				GeometryServiceSingleton.instance.buffer(bufferParameters,new AsyncResponder(bufferCompleteHandler,bufferFault));
+			}
+			
+			/**
+			 * Evento que se produce al finalizar con exito la creacion del buffer
+			 */
+			private function bufferCompleteHandler(event:GeometryServiceEvent):void
+			{
+				/*if(event.graphics.length != 0)
+				{
+					var feature:FeatureSet = new FeatureSet(event.graphics)
+					dibujaGeometriaItemSeleccionado(feature);
+				}
+				else
+				{
+					bufferFault(new FaultEvent(FaultEvent.FAULT));
+				}*/
+			}
+			
+			/**
+			 * Error al realizar el buffer
+			 */
+			private function bufferFault(error:FaultEvent):void
+			{
+				showMessage("No se pudo calcular el area de influencia para el centro de foto",false);
+			}
+			
+			
+			//--------------------------------------------------------------------------
+			//
+			//  Métodos del botón desplegable
+			//
+			//--------------------------------------------------------------------------
+			
+			/**
+			 * Actualiza la información en el popUp Button
+			 */
+			private function itemClickHandler(event:MenuEvent):void {
+				popB.label = event.item.label;        
+				popB.close();
+				myMenu.selectedIndex = event.index;
+				accionClick(event.item.label);
+			}
+			
+			private function accionClick(accion:String):void
+			{
+				if(accion == "Acercar")
+				{
+					buscaGeometriaItemSeleccionado();
+				}
+				else if(accion == "Limpiar")
+				{
+					graphicsLayer.clear();
+					//this.showInfoWindow(null);
+					ViewerContainer.getInstance().mapManager.m_infoPopup.visible = false;
+				}
+				else if(accion == "Ver Metadato")
+				{
+					verMetadatos();
+				}
+				else if(accion == "Vista previa")
+				{
+					vistaPrevia();
+				}
+				else if(accion == "Cargar servicio")
+				{
+					cargarServicio();
+				}
+				else if(accion == "Ver URL del Servicio")
+				{
+					verURLServicio();
+				}
+			}
+			
+			/**
+			 * Añade la URL a los datos compartidos que son leidos por el widget Servicio Imágenes quien realiza la carga del servicio publicado en la URL especificada
+			 */
+			private function cargarServicio():void
+			{
+				var servicio:Object = new Object();
+				servicio.url = itemSeleccionado.url as String != null ? itemSeleccionado.url as String : "No hay url disponible";
+				addSharedData("ServicioImagen",new ArrayCollection([servicio]));
+				
+				for (var k:Number = 0; k < configData.widgets.length; k++)
+				{
+					var lbl:String = configData.widgets[k].label;
+					if (lbl == "Cargar servicio Web")
+					{
+						EventBus.instance.dispatchEvent(new AppEvent(AppEvent.WIDGET_RUN,k));
+					}
+				}
+				
+			}
+			
+			/**
+			 * Abre el widget metadatos y envía los parámetros necesarios para la consulta de la información requerida
+			 */
+			private function verMetadatos():void
+			{
+				var idDane:String = itemSeleccionado.id_dane;
+				if(idDane != null)
+				{
+					//Obtener el nombre del widget actual para cerrarlo desde el widget metadatos
+					//this.cursorManager.setBusyCursor();
+					var nombreWidget:String = widgetTitle;
+					
+					/*
+					for (var k:Number = 0; k < configData.widgets.length; k++)
+					{
+						var lbl:String = configData.widgets[k].label;
+						if (lbl == "Visor de metadatos")
+						{
+							EventBus.getInstance().dispatchEvent(new AppEvent(AppEvent.WIDGET_RUN,k));
+							break;
+						}
+					}*/
+					//tmpMetadatos = [idDane,nombreWidget];
+					
+					addSharedData(Constantes.OPERACION_ABRIR_WIDGET,new ArrayCollection([{label:"Metadatos Raster",data:{idDane:idDane,parentWidget:nombreWidget}}]));
+					//addSharedData("Metadatos",new ArrayCollection(tmpMetadatos as Array));
+				}
+				else
+				{
+					Alert.show("No fué posible encontrar el ID del item seleccionado", "ID DANE desconocido");
+				}
+			} 
+			
+			/**
+			 * Muestra en un Alert la URL del servicio y da la posibilidad de cargar este servicio
+			 */
+			private function verURLServicio():void
+			{
+				var url:String = itemSeleccionado.url as String;
+				if(url != null)
+				{
+					Alert.yesLabel = "Cargar Servicio";
+					Alert.noLabel = "Ok";
+					Alert.buttonWidth = 120;
+					
+					Alert.show("El servicio se encuentra publicado en la siguiente URL:\n" + url,"URL del servicio",3,null,
+						function(event:CloseEvent):void
+						{
+							if (event.detail==Alert.YES)
+							{
+								cargarServicio();
+							}
+						}
+					);
+				}
+				else
+				{
+					Alert.show("El servicio no se encuentra publicado o su URL es desconocida","URL Desconocida");
+				}
+				
+			}
+			
+			private function vistaPrevia():void
+			{
+				if(itemSeleccionado.id_dane)
+				{
+					var v:VistaPrevia = new VistaPrevia();
+					v.height = ViewerContainer.getInstance().height * 0.8;
+					v.width = ViewerContainer.getInstance().width * 0.8; 
+					
+					v.NombreImagen = itemSeleccionado.id_dane + "_25dpi.jpg";
+					
+					v.addEventListener(CloseEvent.CLOSE,
+						function():void
+						{
+							PopUpManager.removePopUp(v);
+						}
+					);
+					PopUpManager.addPopUp(v, ViewerContainer.getInstance(), true);
+					PopUpManager.centerPopUp(v);
+				}
+				else
+				{
+					Alert.show("El item seleccionado no cuenta con un ID DANE","Falta ID DANE");
+				}
+			}
+			
+			//--------------------------------------------------------------------------
+			//
+			//  Métodos del carrito
+			//
+			//--------------------------------------------------------------------------
+			
+			/**
+			 * Evento que maneja el inicio de una operación de drag and drop en el treeResultados
+			 * 
+			 * @param event <code>DragEvent</code> contiene la información del control y el contenido arrastrado
+			 */
+			private function grdResultadosDragStarHandler(event:DragEvent):void
+			{
+				var item:Object = grdResultados.selectedItem;
+				var ds:DragSource = new DragSource();
+				ds.addData(item, "img");    
+				DragManager.doDrag(event.currentTarget as IUIComponent, ds, event);
+			}
+			
+			/**
+			 * Evento que se produce cuando se ha iniciado una operación de DragStart y el mouse ingresa al ambiente del canvas cnvCarrito,
+			 * para que éste pueda aceptar información
+			 * 
+			 * @param event <code>DragEvent</code>
+			 */
+			private function cnvCarritoDragEnterHandler(event:DragEvent):void
+			{
+				DragManager.acceptDragDrop(Canvas(event.currentTarget));
+			}
+			
+			/**
+			 * Evento que se produce cuando finaliza una operación de Drag and Drop en el interior del cnvCarrito,
+			 * se toma la información del item arrastrado y se agrega a un objeto de tipo <code>AdvancedDataGrid</code>
+			 * 
+			 * @param event <code>DragEvent</code> contiene la información del control y el contenido arrastrado
+			 */
+			private function dragDropHandler(event:DragEvent):void {
+				for each (var formato:String in event.dragSource.formats)
+				{
+					var data:Object = event.dragSource.dataForFormat(formato);
+					try
+					{
+						if (data is Array)
+						{
+							for each (var item:Object in data)
+							{
+								addItemParents(item,providerCarrito);
+							}
+						}
+						else
+						{
+							addItemParents(data,providerCarrito);
+						}
+					}
+					catch(e:Error)
+					{
+						Alert.show(data.toString() + " no es un tipo de objeto aceptado por el carrito","Error en Drag and Drop");
+					}
+				}
+			}
+			
+			/**
+			 * Método recursivo que toma un nodo intermedio del arbol de resultados y añade todos sus nodos padres en el arbol del carrito
+			 * 
+			 * @param item <code>Object</code> es el nodo que se desea agregar, debe contener la propiedad herencia <code>String</code>
+			 * que contiene los nombres de los nodos padres a <b>item</b> separados por ","
+			 * @param parents <code>ArrayCollection</code> es el arreglo al que se va a agregar el nodo
+			 * @param index <code>Number</code> se trata del indice del listado de nodos padres desde el que se va a añadir al carrito
+			 */
+			private function addItemParents(item:Object,parents:ArrayCollection,index:Number = 0):void
+			{
+				var padres:Array = item.herencia.split(",");
+				
+				if(item.herencia != null && item.herencia != "" && padres.length > index)
+				{
+					var hijo:Object = item;
+					if(padres.length > 0)
+					{
+						var hasParent:Boolean = false;
+						for each(var parent:Object in parents)
+						{
+							if(parent.label == padres[index])
+							{
+								try
+								{
+									addItemParents(hijo,parent.children,index+1);
+								}catch(e:Error)
+								{
+									showMessage("Se presento un error al agregar el item al carrito",false);
+								}
+								hasParent = true;
+								break;
+							}
+						}
+						if(!hasParent)
+						{
+							try
+							{
+								//si se trata de un nodo raiz y no de un nodo intermedio
+								var isPrograma:Boolean = false;
+								
+								for (var i:Number = 0; i < programas.length ; i++)
+								{
+									if(programas[i].nombre == padres[index])
+									{
+										var ct:ColorTransform = new ColorTransform(1,1,1,1,Math.random()*0xFF,Math.random()*0xFF,Math.random()*0xFF);
+										var color:uint = ct.color;
+										
+										parents.addItem({label:padres[index], children:new ArrayCollection(), visible:true, color:color, transparencia:1, parent:this});
+										addItemParents(hijo,parents[parents.length - 1].children,index+1);
+										
+										//Añadir el layer al mapa
+										var graphicsLayerTemp:GraphicsLayer = new GraphicsLayer();
+										graphicsLayerTemp.name = padres[index];
+										graphicsLayerTemp.id = padres[index];
+										map.addLayer(graphicsLayerTemp);
+										
+										isPrograma = true;
+										break;
+									}
+								}
+								if(!isPrograma)
+								{
+									parents.addItem({label:padres[index],children:new ArrayCollection()});
+									addItemParents(hijo,parents[parents.length - 1].children,index+1);
+								}
+								
+								/*
+								var programas:XMLList = (configXML.programas as XMLList).children();
+								for (var i:Number = 0; i < programas.length() ; i++)
+								{
+									if(programas[i].localName() == padres[index])
+									{
+										var ct:ColorTransform = new ColorTransform(1,1,1,1,Math.random()*0xFF,Math.random()*0xFF,Math.random()*0xFF);
+										var color:uint = ct.color;
+										
+										parents.addItem({label:padres[index], children:new ArrayCollection(), visible:true, color:color, transparencia:1, parent:this});
+										addItemParents(hijo,parents[parents.length - 1].children,index+1);
+										
+										//Añadir el layer al mapa
+										var graphicsLayerTemp:GraphicsLayer = new GraphicsLayer();
+										graphicsLayerTemp.name = padres[index];
+										graphicsLayerTemp.id = padres[index];
+										map.addLayer(graphicsLayerTemp);
+										
+										isPrograma = true;
+										break;
+									}
+								}
+								if(!isPrograma)
+								{
+									parents.addItem({label:padres[index],children:new ArrayCollection()});
+									addItemParents(hijo,parents[parents.length - 1].children,index+1);
+								}
+								*/
+							}catch(e:Error)
+							{
+								showMessage("Se presento un error al agregar el item al carrito",false);
+							}
+						}
+					}
+				}
+				else if(parents != null)
+				{
+					addItemChildren(item,parents);
+				}
+			}
+			
+			/**
+			 * Método recursivo que toma un nodo, lo agrega al listado en el carrito.
+			 * luego repite el proceso con cada uno de sus nodos hijos hasta llegar al ultimo nodo, 
+			 * el cual corresponde a una imagen, la cual es dibujada en el mapa.
+			 * 
+			 * @param item <code>Object</code> se trata del nodo que se desea agregar.
+			 * @param parents <code>ArrayCollection</code> es el arreglo al cual se va a agregar el item con sus respectivos nodos hijos
+			 */
+			private function addItemChildren(item:Object,parents:ArrayCollection):void
+			{
+				var color:uint;
+				
+				if(item.children != null)
+				{
+					var child:Object;
+					
+					var hasParent:Boolean = false;
+					for each(var parent:Object in parents)
+					{
+						if(parent.label == item.label)
+						{
+							for each (child in item.children)
+							{
+								try
+								{
+									addItemChildren(child,parents[parents.getItemIndex(parent)].children);
+								}catch(e:Error)
+								{
+									showMessage("Se presento un error al agregar el item al carrito",false);
+								}
+							}
+							hasParent = true;
+							break;
+						}
+					}
+					if(!hasParent)
+					{
+						//Verificar si se trata de un nodo raiz para añadir las propiedades de color y visible
+						var isPrograma:Boolean = false;
+						
+						
+						
+						
+						for (var i:Number = 0; i < programas.length ; i++)
+						{
+							if(programas[i].nombre == item.label)
+							{
+								var ct:ColorTransform = new ColorTransform(1,1,1,1,Math.random()*0xFF,Math.random()*0xFF,Math.random()*0xFF);
+								color = ct.color;
+								parents.addItem({label:item.label, children:new ArrayCollection(), visible:true, color:color, transparencia:1, parent:this});
+								
+								//Añadir el layer al mapa
+								var graphicsLayerTemp:GraphicsLayer = new GraphicsLayer();
+								graphicsLayerTemp.name = item.label;
+								graphicsLayerTemp.id = item.label;
+								map.addLayer(graphicsLayerTemp);
+								
+								isPrograma = true;
+								break;
+							}
+						}
+						/*
+						var programas:XMLList = (configXML.programas as XMLList).children();
+						for (var i:Number = 0; i < programas.length() ; i++)
+						{
+							if(programas[i].localName() == item.label)
+							{
+								var ct:ColorTransform = new ColorTransform(1,1,1,1,Math.random()*0xFF,Math.random()*0xFF,Math.random()*0xFF);
+								color = ct.color;
+								parents.addItem({label:item.label, children:new ArrayCollection(), visible:true, color:color, transparencia:1, parent:this});
+								
+								//Añadir el layer al mapa
+								var graphicsLayerTemp:GraphicsLayer = new GraphicsLayer();
+								graphicsLayerTemp.name = item.label;
+								graphicsLayerTemp.id = item.label;
+								map.addLayer(graphicsLayerTemp);
+								
+								isPrograma = true;
+								break;
+							}
+						}
+						*/
+						if(!isPrograma)
+						{
+							parents.addItem({label:item.label,children: new ArrayCollection()});
+						}
+						
+						for each (child in item.children)
+						{
+							try
+							{
+								addItemChildren(child,parents[parents.length - 1].children);
+							}catch(e:Error)
+							{
+								showMessage("Se presento un error al agregar el item al carrito",false);
+							}
+						}
+					}
+				}
+				else
+				{
+					var hasItem:Boolean = false;
+					for each(var hijo:Object in parents)
+					{
+						if(hijo.imagen == item.imagen)
+						{
+							hasItem = true;
+							break;
+						}
+					}
+					if(!hasItem)
+					{
+						if(item.hasOwnProperty("imagen"))
+						{
+							var imagen:Object = new Object();
+							for (var propiedad:String in item)
+							{
+								if(propiedad != "label")
+								{
+									imagen[propiedad] = item[propiedad];
+								}
+							}
+							imagen.imagen = item.label;
+							
+							parents.addItem(imagen);
+							
+							//Obtener el color del nodo raiz al que pertenece el item
+							for each (var programa:Object in providerCarrito)
+							{
+								if(programa.label == item.herencia.slice(0,item.herencia.indexOf(",")))
+								{
+									color = programa.color
+								}
+							}
+							
+							//Añadir el elemento al mapa
+							buscarGraphicsFoto(imagen, new AsyncResponder( dibujaGraphicsFotos, onFaultBuscarGraphicsFotos, color));
+						}
+						else
+						{
+							parents.addItem(item);
+						}
+					}
+				}
+				
+			}
+			
+			
+			/**
+			 * Busca un item y lo elimina del grdCarrito y del graphicsLayer que lo contiene
+			 * 
+			 * @param imagenEliminar <code>Object</code> representa el item que se desea eliminar
+			 */
+			public function removerFoto(imagenEliminar:Object):void
+			{
+				var lista:Object = new Object();
+				var children:Array = new Array();
+				var child:Object = new Object()
+				var i:Number = 0; 
+				for each (var programa:Object in providerCarrito)
+				{
+					if(programa.label == imagenEliminar.programa)
+					{
+						//Eliminar el grafico del layer
+						try
+						{
+							var graphics:ArrayCollection = (map.getLayer(imagenEliminar.programa) as GraphicsLayer).graphicProvider as ArrayCollection;
+							var path:String;
+							var imagen:Graphic;
+							var j:Number = 0;
+							
+							//var programaSeleccionadoXML:XML = (configXML.programas as XMLList).descendants(imagenEliminar.programa)[0];
+							
+							var programaSeleccionado:ObjectProxy;
+							for each(var prog:ObjectProxy in programas)
+							{
+								if(prog.nombre == imagenEliminar.programa)
+								{
+									programaSeleccionado = prog;
+									break;
+								}
+							}
+							
+							for each (imagen in graphics)
+							{
+								path = imagenEliminar[programaSeleccionado.atributoInventario];
+								if(imagen.attributes[programaSeleccionado.atributoLayer.value] == path)
+								{
+									((map.getLayer(imagenEliminar.programa) as GraphicsLayer).graphicProvider as ArrayCollection).removeItemAt(j);
+									break;
+								}
+								j++;
+							}
+							
+							//eliminar el label del grafico
+							j = 0;
+							for each (imagen in graphics)
+							{
+								if(imagen.symbol is TextSymbol)
+								{
+									path = imagenEliminar[programaSeleccionado.atributoInventario];
+									if(imagen.attributes[programaSeleccionado.atributoLayer.value] == path)
+									{
+										((map.getLayer(imagenEliminar.programa) as GraphicsLayer).graphicProvider as ArrayCollection).removeItemAt(j);
+										break;
+									}
+								}
+								j++;
+							}
+						}
+						catch(e:Error)
+						{
+							showMessage("No se pudo eliminar el item del mapa",false);
+						}
+						
+						//Eliminar el item del grdCarrito
+						try
+						{
+							removerFotoFromGrid(imagenEliminar,providerCarrito);
+						}catch(e:Error)
+						{
+							showMessage("El item no se pudo elimiar del carrito",false);
+						}
+						break;
+					}
+					i++;
+				}
+			}
+			
+			private function removerFotoFromGrid(item:Object,parents:ArrayCollection,indice:Number = 0):void
+			{
+				var herencias:Array = item.herencia.toString().split(",");
+				for each (var parent:Object in parents)
+				{
+					if(parent.children != null)
+					{
+						if(parent.label == herencias[indice])
+						{
+							removerFotoFromGrid(item,parent.children,indice + 1);
+							break;
+						}
+					}else if(parents.contains(item))
+					{
+						parents.removeItemAt(parents.getItemIndex(item));
+						for(var i:Number = 0; i < item.herencia.toString().split(",").length ; i++ )
+						{
+							estructurarCarritoDespuesDeEliminarItem(providerCarrito);
+						}
+						break;
+					}
+				}
+			}
+			
+			/**
+			 * Varifica la estructura del Carrito eliminando los nodos que no tengan hijos
+			 */
+			private function estructurarCarritoDespuesDeEliminarItem(provider:ArrayCollection):void
+			{
+				for each(var item:Object in provider)
+				{
+					if(item.children != null)
+					{
+						if(item.children.length <= 0)
+						{
+							provider.removeItemAt(provider.getItemIndex(item));
+							
+							//Verificar si el item a eliminar es un nodo raiz y eliminar su layer del mapa
+							if(item.hasOwnProperty("visible") && item.hasOwnProperty("color") && item.hasOwnProperty("transparencia"))
+							{
+								map.removeLayer(map.getLayer(item.label));
+							}
+						}else
+						{
+							estructurarCarritoDespuesDeEliminarItem(item.children);
+						}
+					}
+				}
+			}
+			
+			/**
+			 * Realiza la consulta de la geometría del item
+			 * 
+			 * @param foto <code>Object</code> contiene la información del item a consultar
+			 * @param responder <code>IResponder</code> contiene la referencia a las funciones que se ejecutan luego de realizar la consulta.
+			 * debe incluirse como token un objeto de tipo <code>uint</code> que representa el color con que se dibujará la geometría
+			 */
+			private function buscarGraphicsFoto(foto:Object,responder:IResponder):void
+			{
+				query.outFields = ["*"];
+				query.outSpatialReference = map.spatialReference;
+				queryTask.url = null;
+				
+				var programaSeleccionado:ObjectProxy;
+				for each(var programa:ObjectProxy in programas)
+				{
+					if(programa.nombre == foto.programa)
+					{
+						programaSeleccionado = programa;
+						break;
+					}
+				}
+				//var programaSeleccionadoXML:XML = (configXML.programas as XMLList).descendants(foto.programa.toString())[0];
+				var path:String = foto[programaSeleccionado.atributoInventario];
+				
+				//Verificar el tipo de campo que corresponde con el atributo de enlace del layer
+				if (programaSeleccionado.atributoLayer.numerico == true)
+				{
+					query.where = programaSeleccionado.atributoLayer.value + " = " + path + "";
+				}else
+				{
+					query.where = programaSeleccionado.atributoLayer.value + " = '" + path + "'";
+				}
+				
+				queryTask.url = programaSeleccionado.url;
+				
+				queryTask.proxyURL = (programaSeleccionado.useproxy ? configData.proxyUrl :null);
+				queryTask.useAMF = queryTask.proxyURL? false: programaSeleccionado.useAMF;
+				queryTask.token = TokenUtil.buscarToken(queryTask.url,configData);
+				
+				
+				if(queryTask.url != null)
+				{
+					queryTask.execute(query, responder);
+				}
+				else
+				{
+					showMessage("No fué posible dibujar la geometría de los elementos agregados al carrito",false);
+				}
+			}
+			
+			/**
+			 * Método respuesta a una consulta satisfactoria a la geometría de un item, dibuja la geometría obtenida y 
+			 * la ubica en el graphicsLayer correspondiente
+			 * @param featureSet <code>FeatureSet</code> contiene las geometrías resultado de la consulta
+			 * @param token <code>uint</code> Color de la geometría
+			 */
+			private function dibujaGraphicsFotos(featureSet:FeatureSet, token:Object = null):void
+			{
+				try
+				{
+					var gra:Graphic;
+					var graphicProvider:ArrayCollection = new ArrayCollection();
+					var i:Number;
+					var j:Number;
+					var color:uint = 0x00FFFF;
+					
+					if(token as uint)
+					{
+						color = token as uint;
+					}
+					
+					for(i = 0 ; i < featureSet.features.length; i++)
+					{
+						
+						gra = featureSet.features[i] as Graphic;
+						switch(gra.geometry.type)
+						{
+							case Geometry.MAPPOINT:
+							{
+								//hacerBufferCarrito(gra,gra.attributes.ESCALA);
+								var ptSym:SimpleMarkerSymbol = new SimpleMarkerSymbol("circle", 10, color);
+								gra.symbol = ptSym;
+								
+								labelPointsCompleteHandler([getGeomCenter(gra)],gra.attributes);
+							}break;
+							case Geometry.POLYLINE:
+							{
+								var lineSym:SimpleLineSymbol = new SimpleLineSymbol("solid", color, 1, 2);
+								gra.symbol = lineSym;
+								
+								labelPointsCompleteHandler([getGeomCenter(gra)],gra.attributes);
+							}break;
+							case Geometry.POLYGON:
+							{
+								var outlineSym:SimpleLineSymbol = new SimpleLineSymbol("solid",color, 1, 2);
+								var polySym:SimpleFillSymbol = new SimpleFillSymbol("solid", color, 0.25, outlineSym);
+								gra.symbol = polySym;
+								
+								//Buscar el mejor sitio para ubicar el label de la geometria
+								GeometryServiceSingleton.instance.showBusyCursor = true;
+								GeometryServiceSingleton.instance.labelPoints([gra.geometry],new AsyncResponder(labelPointsCompleteHandler,labelPointsFaultHandler,gra.attributes));
+								
+							}break;
+						}
+						if(gra)
+						{
+							graphicProvider.addItem(gra);
+							//gra.addEventListener(MouseEvent.CLICK, mouseOverGraphic)
+						}
+					}
+					
+					if(graphicProvider != new ArrayCollection())
+					{
+						var layerTemp:GraphicsLayer = new GraphicsLayer();
+						var layerTempIndice:Number;
+						
+						//var atributos:XMLList = configXML.programas..atributoLayer as XMLList;
+						//var programa:XML;
+						
+						var programa:ObjectProxy;
+						for each (var field:Field in featureSet.fields)
+						{
+							for each ( var prog:ObjectProxy in programas)
+							{
+								if(prog.atributoLayer.value == field.name)
+								{
+									programa = prog;
+									break;
+								}
+							}
+							if(programa)
+							{
+								break;
+							}
+						}
+						
+						
+						if(programa)
+						{
+							//Encontrar el índice del layer
+							for (j = 0; j < map.layerIds.length; j++)
+							{
+								if(map.layerIds[j] == programa.nombre)
+								{
+									layerTempIndice = j;
+									break;
+								}
+							}
+							if(!layerTempIndice)
+								layerTempIndice = map.layerIds.length;
+							
+							
+							layerTemp = map.getLayer(programa.nombre) as GraphicsLayer;
+							//layerTemp.addEventListener(GraphicEvent.GRAPHIC_ADD,updateExtendCarrito);
+							
+							graphicProvider.addAll(layerTemp.graphicProvider as ArrayCollection);
+							
+							layerTemp.graphicProvider = graphicProvider;
+							
+							map.removeLayer(map.getLayer(programa.localName()))
+							map.addLayer(layerTemp,layerTempIndice);
+							
+							updateExtendCarrito();
+						}
+						/* 
+						for (i = 0; i < atributos.length(); i++)
+						{
+							if(featureSet.fieldAliases[atributos[i]] != null)
+							{
+								programa = configXML.programas[0].children()[i];
+								
+								//Encontrar el índice del layer
+								for (j = 0; j < map.layerIds.length; j++)
+								{
+									if(map.layerIds[j] == programa.localName())
+									{
+										layerTempIndice = j;
+										break;
+									}
+								}
+								if(!layerTempIndice)
+									layerTempIndice = map.layerIds.length;
+								
+								
+								layerTemp = map.getLayer(programa.localName()) as GraphicsLayer;
+								//layerTemp.addEventListener(GraphicEvent.GRAPHIC_ADD,updateExtendCarrito);
+								
+								graphicProvider.addAll(layerTemp.graphicProvider as ArrayCollection);
+								
+								layerTemp.graphicProvider = graphicProvider;
+								
+								map.removeLayer(map.getLayer(programa.localName()))
+								map.addLayer(layerTemp,layerTempIndice);
+								
+								updateExtendCarrito();
+								
+								break;
+							}
+						} */
+					}
+				}
+				catch(e:Error)
+				{
+					trace("ERROR: No fue posible dibujar la geometria del item. " + e.message);
+				}
+			}
+			
+			private function onFaultBuscarGraphicsFotos(info:Object, token:Object = null):void
+			{
+				showMessage("No fué posible dibujar la geometría de los elementos agregados al carrito",false);
+			}
+			
+			/**
+			 * Ubica el label del item especificado en un punto dado
+			 */
+			private function labelPointsCompleteHandler(geometries:Array,attributes:Object):void
+			{
+				try
+				{
+					for(var i:Number = 0 ; i < geometries.length; i++)
+					{
+						var labelSym:TextSymbol;
+						
+						var gra:Graphic = new Graphic(geometries[i],null,attributes);
+						
+						//var atributos:XMLList = configXML.programas..atributoLayer as XMLList;
+						//var programa:XML;
+						var indiceLayer:Number;
+						
+						
+						
+						var programa:ObjectProxy;
+						for (var prop:String in attributes)
+						{
+							for each ( var prog:ObjectProxy in programas)
+							{
+								if(prog.atributoLayer.value == prop)
+								{
+									programa = prog;
+									break;
+								}
+							}
+							if(programa)
+							{
+								break;
+							}
+						}
+						
+						if(programa)
+						{
+							//Encontrar el índice del layer
+							for (var j:Number = 0; j < map.layerIds.length; j++)
+							{
+								if(map.layerIds[j] == programa.nombre)
+								{
+									indiceLayer = j;
+									break;
+								}
+							}
+							
+							/**
+							 * Poner el label del color de los demas elementos de la capa
+							 **/
+							var color:uint;
+							if(((map.layers[indiceLayer] as GraphicsLayer).graphicProvider as ArrayCollection).length > 0)
+							{
+								if(((map.layers[indiceLayer] as GraphicsLayer).graphicProvider[0] as Graphic).symbol is SimpleMarkerSymbol)
+								{
+									color = (((map.layers[indiceLayer] as GraphicsLayer).graphicProvider[0] as Graphic).symbol as SimpleMarkerSymbol).color;
+								}
+								else if(((map.layers[indiceLayer] as GraphicsLayer).graphicProvider[0] as Graphic).symbol is SimpleFillSymbol)
+								{
+									color = (((map.layers[indiceLayer] as GraphicsLayer).graphicProvider[0] as Graphic).symbol as SimpleFillSymbol).color;
+								}
+								else if(((map.layers[indiceLayer] as GraphicsLayer).graphicProvider[0] as Graphic).symbol is SimpleLineSymbol)
+								{
+									color = (((map.layers[indiceLayer] as GraphicsLayer).graphicProvider[0] as Graphic).symbol as SimpleLineSymbol).color;
+								}
+								else
+								{
+									color = 0xFF0000;
+								}
+							}else
+							{
+								color = 0xFF0000;
+							}				
+							
+							var textFormat:TextFormat = new TextFormat("Verdana",11,color);
+							
+							labelSym = new TextSymbol(gra.attributes[programa.atributoLayer.value]);
+							labelSym.yoffset = -10;
+							labelSym.textFormat = textFormat;
+							gra.symbol = labelSym;
+							(map.layers[indiceLayer] as GraphicsLayer).add(gra);
+							
+						}
+						
+						/* 
+						for (var k:Number = 0 ; k < atributos.length() ; k++)
+						{
+							if(gra.attributes[atributos[k]] != null)
+							{
+								programa = configXML.programas[0].children()[k];
+								
+								//Encontrar el índice del layer
+								for (var j:Number = 0; j < map.layerIds.length; j++)
+								{
+									if(map.layerIds[j] == programa.localName())
+									{
+										indiceLayer = j;
+										break;
+									}
+								}
+								
+								//Poner el label del color de los demas elementos de la capa
+								 
+								var color:uint;
+								if(((map.layers[indiceLayer] as GraphicsLayer).graphicProvider as ArrayCollection).length > 0)
+								{
+									if(((map.layers[indiceLayer] as GraphicsLayer).graphicProvider[0] as Graphic).symbol is SimpleMarkerSymbol)
+									{
+										color = (((map.layers[indiceLayer] as GraphicsLayer).graphicProvider[0] as Graphic).symbol as SimpleMarkerSymbol).color;
+									}
+									else if(((map.layers[indiceLayer] as GraphicsLayer).graphicProvider[0] as Graphic).symbol is SimpleFillSymbol)
+									{
+										color = (((map.layers[indiceLayer] as GraphicsLayer).graphicProvider[0] as Graphic).symbol as SimpleFillSymbol).color;
+									}
+									else if(((map.layers[indiceLayer] as GraphicsLayer).graphicProvider[0] as Graphic).symbol is SimpleLineSymbol)
+									{
+										color = (((map.layers[indiceLayer] as GraphicsLayer).graphicProvider[0] as Graphic).symbol as SimpleLineSymbol).color;
+									}
+									else
+									{
+										color = 0xFF0000;
+									}
+								}else
+								{
+									color = 0xFF0000;
+								}				
+								
+								var textFormat:TextFormat = new TextFormat("Verdana",11,color);
+								
+								labelSym = new TextSymbol(gra.attributes[atributos[k]]);
+								labelSym.yoffset = -10;
+								labelSym.textFormat = textFormat;
+								gra.symbol = labelSym;
+								(map.layers[indiceLayer] as GraphicsLayer).add(gra);
+								break;
+							}
+						} */
+					}
+				}
+				catch(e:Error)
+				{
+					trace("ERROR: No fue posible dibujar el label del item. " + e.message);
+				}
+			}
+			private function labelPointsFaultHandler(event:Fault,token:Object = null):void
+			{
+				trace("ERROR: No fue posible encontrar un sitio para ubicar el label del item. " + event.message);
+			}
+			
+			public function cambiaTransparencia(programa:String,transparencia:Number):void
+			{
+				try
+				{
+					(map.getLayer(programa) as GraphicsLayer).alpha = transparencia;
+				}catch(e:Error){}
+			}
+			
+			public function cambiaVisibilidad(programa:String,visible:Boolean):void
+			{
+				try
+				{
+					(map.getLayer(programa) as GraphicsLayer).visible = visible;
+				}catch(e:Error){}
+			}
+			
+			public function cambiaColor(programa:String,color:uint):void
+			{
+				try
+				{
+					var layer:GraphicsLayer = map.getLayer(programa) as GraphicsLayer;
+					var graphicProvider:ArrayCollection = layer.graphicProvider as ArrayCollection;
+					for each(var graphic:Graphic in graphicProvider)
+					{
+						if(graphic.symbol is SimpleMarkerSymbol)
+						{
+							(graphic.symbol as SimpleMarkerSymbol).color = color;
+						}else if(graphic.symbol is SimpleLineSymbol)
+						{
+							(graphic.symbol as SimpleLineSymbol).color = color;
+						}else if(graphic.symbol is SimpleFillSymbol)
+						{
+							(graphic.symbol as SimpleFillSymbol).outline.color = color;
+							(graphic.symbol as SimpleFillSymbol).color = color;
+						}else if(graphic.symbol is TextSymbol)
+						{
+							(graphic.symbol as TextSymbol).textFormat.color = color;
+						}
+						
+					}
+					layer.refresh();
+				}catch(e:Error){}
+			}
+			
+			private function removePrograma(programa:String):void
+			{
+				for( var i:Number = 0; i < providerCarrito.length ; i++ )
+				{
+					if(providerCarrito[i].label == programa)
+					{
+						providerCarrito.removeItemAt(i);
+						map.removeLayer(map.getLayer(programa));
+						break;
+					}
+				}
+			}
+			
+			private function imgLimpiarCarrito_clickHandler(event:MouseEvent):void
+			{
+				var length:Number = providerCarrito.length;
+				for (var i:Number = 0; i< length ; i++)
+				{
+					removePrograma(providerCarrito[0].label);
+				}
+			}
+			
+			
+			private function imgReporteCarrito_clickHandler(event:MouseEvent):void
+			{
+				var pdf:PDF = new PDF(Orientation.PORTRAIT, Unit.MM, Size.LETTER );
+				
+				//Añadir encabezado a todas las paginas del pdf
+				pdf.addEventListener(PageEvent.ADDED,
+					function(ev:PageEvent):void
+					{
+						(ev.currentTarget as PDF).addImage(imgHeader,null,0,-20);
+						(ev.currentTarget as PDF).addImage(imgFooter,null,0,(ev.currentTarget as PDF).getMargins().height);
+					}
+				);
+				var rs:Resize = new Resize("FitToPage",null);
+				pdf.setMargins(10,30,20,20);
+				
+				
+				pdf.setDisplayMode ( Display.FULL_WIDTH ,Layout.SINGLE_PAGE , PageMode.FULLSCREEN); 
+				pdf.addPage();
+				
+				pdf.setFont(new CoreFont("Helvetica-BoldOblique"),18);
+				pdf.writeText(18,"REPORTE DE LA SELECCIÓN\n");
+				
+				pdf.setFont(new CoreFont("Helvetica-Bold"),14);
+				pdf.addBookmark("ZONA DE ESTUDIO");		//se añade un marcador en el archivo PDf para facilitar la navegación
+				pdf.writeText(14, "ZONDA DE ESTUDIO");
+				pdf.writeText(10, "\n");
+				
+				pdf.addImage(map,rs,0,pdf.getY(),0,0,0,1,true,"PNG",600);
+				
+				var dp:ArrayCollection = new ArrayCollection();
+				
+				escribirItem(providerCarrito);
+				function escribirItem(item:Object, nivel:Number=1):void
+				{
+					var tab:String = "";
+					for(var i:Number = 0; i < nivel; i++) tab+="\t";
+					
+					if(item is ArrayCollection)
+					{
+						for each(var subItem:Object in item)
+						{
+							if(subItem.children)
+							{
+								escribirItem(subItem.children,nivel+1);
+							}
+							else
+							{
+								escribirItem(subItem,nivel+1);
+							}
+						}
+					}
+					else
+					{
+						dp.addItem(item);
+					}
+				}
+				
+				var columns:Array = new Array();
+				//Leer las columnas que se van a incluir en el reporte desde el archivo de configuracion XML
+				if(configObject.configuration.reporte)
+				{
+					if(configObject.configuration.reporte.atributo is ArrayCollection)
+					{
+						for each(var col:ObjectProxy in configObject.configuration.reporte.atributo)
+						{
+							columns.push(new GridColumn(col.label,col.field,col.width));
+						}
+					}else if(configObject.configuration.reporte.atributo)
+					{
+						columns.push(new GridColumn(configObject.configuration.reporte.atributo.label,configObject.configuration.reporte.atributo.field,configObject.configuration.reporte.atributo.width));
+					}
+				}else
+				{
+					Alert.show("No hay atributos definidos en el archivo de configuración para generar el reporte");
+						return;
+				}
+				
+				var grid:org.alivepdf.data.Grid = new org.alivepdf.data.Grid(dp.toArray(),0,0,new RGBColor(0xFF76BD),new RGBColor(0xFFFFFF),true,new RGBColor(0x0 ),1,Joint.ROUND,columns);
+				pdf.addPage();
+				pdf.addBookmark("RESULTADOS");		//se añade un marcador en el archivo PDf para facilitar la navegación
+				pdf.setFont(new CoreFont("Helvetica"),6);
+				pdf.textStyle(new RGBColor(0x00000));
+				pdf.addGrid(grid,0,5,true);
+				
+				pdf.save( Method.REMOTE, configObject.configuration.urlPDF, Download.ATTACHMENT, "Reporte.pdf" );
+				
+			}
+			
+			public function imgItemPDF(item:Object):void
+			{
+				itemSeleccionadoCarrito = item;
+				buscarGraphicsFoto(item, new AsyncResponder( dibujaItem, onFaultBuscarGraphicsItem));
+			}
+			
+			
+			
+			private function dibujaItem(featureSet:FeatureSet,token:Object):void
+			{
+				visibilidadLayers = new Array();
+				
+				//Listar la visibilidad de los layers del carrito
+				for each(var programa:Object in providerCarrito)
+				{
+					for each(var lyr:Object in map.layerIds)
+					{
+						if(programa.label == lyr)
+						{
+							visibilidadLayers.push({layer:lyr.toString(),visible:map.getLayer(lyr.toString()).visible});
+						}
+					}
+				}
+				
+				//Desactivar los layers del carrito
+				for each(var layer:Object in visibilidadLayers)
+				{
+					map.getLayer(layer.layer).visible = false;
+				}
+				
+				//crear un nuevo layer y agregar la geometria del item
+				var layerTemp:GraphicsLayer = new GraphicsLayer();
+				layerTemp.name = "TempReporteItem";
+				layerTemp.id = "TempReporteItem";
+				layerTemp.addEventListener(LayerEvent.LOAD,layerTempLoadHandler);
+				
+				var feature:Graphic;
+				for(var i:Number = 0 ; i < featureSet.features.length; i++)
+				{
+					feature = featureSet.features[i] as Graphic;
+					switch(feature.geometry.type)
+					{
+						case Geometry.MAPPOINT:
+						{
+							var ptSym:SimpleMarkerSymbol = new SimpleMarkerSymbol("circle", 10, 0x00FFFF);
+							feature.symbol = ptSym;
+							
+						}break;
+						case Geometry.POLYLINE:
+						{
+							var lineSym:SimpleLineSymbol = new SimpleLineSymbol("solid", 0x00FFFF, 1, 2);
+							feature.symbol = lineSym;
+							
+						}break;
+						case Geometry.POLYGON:
+						{
+							var outlineSym:SimpleLineSymbol = new SimpleLineSymbol("solid",0x00FFFF, 1, 2);
+							var polySym:SimpleFillSymbol = new SimpleFillSymbol("solid", 0x00FFFF, 0.25, outlineSym);
+							feature.symbol = polySym;
+						}break;
+					}
+				}
+				
+				layerTemp.graphicProvider = featureSet.features;
+				map.addLayer(layerTemp);
+			}
+			
+			private function layerTempLoadHandler(event:LayerEvent):void
+			{
+				var graficos:ArrayCollection = (event.layer as GraphicsLayer).graphicProvider as ArrayCollection;
+				
+				var xmin:Number = 0;
+				var ymin:Number = 0;
+				var xmax:Number = 0;
+				var ymax:Number = 0;
+				
+				if(graficos[0].geometry.extent != null)
+				{
+					xmin = graficos[0].geometry.extent.xmin;
+					ymin = graficos[0].geometry.extent.ymin;
+					xmax = graficos[0].geometry.extent.xmax;
+					ymax = graficos[0].geometry.extent.ymax;
+				}
+				else if(graficos[0].geometry is MapPoint)
+				{
+					xmin = (graficos[0].geometry as MapPoint).x;
+					ymin = (graficos[0].geometry as MapPoint).y;
+					xmax = (graficos[0].geometry as MapPoint).x;
+					ymax = (graficos[0].geometry as MapPoint).y;
+				}
+				
+				for each(var grafico:Graphic in graficos)
+				{
+					if(grafico.geometry.extent != null)
+					{
+						if(xmin > grafico.geometry.extent.xmin)
+							xmin = grafico.geometry.extent.xmin;
+						if(ymin > grafico.geometry.extent.ymin)
+							ymin = grafico.geometry.extent.ymin;
+						if(xmax < grafico.geometry.extent.xmax)
+							xmax = grafico.geometry.extent.xmax;
+						if(ymax < grafico.geometry.extent.ymax)
+							ymax = grafico.geometry.extent.ymax;
+					}
+					else if(grafico.geometry is MapPoint)
+					{
+						if(xmin > (grafico.geometry as MapPoint).x)
+							xmin = (grafico.geometry as MapPoint).x;
+						if(ymin > (grafico.geometry as MapPoint).y)
+							ymin = (grafico.geometry as MapPoint).y;
+						if(xmax < (grafico.geometry as MapPoint).x)
+							xmax = (grafico.geometry as MapPoint).x;
+						if(ymax < (grafico.geometry as MapPoint).y)
+							ymax = (grafico.geometry as MapPoint).y;
+					}
+				}
+				
+				if(xmin != xmax && ymin != ymax)
+				{
+					var extent:Extent = new Extent(xmin,ymin,xmax,ymax,(graficos[0].geometry as Geometry).spatialReference);
+					map.extent = extent;
+					
+					var extPol:Polygon = new Polygon(
+						[[
+							new MapPoint(extent.xmin,extent.ymin,extent.spatialReference),
+							new MapPoint(extent.xmin,extent.ymax,extent.spatialReference),
+							new MapPoint(extent.xmax,extent.ymax,extent.spatialReference),
+							new MapPoint(extent.xmax,extent.ymin,extent.spatialReference),
+							new MapPoint(extent.xmin,extent.ymin,extent.spatialReference)
+						]]
+						,extent.spatialReference);
+					
+					if(!map.extent.contains(extPol))
+					{
+						map.level--;
+					}
+					generaItemPDF();
+				}
+				else
+				{
+					map.centerAt(new MapPoint(xmin,ymin,(graficos[0].geometry as Geometry).spatialReference));
+					generaItemPDF();
+				}
+			}
+			
+			private function generaItemPDF():void
+			{
+				Alert.show("El reporte se generará en una ventana emergente","Reporte",Alert.NONMODAL,this.parentApplication.getChildAt(0),
+					function():void
+					{
+						//Generar el archivo PDF
+						
+						var pdf:PDF = new PDF(Orientation.PORTRAIT, Unit.MM, Size.LETTER );
+						var rs:Resize = new Resize("FitToPage",null);
+						
+						pdf.addEventListener(PageEvent.ADDED,
+							function(ev:PageEvent):void
+							{
+								(ev.currentTarget as PDF).addImage(imgHeader,null,0,-20);
+								(ev.currentTarget as PDF).addImage(imgFooter,null,0,(ev.currentTarget as PDF).getMargins().height);
+							}
+						);
+						pdf.setMargins(10,30,20,20);
+						
+						pdf.setDisplayMode ( Display.FULL_WIDTH ,Layout.SINGLE_PAGE , PageMode.FULLSCREEN); 
+						pdf.addPage();
+						pdf.setFont(new CoreFont("Helvetica-BoldOblique"),18);
+						pdf.writeText(18,"REPORTE DEL ITEM SELECCIONADO\n");
+						
+						pdf.setFont(new CoreFont("Helvetica-Bold"),14);
+						pdf.addBookmark("CUBRIMIENTO");		//se añade un marcador en el archivo PDf para facilitar la navegación
+						pdf.writeText(14, "CUBRIMIENTO DE " + itemSeleccionadoCarrito.imagen.toString().toUpperCase());
+						pdf.writeText(10, "\n");
+						
+						pdf.addImage(map,rs,0,pdf.getY(),0,0,0,1,true,"PNG",600);
+						
+						pdf.addPage();
+						
+						pdf.addBookmark("INFORMACIÓN");		//se añade un marcador en el archivo PDf para facilitar la navegación
+						pdf.writeText(14, "INFORMACIÓN\n");
+						pdf.writeText(12, "\n");
+						
+						pdf.setFont(new CoreFont("Helvetica"),12);
+						
+						for (var prop:* in itemSeleccionadoCarrito) {
+							if(itemSeleccionadoCarrito[prop] != null && prop != "icon" && prop != "label" && prop != "herencia" && prop != "mx_internal_uid")
+							{
+								var val:* = itemSeleccionadoCarrito[prop];
+								pdf.writeText(12, prop + ": ");
+								pdf.writeText(12, val + "\n");
+							}
+						}
+						
+						pdf.save( Method.REMOTE, configObject.configuration.urlPDF, Download.ATTACHMENT, "Reporte Item.pdf" );
+						
+						
+						itemSeleccionadoCarrito = null;
+						//volver el mapa a su estado anterior
+						for each(var lyr:Object in visibilidadLayers)
+						{
+							map.getLayer(lyr.layer).visible = lyr.visible;
+						}
+						map.removeLayer(map.getLayer("TempReporteItem"));
+					});
+				
+				map.removeEventListener(ZoomEvent.ZOOM_END,generaItemPDF);
+			}
+			
+			private function onFaultBuscarGraphicsItem(fault:FaultEvent):void
+			{
+				
+			}
+			
+			private function imgSubirItem_clickHandler(event:MouseEvent):void
+			{
+				if(grdCarrito.selectedIndex != -1 && grdCarrito.selectedIndex > 0)
+				{
+					try
+					{
+						var temp:Object = providerCarrito[grdCarrito.selectedIndex]; 
+						providerCarrito[grdCarrito.selectedIndex] = providerCarrito[grdCarrito.selectedIndex-1];
+						providerCarrito[grdCarrito.selectedIndex-1] = temp;
+						grdCarrito.selectedIndex = -1; 
+						grdCarrito.dispatchEvent(new ListEvent(ListEvent.ITEM_CLICK,false,false,-1));
+					}catch(e:Error){}
+				}
+			}
+			
+			
+			private function imgBajarItem_clickHandler(event:MouseEvent):void
+			{
+				if(grdCarrito.selectedIndex != -1 && grdCarrito.selectedIndex < providerCarrito.length-1)
+				{
+					try
+					{
+						var temp:Object = providerCarrito[grdCarrito.selectedIndex]; 
+						providerCarrito[grdCarrito.selectedIndex] = providerCarrito[grdCarrito.selectedIndex+1];
+						providerCarrito[grdCarrito.selectedIndex+1] = temp;
+						grdCarrito.selectedIndex = -1; 
+						grdCarrito.dispatchEvent(new ListEvent(ListEvent.ITEM_CLICK,false,false,-1));
+					}catch(e:Error){}
+				}
+			}
+			
+			
+			/**
+			 * Realiza el acercamiento a la geometría del item seleccionado 
+			 **/
+			private function grdCarrito_itemClickHandler(event:ListEvent):void
+			{
+				if(event.itemRenderer != null)
+				{
+					//si se trata de un item hijo
+					if(event.itemRenderer.data.children == null)
+					{
+						try
+						{
+							var item:Object = event.itemRenderer.data;
+							if(item != null)
+							{
+								//var programa:XMLList = configXML.programas[item.programa];
+								
+								
+								var programa:ObjectProxy;
+								for each ( var prog:ObjectProxy in programas)
+								{
+									if(prog.nombre == item.programa)
+									{
+										programa = prog;
+										break;
+									}
+								}
+								
+								if(programa)
+								{
+									var layer:GraphicsLayer = map.getLayer(item.programa) as GraphicsLayer;
+									var graphicProvider:ArrayCollection = layer.graphicProvider as ArrayCollection;
+
+									for each(var graphic:Graphic in graphicProvider)
+									{
+										var codigo:String;
+										codigo = item[programa.atributoInventario];
+										
+										if (codigo == graphic.attributes[programa.atributoLayer.value])
+										{
+											if(graphic.geometry.extent != null)
+											{
+												map.extent = graphic.geometry.extent;
+												if(!map.extent.contains(graphic.geometry))
+												{
+													map.level--;
+												}
+											}
+											else if(graphic.geometry is MapPoint)
+											{
+												map.centerAt(graphic.geometry as MapPoint);
+											}
+										}
+									}
+								}
+								
+								
+							}
+						}catch(e:Error)
+						{
+							//showMessage("No fue posible realizar el acercamiento al item del carrito seleccionado",false);
+						}
+					}
+				}
+			}
+			
+			private function updateExtendCarrito():void
+			{
+				
+				var graficos:ArrayCollection = new ArrayCollection();
+				
+				for each(var programa:ObjectProxy in programas)
+				{
+					//Encontrar el índice del layer
+					for (var j:Number = 0; j < map.layerIds.length; j++)
+					{
+						if(map.layerIds[j] == programa.nombre)
+						{
+							graficos.addAll((map.getLayer(programa.nombre) as GraphicsLayer).graphicProvider as ArrayCollection);
+							
+							break;
+						}
+					}
+				}
+				
+				
+				
+				var graphicProvider:ArrayCollection = new ArrayCollection();
+				for each (var grap:Graphic in graficos)
+				{
+					if(grap.geometry is Polygon)
+					{
+						graphicProvider.addItem(grap);
+					}
+				}
+				var extent:Extent = extendGrupo(graphicProvider);
+				if(extent)
+				{
+					map.extent = extent;
+					var extPol:Polygon = new Polygon(
+						[[
+							new MapPoint(extent.xmin,extent.ymin,extent.spatialReference),
+							new MapPoint(extent.xmin,extent.ymax,extent.spatialReference),
+							new MapPoint(extent.xmax,extent.ymax,extent.spatialReference),
+							new MapPoint(extent.xmax,extent.ymin,extent.spatialReference),
+							new MapPoint(extent.xmin,extent.ymin,extent.spatialReference)
+						]]
+						,extent.spatialReference);
+					
+					if(!map.extent.contains(extPol))
+					{
+						map.level--;
+					}
+				}
+			}
+			
+			private function extendGrupo(graficos:ArrayCollection):Extent
+			{
+				try
+				{
+					if(!graficos)return null;
+					
+					var xmin:Number = 0;
+					var ymin:Number = 0;
+					var xmax:Number = 0;
+					var ymax:Number = 0;
+					
+					if(graficos[0].geometry.extent != null)
+					{
+						xmin = graficos[0].geometry.extent.xmin;
+						ymin = graficos[0].geometry.extent.ymin;
+						xmax = graficos[0].geometry.extent.xmax;
+						ymax = graficos[0].geometry.extent.ymax;
+					}
+					else if(graficos[0].geometry is MapPoint)
+					{
+						xmin = (graficos[0].geometry as MapPoint).x;
+						ymin = (graficos[0].geometry as MapPoint).y;
+						xmax = (graficos[0].geometry as MapPoint).x;
+						ymax = (graficos[0].geometry as MapPoint).y;
+					}
+					
+					for each(var grafico:Graphic in graficos)
+					{
+						if(grafico.geometry.extent != null)
+						{
+							if(xmin > grafico.geometry.extent.xmin)
+								xmin = grafico.geometry.extent.xmin;
+							if(ymin > grafico.geometry.extent.ymin)
+								ymin = grafico.geometry.extent.ymin;
+							if(xmax < grafico.geometry.extent.xmax)
+								xmax = grafico.geometry.extent.xmax;
+							if(ymax < grafico.geometry.extent.ymax)
+								ymax = grafico.geometry.extent.ymax;
+						}
+						else if(grafico.geometry is MapPoint)
+						{
+							if(xmin > (grafico.geometry as MapPoint).x)
+								xmin = (grafico.geometry as MapPoint).x;
+							if(ymin > (grafico.geometry as MapPoint).y)
+								ymin = (grafico.geometry as MapPoint).y;
+							if(xmax < (grafico.geometry as MapPoint).x)
+								xmax = (grafico.geometry as MapPoint).x;
+							if(ymax < (grafico.geometry as MapPoint).y)
+								ymax = (grafico.geometry as MapPoint).y;
+						}
+					}
+					
+					if(xmin != xmax && ymin != ymax)
+					{
+						var extent:Extent = new Extent(xmin,ymin,xmax,ymax,(graficos[0].geometry as Geometry).spatialReference);
+						return extent;
+					}
+					else
+					{
+						return null;
+					}
+				}
+				catch(e:Error)
+				{
+					return null;
+				}
+				return null;
+			}
+
+			private function imgVolverResultados_showHandler(event:FlexEvent):void
+			{
+				showMessage("Haga click en el icono \"Volver a resultados\" para visualizar los resultados de la última búsqueda",false);
+			}
+			
+			private function mouseOverGraphic(event:MouseEvent):void {
+				cursorManager.setCursor(infoCursorSymbol);
+			}
+			private function mouseOutGraphic(event:MouseEvent):void {
+				cursorManager.removeAllCursors();
+			}
+			
+			private function mouseClickGraphic(event:MouseEvent):void {
+				var gra:Graphic = event.currentTarget as Graphic;
+				setState(WidgetStates.WIDGET_MINIMIZED);
+				mostrarGraphicAttributes(gra);
+				
+				for each(var layer:Layer in map.layers)
+				{
+					if(layer is GraphicsLayer)
+					{
+						for each(var grap:Graphic in (layer as GraphicsLayer).graphicProvider)
+						{
+							grap.removeEventListener(MouseEvent.CLICK, mouseClickGraphic);
+							grap.removeEventListener(MouseEvent.ROLL_OVER,mouseOverGraphic)
+							grap.removeEventListener(MouseEvent.ROLL_OUT,mouseOutGraphic)
+						}
+					}
+				}
+				cursorManager.removeAllCursors();
+			}
+
+			private function imgInfoItem_clickHandler(event:MouseEvent):void
+			{
+				for each(var layer:Layer in map.layers)
+				{
+					if(layer is GraphicsLayer)
+					{
+						for each(var gra:Graphic in (layer as GraphicsLayer).graphicProvider)
+						{
+							gra.addEventListener(MouseEvent.CLICK, mouseClickGraphic);
+							gra.addEventListener(MouseEvent.ROLL_OVER,mouseOverGraphic)
+							gra.addEventListener(MouseEvent.ROLL_OUT,mouseOutGraphic)
+						}
+					}
+				}
+			}
+			
+			protected function btnFiltro_clickHandler(event:MouseEvent):void
+			{
+				var clave:String = txtFiltro.text;
+				itemsFiltrados.removeAll();
+				indiceFiltrado = -1;
+				if(clave != "")
+				{
+					filtrar(providerGrdResultados,clave);
+				}
+			}
+			
+			/**
+			 * Metodo recursivo que filtra los elementos de un ArrayCollection segun una clave y almacena los resultados en el ArrayCollection itemsFiltrados
+			 */
+			private function filtrar(items:Object,clave:String):void
+			{
+				if(items is ArrayCollection)
+				{
+					for each (var item:Object in items)
+					{
+						if(item.children)
+						{
+							filtrar(item.children,clave);
+						}
+						else
+						{
+							var encontrado:Boolean = false;
+							for(var prop:String in item)
+							{
+								if(item[prop] != null)
+								{
+									if(item[prop].toString().toUpperCase().indexOf(clave.toUpperCase()) != -1)
+									{
+										encontrado = true;
+										break;
+									}
+								}
+							}
+							if(encontrado)
+							{
+								itemsFiltrados.addItem(item);
+							}
+						}
+					}
+				}
+			}
+
+			private function imgFiltroAnterior_clickHandler(event:MouseEvent):void
+			{
+				indiceFiltrado--;
+				var item:Object = itemsFiltrados[indiceFiltrado];
+				expandirHerencia(providerGrdResultados,item.herencia + "," + item.label);
+			}
+
+			private function imgFiltroSiguiente_clickHandler(event:MouseEvent):void
+			{
+				indiceFiltrado++;
+				var item:Object = itemsFiltrados[indiceFiltrado];
+				expandirHerencia(providerGrdResultados,item.herencia + "," + item.label);
+			}
+			
+			/**
+			 * Metodo recursivo que busca un elemento en el grdResultados, lo expande y lo selecciona
+			 */
+			private function expandirHerencia(items:Object,herencia:String):void
+			{
+				var herencias:Array = herencia.split(",");
+				var her:String = herencias.shift();
+				var nuevaHerencia:String = herencias.join(",");
+				
+				if(items is ArrayCollection)
+				{
+					for each (var item:Object in items)
+					{
+						if(item.label == her)
+						{
+							if(item.children)
+							{
+								grdResultados.expandItem(item,true);
+								expandirHerencia(item.children,nuevaHerencia);
+							}
+							else
+							{
+								grdResultados.selectedItem = item;
+								grdResultados.dispatchEvent(new ListEvent(ListEvent.ITEM_CLICK));
+								//grdResultados.expandItem(item,true);
+							}
+							break;
+						}
+					}
+				}
+			}
+
+		]]>
+	</fx:Script>
+	
+	<viewer:WidgetTemplate id="wTemplate" 
+						   autoLayout="true"
+						   minimized="widgetMinimizedHandler(event)" 
+						   open="widgetMaximizedHandler(event)"
+						   closed="widgetClosedHandler(event)"
+						   height="470" width="500">
+		<s:VGroup height="100%" width="100%" horizontalAlign="center">
+			<mx:ViewStack id="viewstack" width="100%" height="150">
+				
+				<!--Panel que contiene los objetos necesarios para visualizar los resultados de las consultas-->
+				<mx:VBox width="100%" height="100%" verticalAlign="middle" horizontalAlign="center" label="Resultados">
+					<s:BorderContainer height="30" width="100%" 
+									   visible="{providerGrdResultados.length > 0}" 
+									   includeInLayout="{providerGrdResultados.length > 0}"
+									   contentBackgroundAlpha="1" backgroundAlpha="1"
+									   backgroundColor="{getStyle('contentBackgroundColor')}"
+									   contentBackgroundColor="{getStyle('contentBackgroundColor')}">
+						<mx:HBox width="100%" height="100%" verticalAlign="middle" horizontalAlign="right">
+							<s:Label text="Filtro"/>
+							<s:TextInput id="txtFiltro"/>
+							<s:Button id="btnFiltro" label="Buscar" click="btnFiltro_clickHandler(event)"/>
+							<mx:VRule width="6" height="90%" strokeColor="#7E8686" alpha="0.45"/>
+							<s:Label text="{itemsFiltrados.length + ' Resultados'}"
+									 visible="{itemsFiltrados.length > 0}"
+									 includeInLayout="{itemsFiltrados.length > 0}"/>
+							<mx:Image id="imgFiltroAnterior" 
+									  source="assets/images/w_left.png" 
+									  useHandCursor="true" 
+									  buttonMode="true" 
+									  toolTip="Anterior" 
+									  width="21" height="21" 
+									  click="imgFiltroAnterior_clickHandler(event)" 
+									  visible="{itemsFiltrados.length > 0}"
+									  includeInLayout="{itemsFiltrados.length > 0}"
+									  enabled="{indiceFiltrado > 0}"
+									  alpha="{(indiceFiltrado > 0)? 1 : 0.5}"/>
+							<mx:Image id="imgFiltroSiguiente" 
+									  source="assets/images/w_right.png" 
+									  useHandCursor="true" 
+									  buttonMode="true" 
+									  toolTip="Siguiente" 
+									  width="21" height="21" 
+									  click="imgFiltroSiguiente_clickHandler(event)" 
+									  visible="{itemsFiltrados.length > 0}"
+									  includeInLayout="{itemsFiltrados.length > 0}"
+									  enabled="{itemsFiltrados.length-1> indiceFiltrado}"
+									  alpha="{(itemsFiltrados.length-1> indiceFiltrado)? 1 : 0.5}"/>
+						</mx:HBox>
+					</s:BorderContainer>
+					<mx:AdvancedDataGrid id="grdResultados" 
+										 designViewDataType="tree" 
+										 height="100%" width="100%"
+										 variableRowHeight="true"
+										 sortableColumns="false"
+										 iconField="icon"
+										 
+										 headerHeight="0"
+										 headerWordWrap="true"
+										 
+										 color="{getStyle('color')}"
+										 selectionColor="{getStyle('rollOverColor')}"
+										 alternatingItemColors="{[getStyle('contentBackgroundColor')]}"
+										 
+										 itemClick="{verItemInfo(event)}"
+										 
+										 dragStart="grdResultadosDragStarHandler(event)"
+										 dragEnabled="true" 
+										 dragMoveEnabled="false"
+										 >
+						<mx:dataProvider>
+							<mx:HierarchicalData source="{providerGrdResultados}"/>
+						</mx:dataProvider>
+						<mx:columns>
+							<mx:AdvancedDataGridColumn headerText="Programa" dataField="label" />
+						</mx:columns>
+					</mx:AdvancedDataGrid>
+				</mx:VBox>
+				
+				<!--Panel que contiene los objetos necesarios para visualizar los detalles de las imágenes-->
+				<mx:VBox label="Detalles" width="100%" height="100%" horizontalAlign="center">
+					<mx:VBox width="100%" horizontalAlign="center">
+						<mx:HBox width="100%" height="100%">
+							<mx:Label text="Item seleccionado:"/>
+							<mx:Text id="txtImagenSeleccionada" text="{(itemSeleccionado!=null?itemSeleccionado.label:'')}"/>
+						</mx:HBox>
+					</mx:VBox>
+					<mx:HBox width="100%" height="100%">
+						<mx:DataGrid width="100%" height="90%" 
+									 dataProvider="{detalles}"
+									 wordWrap="true"
+									 variableRowHeight="true" 
+									 borderStyle="solid"
+									 borderColor="{getStyle('textSelectedColor')}"
+									 textSelectedColor="{getStyle('textRollOverColor')}"
+									 >
+							<mx:columns>
+								<mx:DataGridColumn headerText="" dataField="label" width="120" backgroundColor="{getStyle('contentBackgroundColor')}"/>
+								<mx:DataGridColumn headerText="" dataField="data"/>
+							</mx:columns>
+						</mx:DataGrid>
+						
+					</mx:HBox>
+				</mx:VBox>
+			</mx:ViewStack>
+			<mx:VBox width="100%" horizontalAlign="center" visible="{hasItemSeleccionado}" includeInLayout="{hasItemSeleccionado}">
+				<mx:HRule width="90%" height="6" strokeColor="#7E8686" alpha="0.45"/>
+				<mx:Grid width="100%" height="100%" verticalAlign="middle">
+					<mx:GridRow width="100%">
+						<mx:GridItem verticalAlign="middle" textAlign="center">
+							<mx:HBox height="100%" verticalGap="2" verticalAlign="middle">
+								<mx:Image id="imgItemDetalles" 
+										  source="assets/images/i_info.png" 
+										  useHandCursor="true" 
+										  buttonMode="true" 
+										  toolTip="Ver Detalles" 
+										  width="20" height="20" 
+										  click="{mostrarDetalles()}" 
+										  mouseOver="{onMouseOverImage(event)}"
+										  mouseOut="{onMouseOutImage(event)}"
+										  visible="{!imgVerResultadosVisible}"
+										  includeInLayout="{!imgVerResultadosVisible}"/>
+								<mx:Image id="imgVolverResultados" 
+										  source="assets/images/i_table.png" 
+										  useHandCursor="true" 
+										  buttonMode="true" 
+										  toolTip="Volver a resultados" 
+										  width="20" height="20" 
+										  click="{mostrarResultados()}" 
+										  mouseOver="{onMouseOverImage(event)}"
+										  mouseOut="{onMouseOutImage(event)}"
+										  visible="{imgVerResultadosVisible}"
+										  includeInLayout="{imgVerResultadosVisible}"
+										  show="imgVolverResultados_showHandler(event)"/>
+								<mx:VRule height="20" width="6" strokeColor="#7E8686" alpha="0.45"/>
+								<mx:Image id="imgItemZoom" 
+										  source="assets/images/i_zoomin.png" 
+										  useHandCursor="true" 
+										  buttonMode="true" 
+										  toolTip="Dibujar cubrimiento" 
+										  width="20" height="20" 
+										  click="{accionClick('Acercar')}" 
+										  mouseOver="{onMouseOverImage(event)}"
+										  mouseOut="{onMouseOutImage(event)}"/>
+								<mx:Image id="imgItemLimpiar" 
+										  source="assets/images/eraser.png" 
+										  useHandCursor="true" 
+										  buttonMode="true" 
+										  toolTip="Limpiar grafico" 
+										  width="20" height="20" 
+										  click="{accionClick('Limpiar')}" 
+										  mouseOver="{onMouseOverImage(event)}"
+										  mouseOut="{onMouseOutImage(event)}"/>
+								<mx:VRule height="20" width="6" strokeColor="#7E8686" alpha="0.45"/>
+								<mx:Image id="imgItemMetadato" 
+										  source="assets/images/i_bookmark.png" 
+										  useHandCursor="true" 
+										  buttonMode="true" 
+										  toolTip="Ver Metadato" 
+										  width="20" height="20" 
+										  click="{accionClick('Ver Metadato')}" 
+										  mouseOver="{onMouseOverImage(event)}"
+										  mouseOut="{onMouseOutImage(event)}"/>
+								<mx:Image id="imgItemVistaPrevia" 
+										  source="assets/images/preview.png" 
+										  useHandCursor="true" 
+										  buttonMode="true" 
+										  toolTip="Vista previa" 
+										  width="20" height="20" 
+										  click="{accionClick('Vista previa')}" 
+										  mouseOver="{onMouseOverImage(event)}"
+										  mouseOut="{onMouseOutImage(event)}"/>
+								<mx:VRule height="20" width="6" strokeColor="#7E8686" alpha="0.45"/>
+								<mx:Image id="imgItemCargarServicio" 
+										  source="assets/images/add_layer.png" 
+										  useHandCursor="true" 
+										  buttonMode="true" 
+										  toolTip="Cargar servicio" 
+										  width="20" height="20" 
+										  click="{accionClick('Cargar servicio')}" 
+										  mouseOver="{onMouseOverImage(event)}"
+										  mouseOut="{onMouseOutImage(event)}"/>
+								<mx:Image id="imgItemVerURL" 
+										  source="assets/images/URL.png" 
+										  useHandCursor="true" 
+										  buttonMode="true" 
+										  toolTip="Ver URL del Servicio asociado a la imagen" 
+										  width="20" height="20" 
+										  click="{accionClick('Ver URL del Servicio')}" 
+										  mouseOver="{onMouseOverImage(event)}"
+										  mouseOut="{onMouseOutImage(event)}"/>
+							</mx:HBox>
+						</mx:GridItem>
+						<mx:GridItem width="100%" textAlign="center" verticalAlign="middle">
+							<mx:HBox width="100%" horizontalAlign="right" textAlign="center" verticalAlign="middle">
+								<mx:Image id="imgVerResultados" 
+										  source="assets/images/i_table.png" 
+										  useHandCursor="true" 
+										  buttonMode="true" 
+										  visible="{imgVerResultadosVisible}"
+										  includeInLayout="{imgVerResultadosVisible}"
+										  toolTip="Volver a resultados" 
+										  width="25" height="25" 
+										  click="{wTemplate.selectedTitlebarButtonIndex = 0;mostrarResultados();}" 
+										  mouseOver="{onMouseOverImage(event)}"
+										  mouseOut="{onMouseOutImage(event)}"/>
+								<mx:PopUpButton id="popB" labelPlacement="left" click="accionClick(popB.label)" enabled="{hasItemSeleccionado}"/>
+							</mx:HBox>
+						</mx:GridItem>
+					</mx:GridRow>
+				</mx:Grid>
+			</mx:VBox>
+			<mx:VBox backgroundAlpha="1" contentBackgroundAlpha="1" id="boxMessage" visible="{msgVisible}" includeInLayout="{msgVisible}" width="100%" horizontalAlign="center">
+				<mx:HRule width="90%" height="6" strokeColor="#7E8686" alpha="0.45"/>
+				<mx:HBox width="100%" verticalAlign="middle">
+					<mx:SWFLoader id="swfMessage" source="assets/images/loader.swf" visible="false" includeInLayout="{swfMessage.visible}" />
+					<mx:Text id="txtMessage" text="" styleName="WidgetText" width="100%" fontWeight="bold"/>
+					<mx:Image id="imgCerrarMensaje"
+							  source="assets/images/cerrar.png" 
+							  useHandCursor="true" 
+							  buttonMode="true" 
+							  toolTip="Cerrar mensaje" 
+							  width="15" height="15" 
+							  click="{clearMessage();}"
+							  />
+				</mx:HBox>
+			</mx:VBox>
+			<mx:HRule width="90%" height="6" strokeColor="#7E8686" alpha="0.45"/>
+			<mx:Grid width="100%">
+				<mx:GridRow width="100%">
+					<mx:GridItem verticalAlign="middle" textAlign="center">
+						<mx:Image source="assets/images/carrito.png" width="25" height="25"/>
+						<mx:Text text="Carrito"/>
+					</mx:GridItem>
+					<mx:GridItem width="100%" textAlign="center" verticalAlign="middle">
+						<mx:HBox width="100%" horizontalAlign="right" textAlign="center" verticalAlign="middle">
+							<mx:Image id="imgSubirItem"
+									  source="assets/images/up.png" 
+									  useHandCursor="true" 
+									  buttonMode="true" 
+									  toolTip="Subir item" 
+									  width="20" height="20" 
+									  click="imgSubirItem_clickHandler(event)"
+									  mouseOver="{onMouseOverImage(event)}"
+									  mouseOut="{onMouseOutImage(event)}"
+									  visible="{providerCarrito.length > 1}"/>
+							<mx:Image id="imgBajarItem"
+									  source="assets/images/down.png" 
+									  useHandCursor="true" 
+									  buttonMode="true" 
+									  toolTip="Bajar item" 
+									  width="20" height="20" 
+									  click="imgBajarItem_clickHandler(event)"
+									  mouseOver="{onMouseOverImage(event)}"
+									  mouseOut="{onMouseOutImage(event)}"
+									  visible="{providerCarrito.length > 1}"/>
+							<mx:Spacer width="14" height="10"/>
+							<mx:Image id="imgInfoItem"
+									  source="assets/images/i_info.png" 
+									  useHandCursor="true" 
+									  buttonMode="true" 
+									  toolTip="Información de item" 
+									  width="20" height="20" 
+									  click="imgInfoItem_clickHandler(event)"
+									  mouseOver="{onMouseOverImage(event)}"
+									  mouseOut="{onMouseOutImage(event)}"
+									  visible="{providerCarrito.length > 0}"/>
+							<mx:Image id="imgLimpiarCarrito"
+									  source="assets/images/i_clear2.png" 
+									  useHandCursor="true" 
+									  buttonMode="true" 
+									  toolTip="Limpiar carro" 
+									  width="20" height="20" 
+									  click="imgLimpiarCarrito_clickHandler(event)"
+									  mouseOver="{onMouseOverImage(event)}"
+									  mouseOut="{onMouseOutImage(event)}"/>
+							<mx:Image id="imgReporteCarrito"
+									  source="assets/images/pdf.png" 
+									  useHandCursor="true" 
+									  buttonMode="true" 
+									  toolTip="Generar reporte" 
+									  width="20" height="20" 
+									  click="imgReporteCarrito_clickHandler(event)"
+									  mouseOver="{onMouseOverImage(event)}"
+									  mouseOut="{onMouseOutImage(event)}"/>
+						</mx:HBox>
+					</mx:GridItem>
+				</mx:GridRow>
+			</mx:Grid>
+			<mx:Canvas id="cnvCarrito" width="100%" height="100%" dragDrop="dragDropHandler(event)" dragEnter="cnvCarritoDragEnterHandler(event)" borderStyle="inset" alpha="1">
+				<mx:VBox width="100%" height="100%">
+					<mx:VBox id="vBoxAcordion" height="100%" width="100%">
+						
+						<mx:AdvancedDataGrid id="grdCarrito" 
+											 designViewDataType="tree" 
+											 width="100%" 
+											 height="100%" 
+											 
+											 color="{getStyle('color')}"
+											 headerColors="{[0xF5FAFF,0xD9EAFC]}"
+											 selectionColor="{getStyle('rollOverColor')}"
+											 alternatingItemColors="{[getStyle('contentBackgroundColor')]}"
+											 
+											 headerWordWrap="true"
+											 
+											 visible="{providerCarrito.length != 0}"
+											 variableRowHeight="true"
+											 sortableColumns="false"
+											 iconField="icon"
+											 
+											 itemClick="grdCarrito_itemClickHandler(event)"
+											 >
+							<mx:dataProvider>
+								<mx:HierarchicalData source="{providerCarrito}"/>
+							</mx:dataProvider>
+							<mx:columns>
+								<mx:AdvancedDataGridColumn dataField="label" 
+														   headerText="Programa/Imagen" 
+														   width="160" 
+														   wordWrap="true"/>
+								<mx:AdvancedDataGridColumn dataField="visible" 
+														   headerText="Visible" 
+														   wordWrap="true"
+														   textAlign="center"
+														   rendererIsEditor="true" 
+														   editorDataField="selected" width="80"/>
+								<mx:AdvancedDataGridColumn dataField="transparencia" 
+														   headerText="Transparencia" 
+														   wordWrap="true"
+														   textAlign="center"
+														   />
+							</mx:columns>
+							<mx:rendererProviders>
+								<mx:AdvancedDataGridRendererProvider dataField="visible" 
+																	 columnIndex="1" 
+																	 columnSpan="1"
+																	 renderer="widgets.DANE.Resultados.ResultadosRaster.CarritoVisibleItemRenderer"
+																	 >
+									
+								</mx:AdvancedDataGridRendererProvider>
+								
+								<mx:AdvancedDataGridRendererProvider dataField="transparencia"
+																	 columnIndex="2"
+																	 columnSpan="1"
+																	 renderer="widgets.DANE.Resultados.ResultadosRaster.CarritoTransparenciaItemRenderer"
+																	 >
+									
+								</mx:AdvancedDataGridRendererProvider>
+								
+								<mx:AdvancedDataGridRendererProvider dataField="imagen" 
+																	 columnIndex="1" 
+																	 columnSpan="2"
+																	 renderer="widgets.DANE.Resultados.ResultadosRaster.CarritoImagenItemRenderer"
+																	 >
+									
+								</mx:AdvancedDataGridRendererProvider>
+							</mx:rendererProviders>
+						</mx:AdvancedDataGrid>
+					</mx:VBox>
+				</mx:VBox>
+				<mx:HBox horizontalAlign="center" verticalAlign="middle" horizontalCenter="0" verticalCenter="0" visible="{providerCarrito.length == 0}">
+					<mx:Image source="assets/images/carrito.png"/>
+					<mx:Text text="Arrastre algun resultado para agregarlo al carrito..."/>
+				</mx:HBox>
+			</mx:Canvas>
+		</s:VGroup>
+	</viewer:WidgetTemplate>
+	
+</viewer:BaseWidget>

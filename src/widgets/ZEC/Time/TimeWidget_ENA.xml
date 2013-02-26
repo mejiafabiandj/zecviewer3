@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+	<titulo>ENCUESTA NACIONAL AGROPECUARIA</titulo>
+	<label>Semestre</label>
+	<formatString>YYMM</formatString>
+	
+	<!---Id base 0 del widget de consulta operativa-->
+	<widgetId>0</widgetId>
+	
+	<defaultConfig>http://190.25.231.241:8030/JSegOp/Muestra?op=ena&accion=leer</defaultConfig>
+	
+	<timeStops>	<!---Deben existir mas de dos timeStop-->
+		<timeStop year="2011" month="01" label="SEMESTRE I 2011" config="http://190.25.231.241:8030/JSegOp/Muestra?op=ena&accion=leer&mes=01&ano=2011"/>
+		<timeStop year="2011" month="08" label="SEMESTRE II 2011" config="http://190.25.231.241:8030/JSegOp/Muestra?op=ena&accion=leer&mes=08&ano=2011"/>
+		<timeStop year="2012" month="01" label="SEMESTRE I 2012" config="http://190.25.231.241:8030/JSegOp/Muestra?op=ena&accion=leer&mes=01&ano=2012"/>
+			<timeStop year="2012" month="01" label="SEMESTRE II 2012" config="http://190.25.231.241:8030/JSegOp/Muestra?op=ena&accion=leer&mes=08&ano=2012"/>
+	</timeStops>
+</configuration>

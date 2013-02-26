@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+///////////////////////////////////////////////////////////////////////////
+// Copyright (c) 2010-2011 Esri. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+///////////////////////////////////////////////////////////////////////////
+-->
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009"
+                xmlns:s="library://ns.adobe.com/flex/spark"
+                xmlns:mx="library://ns.adobe.com/flex/mx"
+                autoDrawBackground="false"
+                buttonMode="true"
+                click="itemrenderer_clickHandler(event)"
+                dataChange="itemrenderer_dataChangeHandler(event)"
+                minHeight="30"
+                useHandCursor="true">
+
+    <fx:Script>
+        <![CDATA[
+			import com.esri.ags.Map;
+			import com.esri.ags.layers.ArcGISDynamicMapServiceLayer;
+			import com.esri.ags.layers.ArcGISTiledMapServiceLayer;
+			import com.esri.ags.layers.Layer;
+			import com.esri.ags.utils.JSONUtil;
+			
+			import gov.dane.util.TokenUtil;
+			
+			import mx.events.FlexEvent;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.http.HTTPMultiService;
+			import mx.rpc.http.HTTPService;
+			
+			import spark.components.RadioButtonGroup;
+
+            private const THEME_CLICK:String = "themeClick";
+			
+			private const COMPARAR_TEMA:String = "compararTema";
+
+            [Bindable]
+            private var title:String;
+
+            [Bindable]
+            private var grp:spark.components.RadioButtonGroup;
+
+            [Bindable]
+            private var radioSelected:Boolean;
+			
+			[Bindable]
+			private var shouldShowLink:Boolean = false;
+			
+			[Bindable]
+			private var shouldShowComparar:Boolean = false;
+			
+			private var linkURL:String;
+			
+			[Embed("assets/images/group-layer.png")]
+			private const groupIcon:Class;
+
+            private function itemrenderer_dataChangeHandler(event:FlexEvent):void
+            {
+				shouldShowLink = false;
+				shouldShowComparar = false;
+				
+                if (data)
+                {
+                    title = data.labelref;
+                    grp = data.themeType;
+                    radioSelected = data.visible;
+					
+					if(data.themeUrl)
+					{
+						if(data.map)
+						{
+							var l:Object = (data.map as Map).getLayer(data.labelref);
+							if(	l &&
+								(l is ArcGISDynamicMapServiceLayer || l is ArcGISTiledMapServiceLayer) && 
+								l.serviceDescription &&
+								l.serviceDescription != "" &&
+								l.serviceDescription.toLocaleLowerCase().lastIndexOf("http") != -1
+								)
+							{
+								linkURL = l.serviceDescription;
+								shouldShowLink = true;
+							}
+						}
+						if(data.compararlabelref)
+						{
+							shouldShowComparar = true;
+						}
+							
+					}
+					
+                }
+            }
+
+            private function itemrenderer_clickHandler(event:MouseEvent):void
+            {
+                if (event.target is ThematicItemRenderer)
+                {
+                    ThematicItemRenderer(event.target).themeRadio.selected = true;
+                }
+				
+				dispatchEvent(new Event(THEME_CLICK, true)); // bubbles
+            }
+			
+			protected function imgLink_clickHandler(event:MouseEvent):void
+			{
+				if(linkURL)
+				{
+					var request:URLRequest = new URLRequest();
+					request.url = linkURL;
+					request.method = "GET";
+					navigateToURL(request, "_blank");
+				}
+			}
+			
+			protected function imgComparar_clickHandler(event:MouseEvent):void
+			{
+				dispatchEvent(new Event(COMPARAR_TEMA, true)); // bubbles
+			}
+			
+		]]>
+    </fx:Script>
+	
+    <s:states>
+        <s:State name="normal"/>
+        <s:State name="hovered"/>
+    </s:states>
+
+    <!-- border -->
+    <s:Rect left="0" right="10" top="0" bottom="0"
+            radiusX="4"
+            radiusY="4">
+        <s:stroke>
+            <s:SolidColorStroke alpha="{getStyle('borderAlpha')}"
+                                color="{getStyle('borderColor')}"
+                                weight="1"/>
+        </s:stroke>
+    </s:Rect>
+
+    <!-- background fill -->
+    <s:Rect left="1" right="11" top="1" bottom="1"
+            radiusX="4"
+            radiusY="4">
+        <s:fill>
+            <s:SolidColor alpha="0.3"
+                          alpha.hovered="0.8"
+                          color.hovered="{getStyle('rollOverColor')}"
+                          color.normal="{getStyle('contentBackgroundColor')}"/>
+        </s:fill>
+    </s:Rect>
+
+    <s:RadioButton id="themeRadio"
+                   left="20" right="55"
+                   fontWeight="normal"
+                   group="{grp}"
+                   label="{title}"
+                   selected="{radioSelected}"
+                   verticalCenter="0"
+				   visible="{!data.children}"
+				   includeInLayout="{!data.children}"/>
+	
+	<mx:LinkButton 
+				   left="15" right="40"
+				   fontWeight="normal"
+				   label="{title}"
+				   verticalCenter="0"
+				   icon="{groupIcon}"
+				   textAlign="left"
+				   visible="{data.children}"
+				   includeInLayout="{data.children}"/>
+
+	<s:HGroup right="15" verticalAlign="middle" height="100%">
+		<s:Image id="imgComparar"
+				 width="20"
+				 height="20"
+				 useHandCursor="true"
+				 buttonMode="true"
+				 visible="{shouldShowComparar}"
+				 includeInLayout="{shouldShowComparar}"
+				 source="assets/images/multiples_mapas20.png"
+				 click="imgComparar_clickHandler(event)"
+				 toolTip="{'Comparar con: ' + data.compararlabelref}"
+				 />
+		
+		<s:Image id="imgLink"
+				 width="16"
+				 height="16"
+				 useHandCursor="true"
+				 buttonMode="true"
+				 visible="{shouldShowLink}"
+				 includeInLayout="{shouldShowLink}"
+				 source="assets/images/i_info16.png"
+				 click="imgLink_clickHandler(event)"
+				 toolTip="Información del tema"
+				 />
+	</s:HGroup>
+	
+</s:ItemRenderer>

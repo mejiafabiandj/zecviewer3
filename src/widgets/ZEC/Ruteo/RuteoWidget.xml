@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<configuration>
+	<!--urlnaservice>http://dg_est45.dane.gov.co/arcgis/rest/services/Ruteo/Vias_500000/NAServer/Route</urlnaservice-->
+	<urlnaservice>http://www.mapas.com.co/titan/arcgis/rest/services/mpc/MPC_Route_COL/NAServer/Route</urlnaservice>
+	
+</configuration>

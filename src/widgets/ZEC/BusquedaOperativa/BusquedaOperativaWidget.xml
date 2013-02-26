@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<configuration>
+
+	<proxyURL></proxyURL>
+	
+	<criterios>
+		<criterio alias="Código de USM" 
+				  urlCapaOperativa="http://190.25.231.241:8399/arcgis/rest/services/Microestablecimientos/Microestablecimientos/MapServer/1" 
+				  tabla="BDG_OPERATIVO_2011.USM"
+				  useProxy="false"
+				  >
+			<campo nombreCampo="USM" 
+				   alias="Código de USM" 
+				   numerico="false"
+				   />
+			<!---->
+		   	<valores>
+		   		<USM valor="1"/>
+		   		<USM valor="2"/>
+		   	</valores>
+		   	<!---->
+		</criterio>
+		
+		<criterio alias="Municipio" 
+				  urlCapaOperativa="http://190.25.231.241:8399/arcgis/rest/services/Microestablecimientos/Microestablecimientos/MapServer/1"
+				  tabla="BDG_OPERATIVO_2011.USM" 
+				  useProxy="false">
+			<campo nombreCampo="NOM_DPTO" 
+				   alias="Departamento" 
+				   numerico="false"
+				   />
+		   	<campo nombreCampo="NOM_MPIO" 
+				   alias="Municipio" 
+				   numerico="false"
+				   />
+		</criterio>
+	</criterios>
+</configuration>

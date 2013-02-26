@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="utf-8"?>
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark"
+				   xmlns:text="flash.text.*"
+				   xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:viewer="com.esri.viewer.*" layout="absolute"
+				   widgetConfigLoaded="basewidget1_widgetConfigLoadedHandler(event)" xmlns:esri="http://www.esri.com/2008/ags"
+				   >
+
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.Graphic;
+			import com.esri.ags.clusterers.WeightedClusterer;
+			import com.esri.ags.clusterers.supportClasses.FlareSymbol;
+			import com.esri.ags.events.FlareEvent;
+			import com.esri.ags.events.FlareMouseEvent;
+			import com.esri.ags.events.GraphicEvent;
+			import com.esri.ags.events.LayerEvent;
+			import com.esri.ags.geometry.MapPoint;
+			import com.esri.ags.layers.FeatureLayer;
+			
+			import gov.dane.util.GraphicsLayerInfoWindowRenderer;
+			import gov.dane.util.TokenUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.CollectionEvent;
+			import mx.utils.ObjectProxy;
+			
+						
+			protected function basewidget1_widgetConfigLoadedHandler(event:Event):void
+			{
+				if(configObject)
+				{
+					map.addEventListener(FlareMouseEvent.FLARE_CLICK, flareClickHandler);
+					
+					if(configObject.configuration.layer is ArrayCollection)
+					{
+						for each(var layer:ObjectProxy in configObject.configuration.layer)
+						{
+							if(layer.groupField)
+							{
+								addFliteredClusterLayer(layer,layer.groupField);
+							}else
+							{
+								addClusteredFeatureLayer(layer);
+							}
+						}
+					}else if(configObject.configuration.layer)
+					{
+						if(configObject.configuration.layer.groupField)
+						{
+							addFliteredClusterLayer(configObject.configuration.layer,configObject.configuration.layer.groupField);
+						}else
+						{
+							addClusteredFeatureLayer(configObject.configuration.layer);
+						}
+						
+					}
+				}
+			}
+			
+			/**Añade un layer con cluster para cada uno de los grupos de datos definidos en la configuración*/
+			private function addFliteredClusterLayer(layer:ObjectProxy,groupField:ObjectProxy):void
+			{
+				
+				var groupList:ArrayCollection = new ArrayCollection(groupField.values.toString().split(","));
+				
+				groupList.addItem(groupField.defaultValue);
+				
+				for each (var item:Object in groupList)
+				{
+					var newLayer:ObjectProxy = new ObjectProxy();
+					
+					for(var prop:String in layer)
+					{
+						if(prop != "mx_internal_uid" && prop != "uid")
+						{
+							newLayer[prop] = layer[prop];
+						}
+					}
+					
+					newLayer.label += " (" + groupField.alias + ": " + item + ")";
+					
+					if(groupField.defaultValue != item)
+					{
+						newLayer.definitionExpression = groupField.name + " LIKE '" + item +"'";
+					}else
+					{
+						var list:Array = groupField.values.toString().split(",");
+						var items:String = "";
+						list.forEach(
+							function(ob:Object, index:int, array:Array):void
+							{
+								items += "'" + ob + "',";
+							});
+						items.substr(0,items.length-1);
+						
+						newLayer.definitionExpression = groupField.name + " NOT IN (" + items +")";
+					}
+					
+					addClusteredFeatureLayer(newLayer);
+				}
+					
+			}
+			
+			private function addClusteredFeatureLayer(layer:ObjectProxy):void
+			{
+				var proxy:String;
+				if(layer.useproxy == true)
+				{
+					proxy = configData.proxyUrl;
+				}
+				
+				var featureLayer:FeatureLayer;
+				var clusterer:WeightedClusterer;
+				var flareSymbol:FlareSymbol;
+				var textFormat:TextFormat;
+				var token:String = TokenUtil.buscarToken(layer.url,configData);
+				var url:String = layer.url;
+				
+				/*
+				//el indice inicial es 7 ya que se elimina "http://"
+				var host:String = url.substring(0 , url.indexOf("/",7) + 1);
+				
+				if(configData.data && configData.data.tokens)
+				{
+					if(configData.data.tokens.token is ArrayCollection)
+					{
+						for each (var tkn:ObjectProxy in configData.data.tokens.token)
+						{
+							if(tkn.url == host)
+							{
+								token = tkn.token;
+								break;
+							}
+						}
+					}else if(configData.data.tokens.token)
+					{
+						if(configData.data.tokens.token.url == host)
+						{
+							token = configData.data.tokens.token.token;
+						}
+					}
+				}*/
+				
+				
+				featureLayer = new FeatureLayer(layer.url,proxy,token);
+				featureLayer.useAMF = proxy? false: layer.useAMF;
+				featureLayer.name = layer.label;
+				featureLayer.alpha = layer.alpha;
+				featureLayer.visible = layer.visible;
+				featureLayer.mode = FeatureLayer.MODE_SNAPSHOT;
+				featureLayer.token = token;
+				
+				if(layer.outFields)
+				{
+					featureLayer.outFields = layer.outFields.toString().split(",");
+				}else
+				{
+					featureLayer.outFields = ["*"];
+				}
+				
+				if(layer.definitionExpression)
+				{
+					featureLayer.definitionExpression = layer.definitionExpression; 
+				}
+				
+				clusterer = new WeightedClusterer();
+				flareSymbol = new FlareSymbol();
+				textFormat = new TextFormat();
+				
+				textFormat.font = "Arial";
+				textFormat.color = layer.textColor;
+				textFormat.size = layer.textSize;
+				
+				flareSymbol.flareSizeIncOnRollOver = 3;
+				flareSymbol.textFormat=textFormat;
+				
+				flareSymbol.backgroundColor = layer.backgroundColor;
+				flareSymbol.borderColor = layer.borderColor;
+				
+				clusterer.symbol = flareSymbol;
+				
+				featureLayer.clusterer = clusterer;
+				
+				featureLayer.addEventListener(GraphicEvent.GRAPHIC_ADD,
+					function(ev:GraphicEvent):void
+					{
+						var classFactory:ClassFactory = new ClassFactory(GraphicsLayerInfoWindowRenderer);
+						classFactory.properties = {propiedades:{fields:new ArrayCollection((ev.currentTarget as FeatureLayer).layerDetails.fields),attributes:ev.graphic.attributes, feature:ev.graphic}};
+						ev.graphic.infoWindowRenderer = classFactory;
+					});
+				
+				map.addLayer(featureLayer);
+			}
+			
+			private function flareClickHandler(event:FlareMouseEvent):void
+			{
+				map.infoWindow.hide();
+				
+				for each (var layer:Object in map.layers)
+				{
+					if(layer is FeatureLayer)
+					{
+						if(layer.graphicProvider.contains(event.graphic))
+						{
+							var infoWindowContent:GraphicsLayerInfoWindowRenderer = new GraphicsLayerInfoWindowRenderer();
+							infoWindowContent.propiedades = {fields:new ArrayCollection((layer as FeatureLayer).layerDetails.fields),attributes:event.graphic.attributes , feature:event.graphic};
+							
+							map.infoWindowContent = infoWindowContent;
+							map.infoWindow.show(event.graphic.geometry as MapPoint);
+							
+							break;
+						}
+					}
+				}
+				//showInfoWindow(event.graphic, event.stageX, event.stageY);
+			}
+			
+		]]>
+	</fx:Script>
+
+	<fx:Declarations>
+		<!--text:TextFormat id="tf"
+						 font="Arial"
+						 size="14"/-->
+		<!--esri:FlareSymbol id="flareSymbol"
+						  flareSizeIncOnRollOver="3"
+						  textFormat="{tf}"
+						  backgroundColor="0x00aadd"/-->
+		<!--esri:WeightedClusterer id="clusterer" symbol="{flareSymbol}"/-->
+		
+		<esri:SimpleMarkerSymbol id="defaultsym"
+								 alpha="0.8"
+								 color="0xFF0000">
+			<esri:SimpleLineSymbol width="2" color="0xFFFFFF"/>
+		</esri:SimpleMarkerSymbol>
+		
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+</viewer:BaseWidget>

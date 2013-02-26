@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" 
+		 xmlns:esri="http://www.esri.com/2008/ags" 
+		 creationComplete="creationCompleteHandler(event)" xmlns:reports="reports.*" xmlns:components="reports.components.*" 
+		 xmlns:components1="widgets.DANE.ReporteEjecutivo.reports.components.*"
+		 >
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.layers.GraphicsLayer;
+			
+			import mx.events.FlexEvent;
+
+			/** 
+			 * graphicsLayer 
+			 */
+			private var _graphicsLayer:GraphicsLayer;
+			public function get graphicsLayer():GraphicsLayer{ return _graphicsLayer; }
+			public function set graphicsLayer(value:GraphicsLayer):void{ _graphicsLayer = value; }
+
+			/**
+			 * CDataExecutiveReport
+			 */
+			private var _CData:CDataExecutiveReport; 
+			[Bindable]public function get CData():CDataExecutiveReport{ return _CData; }
+			public function set CData(value:CDataExecutiveReport):void{ _CData = value; }
+			
+			/**
+			 * Url del mapa base
+			 **/
+			private var _urlBaseMap:String="http://10.57.48.49:8399/arcgis/rest/services/REUNIDOS/DIVIPOLA_2010/MapServer";
+			[Bindable]public function get urlBaseMap():String{ return _urlBaseMap; }
+			public function set urlBaseMap(value:String):void{ _urlBaseMap = value; }
+			
+			/** 
+			 * creationCompleteHandler() 
+			 */
+			protected function creationCompleteHandler(event:FlexEvent):void
+			{
+				graphicsLayer = new GraphicsLayer();
+				graphicsLayer.id="ERL";
+				graphicsLayer.name = "Executive Report";
+				ExRp_Map.addLayer(graphicsLayer);
+				if(this._CData==null){
+					this._CData=new CDataExecutiveReport();
+					this._CData.loadDemo(ExRp_Map, rCharts, cDataGrid);
+				}else{
+					this._CData.loadData(ExRp_Map, rCharts, cDataGrid);
+				}
+			}
+
+
+			protected function maximize_clickHandler():void
+			{
+				currentState=currentState=='expandedMap'?'default':'expandedMap';
+			}
+
+		]]>
+	</fx:Script>
+	
+	<s:states>
+		<s:State name="default"/>
+		<s:State name="expandedMap" />
+		<s:State name="expandedCharts" />
+		<s:State name="expandedDataGrid" />
+	</s:states>
+	
+	<s:transitions> 
+		<s:Transition> 
+			<s:Parallel> 
+				<mx:Resize target="{MapContent}" duration="500" /> 
+				<mx:Resize target="{DataGridContent}" duration="500" /> 
+				<mx:Resize target="{ChartsContent}" duration="500" />
+			</s:Parallel> 
+		</s:Transition> 
+	</s:transitions>
+	
+	<mx:Grid width="100%" height="100%">
+		<mx:GridRow width="100%" height="60%" height.expandedMap="100%" height.expandedCharts="100%" excludeFrom="expandedDataGrid">
+			<mx:GridItem width="100%" height="100%" >
+				<mx:Grid width="100%" height="100%">
+					<mx:GridRow width="100%" height="100%">
+						<mx:GridItem width="70%" width.expandedMap="100%" height="100%" excludeFrom="expandedCharts, expandedDataGrid">
+							<!-- Map -->
+							<s:Group id="MapContent" width="100%" height="100%">
+								<s:Button label="FS" right="5" top="5" depth="1" click="maximize_clickHandler()">
+								</s:Button>
+								<s:Panel depth="0" left="5" top="5" right="5" bottom="5" cornerRadius="5" dropShadowVisible="true" backgroundAlpha.default="1.0" contentBackgroundAlpha.default="1.0">
+									<esri:Map id="ExRp_Map">
+										<esri:ArcGISDynamicMapServiceLayer url="{urlBaseMap}" id="BM"/>
+									</esri:Map>
+								</s:Panel>
+							</s:Group>
+							<!-- EndMap -->
+						</mx:GridItem>
+						<mx:GridItem width="30%" width.expandedCharts="100%" height="100%" excludeFrom="expandedMap, expandedDataGrid">
+							<!-- Charts -->
+							<s:Group id="ChartsContent" width="100%" height="100%">
+								<s:Button label="FS" right="5" top="5" depth="1" click="currentState='expandedCharts'" click.expandedCharts="currentState='default'">
+								</s:Button>
+								<s:Panel id="Charts" left="5" top="5" right="5" bottom="5" cornerRadius="5" dropShadowVisible="true">
+									<mx:Grid id="gridCharts" left="5" top="5" right="5" bottom="5" minWidth="50">
+										<mx:Repeater id="rCharts">
+											<components1:RowComponent datos="{rCharts.currentItem}" />
+										</mx:Repeater>
+									</mx:Grid>
+								</s:Panel>
+							</s:Group>
+							<!-- End Charts -->
+						</mx:GridItem>
+					</mx:GridRow>
+				</mx:Grid>
+			</mx:GridItem>
+		</mx:GridRow>
+		<mx:GridRow width="100%" height="40%" height.expandedDataGrid="100%" excludeFrom="expandedMap, expandedCharts">
+			<mx:GridItem width="100%" height="100%">
+				<!-- DataGrid -->
+				<s:Group id="DataGridContent" width="100%" height="100%">
+					<s:Button label="FS" right="5" top="5" depth="11" click="currentState='expandedDataGrid'" click.expandedDataGrid="currentState='default'">
+					</s:Button>
+					<s:Panel id="Panel_DataGridContent" left="5" top="5" right="5" bottom="5" cornerRadius="5" dropShadowVisible="true">
+						<components1:DataGridComponent id="cDataGrid" />
+					</s:Panel>
+				</s:Group>
+				<!-- End DataGrid -->
+			</mx:GridItem>
+		</mx:GridRow>
+	</mx:Grid>
+</s:Group>

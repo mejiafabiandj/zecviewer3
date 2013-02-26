@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+						  xmlns:s="library://ns.adobe.com/flex/spark" 
+						  xmlns:mx="library://ns.adobe.com/flex/mx" 
+						  focusEnabled="true">
+	<fx:Script>
+		<![CDATA[
+			import spark.events.IndexChangeEvent;
+
+			protected function cmbOperadores_changeHandler(event:IndexChangeEvent):void
+			{
+				data.operador = cmbOperadores.selectedItem;
+			}
+
+		]]>
+	</fx:Script>
+	<s:DropDownList id="cmbOperadores"
+					dataProvider="{data.operadores}"
+					top="5" left="5" right="5" bottom="5"
+					minWidth="125"
+					change="cmbOperadores_changeHandler(event)"
+					prompt="Seleccione..."
+					/>
+</s:MXDataGridItemRenderer>

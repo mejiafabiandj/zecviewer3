@@ -1,0 +1,389 @@
+<?xml version="1.0" encoding="utf-8"?>
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:viewer="com.esri.viewer.*"
+				   xmlns:esri="http://www.esri.com/2008/ags"
+				   layout="absolute"
+				   creationComplete="ResultadosWidget_creationCompleteHandler(event)"
+				   widgetConfigLoaded="ResultadosWidget_widgetConfigLoadedHandler(event)" >
+
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.FeatureSet;
+			import com.esri.ags.Graphic;
+			import com.esri.ags.geometry.Extent;
+			import com.esri.ags.geometry.Geometry;
+			import com.esri.ags.geometry.MapPoint;
+			import com.esri.ags.geometry.Polygon;
+			import com.esri.ags.geometry.Polyline;
+			import com.esri.ags.layers.supportClasses.Field;
+			import com.esri.ags.symbols.SimpleFillSymbol;
+			import com.esri.ags.symbols.SimpleLineSymbol;
+			import com.esri.ags.symbols.SimpleMarkerSymbol;
+			import com.esri.ags.tasks.GeometryService;
+			import com.esri.ags.tasks.GeometryServiceSingleton;
+			import com.esri.viewer.AppEvent;
+			import com.esri.viewer.ViewerContainer;
+			
+			import gov.dane.util.Constantes;
+			import gov.dane.util.GeometryUtil;
+			import gov.dane.util.GraphicsLayerInfoWindowRenderer;
+			import gov.dane.util.TokenUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.core.UIComponent;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.rpc.AsyncResponder;
+			import mx.rpc.Fault;
+			
+			import spark.components.gridClasses.CellRegion;
+			import spark.events.GridSelectionEvent;
+			import spark.events.GridSelectionEventKind;
+			
+			import widgets.WidgetContainer.WidgetContainer;
+			
+			[Bindable] private var providerGridResultados:ArrayCollection = new ArrayCollection();
+			[Bindable] private var token:Object;
+			[Bindable] private var displayField:String;
+			[Bindable] private var displayFieldAlias:String;
+			[Bindable] private var featureSet:FeatureSet;
+			
+			protected function ResultadosWidget_creationCompleteHandler(event:FlexEvent):void
+			{
+				AppEvent.addListener(AppEvent.DATA_PUBLISH, sharedDataUpdated);
+				addSharedData(Constantes.WIDGET_ABIERTO,new ArrayCollection([widgetTitle]));
+				
+				map.addLayer(graphicsLayerResultadosWidget);
+				
+				AppEvent.addListener(AppEvent.BASEMAP_SWITCH, basemapMenuClicked);
+			}
+			
+			
+			protected function ResultadosWidget_widgetConfigLoadedHandler(event:Event):void
+			{
+				// TODO Auto-generated method stub
+			}
+			
+			private function sharedDataUpdated(event:AppEvent):void
+			{
+				if(event.data.key == widgetTitle)
+				{
+					graphicsLayerResultadosWidget.clear();
+					if(event.data.collection && event.data.collection[0])
+					{
+						featureSet = event.data.collection[0].featureSet as FeatureSet;
+						
+						providerGridResultados.removeAll();
+						for each(var feature:Graphic in featureSet.features)
+						{
+							var atributos:Object = feature.attributes;
+							atributos.feature = feature;
+							providerGridResultados.addItem(atributos);
+						}
+						
+						if(providerGridResultados.length == 1)
+						{
+							grdResultados.selectedIndex = 0;
+							grdResultados.dispatchEvent(new MouseEvent(MouseEvent.CLICK));
+						}
+						
+						//providerGridResultados = new ArrayCollection(featureSet.attributes);
+						token = event.data.collection[0].token
+						displayField = featureSet.displayFieldName;
+						displayFieldAlias = featureSet.fieldAliases[featureSet.displayFieldName];
+						
+						
+						//Acercar a todos los resultados
+						if(!token && providerGridResultados.length > 0)
+						{
+							grdResultados.selectAll();
+							grdResultados.dispatchEvent(new GridSelectionEvent(GridSelectionEvent.SELECTION_CHANGE,false,false,GridSelectionEventKind.SELECT_ALL,new CellRegion(-1,-1)));
+							
+						}
+					}
+				}
+			}
+			
+			protected function wTemplate_openHandler(event:Event):void
+			{
+				// TODO Auto-generated method stub
+			}
+
+			protected function wTemplate_closedHandler(event:Event):void
+			{
+				graphicsLayerResultadosWidget.clear();
+				map.infoWindow.hide();
+			}
+
+
+			protected function wTemplate_minimizedHandler(event:Event):void
+			{
+				// TODO Auto-generated method stub
+			}
+			
+			/**
+			 * Evento resultado de el cambio del mapa base
+			 **/
+			private function basemapMenuClicked(event:AppEvent):void
+			{
+				btnLimpiar.dispatchEvent(new MouseEvent(MouseEvent.CLICK));
+			}
+
+
+			protected function grdResultados_itemClickHandler(event:Event):void
+			{
+				graphicsLayerResultadosWidget.clear();
+				
+				if(!grdResultados.selectedItem){
+					return;
+				}
+				
+				if(token)
+				{
+					for each(var layer:Object in token.vigencia.niveles.nivel)
+					{
+						if(layer.id == token.layer)
+						{
+							query.where = layer.pk + " = " + grdResultados.selectedItem[layer.pk];
+							break;
+						}
+					}
+					
+					queryTask.url = token.vigencia.url + "/" + token.layer;
+					
+					queryTask.proxyURL = (token.vigencia.useproxy ? configData.proxyUrl :null);
+					queryTask.useAMF = queryTask.proxyURL? false: token.vigencia.useAMF;
+					queryTask.token = TokenUtil.buscarToken(queryTask.url,configData);
+					
+					queryTask.execute(query,new AsyncResponder(queryTask_Result,queryTask_Fault));
+				}else if(grdResultados.selectedItem && grdResultados.selectedItem.feature && grdResultados.selectedItem.feature.geometry)
+				{
+					var featureSet:FeatureSet = new FeatureSet([grdResultados.selectedItem.feature]);
+					featureSet.fields = this.featureSet.fields;
+					queryTask_Result(featureSet);
+				}
+			}
+			
+			private function queryTask_Result(featureSet:FeatureSet,token:Object = null):void
+			{
+				for each(var feature:Graphic in featureSet.features)
+				{
+					var colorFondo:uint = 0xFF0000;
+					var colorLinea:uint = 0xFF0000;
+					var outSmbol:SimpleLineSymbol = new SimpleLineSymbol(SimpleLineSymbol.STYLE_SOLID,colorLinea,1,3);
+					switch(feature.geometry.type)
+					{
+						case Geometry.MAPPOINT:
+						{
+							feature.symbol = new SimpleMarkerSymbol(SimpleMarkerSymbol.STYLE_CIRCLE,15,colorFondo,0.8);
+							
+							map.centerAt(feature.geometry as MapPoint);
+							map.scale = 2000;
+							
+							break;
+						}
+						case Geometry.MULTIPOINT:
+						{
+							feature.symbol = new SimpleMarkerSymbol(SimpleMarkerSymbol.STYLE_CIRCLE,15,colorFondo,0.8);
+							break;
+						}
+						case Geometry.POLYGON:
+						{
+							feature.symbol = new SimpleFillSymbol(SimpleFillSymbol.STYLE_SOLID,colorFondo,0.4,outSmbol);
+							break;
+						}
+						case Geometry.POLYLINE:
+						{
+							feature.symbol = outSmbol;
+							break;
+						}
+					}
+					graphicsLayerResultadosWidget.add(feature);
+					
+					
+					var classFactory:ClassFactory = new ClassFactory(GraphicsLayerInfoWindowRenderer);
+					classFactory.properties = {propiedades:{fields:new ArrayCollection(featureSet.fields),attributes:feature.attributes, feature:feature}};
+					feature.infoWindowRenderer = classFactory;
+					
+					
+					if(featureSet.features.length == 1)
+					{
+						if(feature.geometry.extent)
+						{
+							map.extent = feature.geometry.extent;
+							if(!map.extent.contains(feature.geometry))
+							{
+								map.level--;
+							}
+						}
+						
+						
+						var infoWindowContent:GraphicsLayerInfoWindowRenderer = new GraphicsLayerInfoWindowRenderer();
+						infoWindowContent.propiedades = {fields:new ArrayCollection(featureSet.fields),attributes:feature.attributes , feature:feature};
+						map.infoWindowContent = infoWindowContent;
+						map.infoWindow.show(getGeomCenter(feature));
+					}
+				}
+				
+				var extGrupo:Extent = GeometryUtil.extendGrupo(new ArrayCollection(featureSet.features));
+				if(extGrupo)
+				{
+					map.extent = extGrupo;
+					if(!map.extent.contains(extGrupo))
+					{
+						map.level--;
+					}
+				}
+				
+				
+				
+			}
+			
+			private function queryTask_Fault(fault:Fault,token:Object = null):void
+			{
+				
+				showError("No fué posible encontrar la geometría del elemento seleccionado\n\n" + fault.message);
+			}
+			
+			private function getGeomCenter(gra:Graphic):MapPoint {
+				var pt:MapPoint;
+				switch (gra.geometry.type)
+				{
+					case Geometry.MAPPOINT: {
+						pt = gra.geometry as MapPoint;
+						break;
+					}
+					case Geometry.POLYLINE: {
+						var pl:Polyline = gra.geometry as Polyline;
+						var pathCount:Number = pl.paths.length;
+						var pathIndex:int = int((pathCount / 2) - 1);
+						var midPath:Array = pl.paths[pathIndex];
+						var ptCount:Number = midPath.length;
+						var ptIndex:int = int((ptCount / 2) - 1);
+						pt = pl.getPoint(pathIndex, ptIndex);
+						break;
+					}
+					case Geometry.POLYGON: {
+						var poly:Polygon = gra.geometry as Polygon;
+						pt = poly.extent.center;
+						break;
+					}
+				}
+				return pt;
+			}
+
+
+			protected function btnLimpiar_clickHandler(event:MouseEvent):void
+			{
+				providerGridResultados.removeAll();
+				graphicsLayerResultadosWidget.clear();
+				map.infoWindow.hide();
+			}
+			
+			private function labelFunction(item:Object, column:GridColumn):String{
+				return item[displayField];
+			}
+
+
+			protected function grdResultados_selectionChangeHandler(event:GridSelectionEvent):void
+			{
+				graphicsLayerResultadosWidget.clear();
+				
+				if(!grdResultados.selectedItem){
+					return;
+				}
+				
+				if(token)
+				{
+					for each(var layer:Object in token.vigencia.niveles.nivel)
+					{
+						if(layer.id == token.layer)
+						{
+							var where:String = "";
+							for each(var selectedItem:Object in grdResultados.selectedItems)
+							{
+								where += layer.pk + " = " + selectedItem[layer.pk] + " OR ";
+							}
+							
+							where = where.substring(0,where.length - 4);
+							query.where = where;
+							break;
+						}
+					}
+					
+					queryTask.url = token.vigencia.url + "/" + token.layer;
+					
+					queryTask.proxyURL = (token.vigencia.useproxy ? configData.proxyUrl :null);
+					queryTask.useAMF = queryTask.proxyURL? false: token.vigencia.useAMF;
+					queryTask.token = TokenUtil.buscarToken(queryTask.url,configData);
+					
+					queryTask.execute(query,new AsyncResponder(queryTask_Result,queryTask_Fault));
+				}else if(grdResultados.selectedItems)
+				{
+					var features:Array = [];
+					for each(var selected:Object in grdResultados.selectedItems)
+					{
+						if(selected.feature)
+						{
+							features.push(selected.feature);
+						}
+					}
+					var featureSet:FeatureSet = new FeatureSet(features);
+					featureSet.fields = this.featureSet.fields;
+					queryTask_Result(featureSet);
+				}
+			}
+			
+		]]>
+	</fx:Script>
+
+	<fx:Declarations>
+		<esri:Query id="query" outFields="[*]" returnGeometry="true" outSpatialReference="{map.spatialReference}"/>
+		<esri:QueryTask id="queryTask" method="POST" showBusyCursor="true" concurrency="last"/>
+		
+		<esri:GraphicsLayer id="graphicsLayerResultadosWidget" name="graphicsLayerResultadosWidget"/>
+	</fx:Declarations>
+	<viewer:WidgetTemplate id="wTemplate" 
+						   open="wTemplate_openHandler(event)"
+						   closed="wTemplate_closedHandler(event)"
+						   minimized="wTemplate_minimizedHandler(event)"
+						   >
+		<s:BorderContainer cornerRadius="5" top="15" bottom="0" right="0" left="0" backgroundAlpha="0" 
+						   minHeight="50"
+						   >
+			<s:VGroup horizontalCenter="0" verticalCenter="0" verticalAlign="middle" horizontalAlign="center" left="5" top="5" right="5" bottom="5"
+					  >
+				<s:HGroup minHeight="0" width="100%" verticalAlign="middle" horizontalAlign="left">
+					<s:Label id="lblCount" text="{'(' + (providerGridResultados.length) + ') resultados'}"/>
+					<s:HGroup width="100%" horizontalAlign="right" verticalAlign="middle">
+						<mx:Image id="btnLimpiar" source="assets/images/eraser.png" width="20" height="20" 
+								  toolTip="Borrar los resultados"
+								  useHandCursor="true" buttonMode="true" click="btnLimpiar_clickHandler(event)"/>
+					</s:HGroup>
+				</s:HGroup>
+				
+				
+				<s:DataGrid id="grdResultados" width="100%" height="100%" variableRowHeight="true" 
+							dataProvider="{providerGridResultados}"
+							selectionMode="multipleRows"
+							
+							selectionChange="grdResultados_selectionChangeHandler(event)">
+					<s:columns>
+						<s:ArrayList>
+							<s:GridColumn labelFunction="labelFunction"  headerText="{displayFieldAlias}"/>
+						</s:ArrayList>
+					</s:columns>
+				</s:DataGrid>
+				<!--<mx:DataGrid id="grdResultados" width="100%" height="100%" variableRowHeight="true" wordWrap="true"
+							 dataProvider="{providerGridResultados}"
+							 alternatingItemColors="{[getStyle('contentBackgroundColor'),getStyle('contentBackgroundColor')]}"
+							 itemClick="grdResultados_itemClickHandler(event)">
+					<mx:columns>
+						<mx:DataGridColumn dataField="{displayField}" headerText="{displayFieldAlias}"/>
+					</mx:columns>
+				</mx:DataGrid>-->
+			</s:VGroup>
+		</s:BorderContainer>
+	</viewer:WidgetTemplate>
+</viewer:BaseWidget>

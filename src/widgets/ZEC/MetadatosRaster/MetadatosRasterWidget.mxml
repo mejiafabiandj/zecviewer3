@@ -1,0 +1,580 @@
+<?xml version="1.0" encoding="utf-8"?>
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" 
+				   xmlns:viewer="com.esri.viewer.*" 
+				   layout="absolute"
+				   creationComplete="init()"
+				   widgetConfigLoaded="basewidget1_widgetConfigLoadedHandler(event)"
+				   fontFamily="Verdana" xmlns:ags="com.esri.ags.*" xmlns:layers="com.esri.ags.layers.*">
+	
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.SpatialReference;
+			import com.esri.ags.geometry.Extent;
+			import com.esri.ags.layers.GraphicsLayer;
+			import com.esri.viewer.AppEvent;
+			import com.esri.viewer.ViewerContainer;
+			import com.esri.viewer.WidgetStates;
+			import com.esri.viewer.utils.Hashtable;
+			
+			import gov.dane.util.*;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.ListEvent;
+			import mx.events.StateChangeEvent;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.utils.ObjectProxy;
+			
+			[Bindable] private var metadato:ObjectProxy;
+			[Bindable] private var dataProviderAdvancedDataGrid:ArrayCollection = new ArrayCollection([{label:"No hay información"}]);
+			[Bindable] private var idDane:String;
+			[Bindable] private var widgetPadre:String;
+			
+			[Bindable] public var graphicsLayer:GraphicsLayer;
+			
+			
+			
+			private function init():void
+			{
+				graphicsLayer = new GraphicsLayer();
+				graphicsLayer.id = "Metadatos Raster";
+				graphicsLayer.name = "Metadatos Raster";
+				map.addLayer(graphicsLayer);
+				
+				AppEvent.addListener(AppEvent.DATA_PUBLISH, sharedDataUpdated);
+				
+			}
+			
+			protected function basewidget1_widgetConfigLoadedHandler(event:Event):void
+			{
+				if(configObject && configObject.configuration && configObject.configuration.urlMetadatos)
+				{
+					servicio.url = configObject.configuration.urlMetadatos;
+				}
+				addSharedData(Constantes.WIDGET_ABIERTO,new ArrayCollection([widgetTitle]));
+				
+			}
+
+			
+			private function sharedDataUpdated(event:AppEvent):void
+			{
+				if (event.data.key == widgetTitle)
+				{
+					var datos:Object = (event.data.collection as ArrayCollection)[0];
+					idDane = datos.idDane;
+					//Minimizar el widget desde el que se abrió el panel de metadatos 
+					if(idDane != null && idDane != "")
+					{
+						
+						servicio.send({IdDane:idDane});
+						dataProviderAdvancedDataGrid = new ArrayCollection([{label:"Buscando..."}]);
+						
+						if(datos.parentWidget)
+							widgetPadre = datos.parentWidget; 
+						
+						if(datos.parentWidget)
+						{
+							cerrarPadre();
+						}
+					}
+					else
+					{
+						dataProviderAdvancedDataGrid = new ArrayCollection([{label:"No hay información"}]);
+					}
+				}
+			}
+			
+			private function abrirPadre():void
+			{
+				if(!widgetPadre)
+				{
+					return;
+				}
+				for (var k:Number = 0; k < configData.widgets.length; k++)
+				{
+					var lbl:String = configData.widgets[k].label;
+					if (lbl == widgetPadre)
+					{
+						ViewerContainer.getInstance().widgetManager.getWidget(k).setState(WidgetStates.WIDGET_OPENED);
+					}
+				}
+			}
+			
+			private function cerrarPadre():void
+			{
+				if(!widgetPadre)
+				{
+					return;
+				}
+				for (var k:Number = 0; k < configData.widgets.length; k++)
+				{
+					var lbl:String = configData.widgets[k].label;
+					if (lbl == widgetPadre)
+					{
+						ViewerContainer.getInstance().widgetManager.getWidget(k).setState(WidgetStates.WIDGET_MINIMIZED);
+					}
+				}
+			}
+			
+			/**
+			 * Desactivar la visibilidad del dibujo cuando se cierre el widget
+			 */
+			private function widgetClosedHandler(event:Event):void
+			{
+				if(widgetPadre)
+				{
+					abrirPadre();
+				}
+				setMapNavigation(null, null);
+				map.removeLayer(graphicsLayer);
+			}
+			
+			/**
+			 * Desactivar la visibilidad del dibujo cuando se minimice el widget
+			 */
+			private function widgetMinimizedHandler(event:Event):void
+			{
+				//graphicsLayer.visible = false;
+				setMapNavigation(null, null);
+				map.addLayer(graphicsLayer);
+			}
+			
+			/**
+			 * Activa la visibilidad del dibujo cuando se abre el widget
+			 */
+			private function widgetOpenedHandler(event:Event):void
+			{	
+				if(graphicsLayer)
+					map.addLayer(graphicsLayer);
+			}
+			
+			protected function servicio_resultHandler(event:ResultEvent):void
+			{
+				if(event.result == "")
+				{
+					dataProviderAdvancedDataGrid = new ArrayCollection([{label:"No hay información asociada al elemento seleccionado"}]);
+					return;
+				}
+				
+				var paletaColores:Array = new Array(0x064377,0x6E3BFF,0xDB48FF,0xFF867C);
+				metadato = event.result as ObjectProxy;
+				
+				graphicsLayer.clear();
+				var grupoInfoIdentificacion:ObjectProxy = 
+					new ObjectProxy(
+						{	
+							grupo : new ObjectProxy ( {label:"Información de Identificación",color:paletaColores[0]} ),
+							children:
+							[
+								new ObjectProxy ( {separador:new ObjectProxy ( {nivel:0 , color:paletaColores[0] , tip:"Inicio Información de Identificación"} )} ),
+								new ObjectProxy ( {label:"Título", value:event.result.MD_Metadata.identificationInfo.MD_DataIdentification.citation.CI_Citation.title.CharacterString} ),
+								new ObjectProxy ( {label:"Título Alternativo", value:event.result.MD_Metadata.identificationInfo.MD_DataIdentification.citation.CI_Citation.title.CharacterString} ),
+								new ObjectProxy ( {label:"Tipo de Fecha", value:"Publication: Date identifies when the resource was issued"} ),
+								new ObjectProxy ( {label:"Forma de presentación", value:"Digital : Mapa representado en forma raster o vector "} ),
+								new ObjectProxy ( {label:"Resumen", value:event.result.MD_Metadata.identificationInfo.MD_DataIdentification.abstract.CharacterString} ),
+								new ObjectProxy ( {label:"Proposito", value:event.result.MD_Metadata.identificationInfo.MD_DataIdentification.purpose.CharacterString} ),
+								
+								new ObjectProxy ( {label:"Estado", value:"Completado: La Produccion de los datos se ha completado"} ),
+								new ObjectProxy ( {label:"Punto de contacto", 
+									children:
+									[
+										new ObjectProxy ( {separador:new ObjectProxy ( {nivel:1 , color:paletaColores[1] , tip:"Inicio Punto de contacto"} )} ),
+										new ObjectProxy ( {label:"Nombre Individual", value:event.result.MD_Metadata.identificationInfo.MD_DataIdentification.pointOfContact.CI_ResponsibleParty.individualName.CharacterString} ),
+										new ObjectProxy ( {label:"Nombre Entidad", value:event.result.MD_Metadata.identificationInfo.MD_DataIdentification.pointOfContact.CI_ResponsibleParty.organisationName.CharacterString } ),
+										new ObjectProxy ( {label:"Nombre del cargo", value:event.result.MD_Metadata.identificationInfo.MD_DataIdentification.pointOfContact.CI_ResponsibleParty.positionName.CharacterString } ),
+										new ObjectProxy ( {label:"Rol", value:"Punto de Contacto : Ente con la cual se puede contactar para cualquier duda o para la adquisicion del conjunto de datos"} ),
+										new ObjectProxy ( {label:"Número de teléfono", value:event.result.MD_Metadata.identificationInfo.MD_DataIdentification.pointOfContact.CI_ResponsibleParty.contactInfo.CI_Contact.phone.CI_Telephone.voice.CharacterString } ),
+										new ObjectProxy ( {label:"Número de fax", value:event.result.MD_Metadata.identificationInfo.MD_DataIdentification.pointOfContact.CI_ResponsibleParty.contactInfo.CI_Contact.phone.CI_Telephone.facsimile.CharacterString } ),
+										new ObjectProxy ( {label:"Punto de entrega", value:event.result.MD_Metadata.identificationInfo.MD_DataIdentification.pointOfContact.CI_ResponsibleParty.contactInfo.CI_Contact.address.CI_Address.deliveryPoint.CharacterString } ),
+										new ObjectProxy ( {label:"Ciudad", value:event.result.MD_Metadata.identificationInfo.MD_DataIdentification.pointOfContact.CI_ResponsibleParty.contactInfo.CI_Contact.address.CI_Address.city.CharacterString } ),
+										new ObjectProxy ( {label:"Área administrativa", value:event.result.MD_Metadata.identificationInfo.MD_DataIdentification.pointOfContact.CI_ResponsibleParty.contactInfo.CI_Contact.address.CI_Address.administrativeArea.CharacterString} ),
+										new ObjectProxy ( {label:"Código Postal", value:event.result.MD_Metadata.identificationInfo.MD_DataIdentification.pointOfContact.CI_ResponsibleParty.contactInfo.CI_Contact.address.CI_Address.postalCode.CharacterString} ),
+										new ObjectProxy ( {label:"País", value:event.result.MD_Metadata.identificationInfo.MD_DataIdentification.pointOfContact.CI_ResponsibleParty.contactInfo.CI_Contact.address.CI_Address.country.CharacterString} ),
+										new ObjectProxy ( {label:"Correo electrónico", value:event.result.MD_Metadata.identificationInfo.MD_DataIdentification.pointOfContact.CI_ResponsibleParty.contactInfo.CI_Contact.address.CI_Address.electronicMailAddress.CharacterString} ),
+										new ObjectProxy ( {separador:new ObjectProxy ( {nivel:1 , color:paletaColores[1] , tip:"Fin Punto de contacto"} )} )
+									]
+								} ),
+								new ObjectProxy ( {label:"Mantenimiento y frecuencia de actualización", value:"Segun necesidad : Los datos se actualizan segun las necesidades o requerimientos"} ),
+								
+								new ObjectProxy ( {label:"Autor del metadato", 
+									children:
+									[
+										new ObjectProxy ( {separador:new ObjectProxy ( {nivel:1 , color:paletaColores[1] , tip:"Inicio Autor del metadato"} )} ),
+										new ObjectProxy ( {label:"Nombre Individual", value:event.result.MD_Metadata.contact.CI_ResponsibleParty.individualName.CharacterString} ),
+										new ObjectProxy ( {label:"Nombre Entidad", value:event.result.MD_Metadata.contact.CI_ResponsibleParty.organisationName.CharacterString} ),
+										new ObjectProxy ( {label:"Nombre del cargo", value:event.result.MD_Metadata.contact.CI_ResponsibleParty.positionName.CharacterString} ),
+										new ObjectProxy ( {label:"Rol", value:"Autor: Ente autor de los datos"} ),
+										new ObjectProxy ( {label:"Número de teléfono", value:event.result.MD_Metadata.contact.CI_ResponsibleParty.contactInfo.CI_Contact.phone.CI_Telephone.voice.CharacterString} ),
+										new ObjectProxy ( {label:"Número de fax", value:event.result.MD_Metadata.contact.CI_ResponsibleParty.contactInfo.CI_Contact.phone.CI_Telephone.facsimile.CharacterString} ),
+										new ObjectProxy ( {label:"Punto de entrega", value:event.result.MD_Metadata.contact.CI_ResponsibleParty.contactInfo.CI_Contact.address.CI_Address.deliveryPoint.CharacterString} ),
+										new ObjectProxy ( {label:"Ciudad", value:event.result.MD_Metadata.contact.CI_ResponsibleParty.contactInfo.CI_Contact.address.CI_Address.city.CharacterString} ),
+										new ObjectProxy ( {label:"Área administrativa", value:event.result.MD_Metadata.contact.CI_ResponsibleParty.contactInfo.CI_Contact.address.CI_Address.administrativeArea.CharacterString} ),
+										new ObjectProxy ( {label:"Código Postal", value:event.result.MD_Metadata.contact.CI_ResponsibleParty.contactInfo.CI_Contact.address.CI_Address.postalCode.CharacterString} ),
+										new ObjectProxy ( {label:"País", value:event.result.MD_Metadata.contact.CI_ResponsibleParty.contactInfo.CI_Contact.address.CI_Address.country.CharacterString} ),
+										new ObjectProxy ( {label:"Correo electrónico", value:event.result.MD_Metadata.contact.CI_ResponsibleParty.contactInfo.CI_Contact.address.CI_Address.electronicMailAddress.CharacterString} ),
+										new ObjectProxy ( {label:"Horario de servicio", value:"Lunes a Viernes de 8:00am a 5:00pm"} ),
+										new ObjectProxy ( {separador:new ObjectProxy ( {nivel:1 , color:paletaColores[1] , tip:"Fin Autor del metadato"} )} )
+									]
+								} ),
+								new ObjectProxy ( {label:"Descriptores", value:event.result.MD_Metadata.identificationInfo.MD_DataIdentification.descriptiveKeywords[0].MD_Keywords.keyword.CharacterString + " (" + event.result.MD_Metadata.identificationInfo.MD_DataIdentification.descriptiveKeywords[0].MD_Keywords.type.MD_KeywordTypeCode.codeListValue +")"} ),
+								new ObjectProxy ( {label:"Descriptores", value:event.result.MD_Metadata.identificationInfo.MD_DataIdentification.descriptiveKeywords[1].MD_Keywords.keyword.CharacterString + " (" + event.result.MD_Metadata.identificationInfo.MD_DataIdentification.descriptiveKeywords[1].MD_Keywords.type.MD_KeywordTypeCode.codeListValue +")"} ),
+								new ObjectProxy ( {label:"Tipo de representación espacial", value:"Raster: Grid data is used to represent geographic data"} ),
+								new ObjectProxy ( {label:"Escala equivalente", value:event.result.MD_Metadata.identificationInfo.MD_DataIdentification.spatialResolution.MD_Resolution.equivalentScale.MD_RepresentativeFraction.denominator.Integer} ),
+								new ObjectProxy ( {label:"Idioma", value:event.result.MD_Metadata.identificationInfo.MD_DataIdentification.language.CharacterString} ),
+								new ObjectProxy ( {label:"Conjunto de caracteres", value:event.result.MD_Metadata.characterSet.MD_CharacterSetCode.codeListValue} ),
+								new ObjectProxy ( {label:"Topic category code", value:event.result.MD_Metadata.identificationInfo.MD_DataIdentification.topicCategory.MD_TopicCategoryCode} ),
+								new ObjectProxy ( {label:"Extensión",
+									children:
+									[
+										new ObjectProxy ( {separador:new ObjectProxy ( {nivel:1 , color:paletaColores[1] , tip:"Inicio Extensión"} )} ),
+										new ObjectProxy ( {label:"Longitud Oeste", value:event.result.MD_Metadata.identificationInfo.MD_DataIdentification.extent[1].EX_Extent.geographicElement.EX_GeographicBoundingBox.westBoundLongitude.Decimal} ),
+										new ObjectProxy ( {label:"latitud Sur", value:event.result.MD_Metadata.identificationInfo.MD_DataIdentification.extent[1].EX_Extent.geographicElement.EX_GeographicBoundingBox.southBoundLatitude.Decimal} ),
+										new ObjectProxy ( {label:"Longitud Este", value:event.result.MD_Metadata.identificationInfo.MD_DataIdentification.extent[1].EX_Extent.geographicElement.EX_GeographicBoundingBox.eastBoundLongitude.Decimal} ),
+										new ObjectProxy ( {label:"Latitud Norte", value:event.result.MD_Metadata.identificationInfo.MD_DataIdentification.extent[1].EX_Extent.geographicElement.EX_GeographicBoundingBox.northBoundLatitude.Decimal} ),
+										
+										//dibuja el cubrimiento del elemento en un grafico con un mapa
+										new ObjectProxy ( {verExtent:new Extent(
+											event.result.MD_Metadata.identificationInfo.MD_DataIdentification.extent[1].EX_Extent.geographicElement.EX_GeographicBoundingBox.westBoundLongitude.Decimal,
+											event.result.MD_Metadata.identificationInfo.MD_DataIdentification.extent[1].EX_Extent.geographicElement.EX_GeographicBoundingBox.southBoundLatitude.Decimal, 
+											event.result.MD_Metadata.identificationInfo.MD_DataIdentification.extent[1].EX_Extent.geographicElement.EX_GeographicBoundingBox.eastBoundLongitude.Decimal,
+											event.result.MD_Metadata.identificationInfo.MD_DataIdentification.extent[1].EX_Extent.geographicElement.EX_GeographicBoundingBox.northBoundLatitude.Decimal,
+											new SpatialReference(4686))} ),
+										new ObjectProxy ( {separador:new ObjectProxy ( {nivel:1 , color:paletaColores[1] , tip:"Fin Extensión"} )} )
+									]
+								} ),
+								new ObjectProxy ( {separador:new ObjectProxy ( {nivel:0 , color:paletaColores[0] , tip:"Fin Información de Identificación"} )} )
+							]
+						}
+					);
+				
+				
+				
+				var grupoInfoRepEspacial:ObjectProxy = new ObjectProxy(
+					{
+						grupo : new ObjectProxy ( {label:"Información de representación espacial",color:paletaColores[0]} ),
+						children :
+						[
+							new ObjectProxy ( {separador:new ObjectProxy ( {nivel:0 , color:paletaColores[0] , tip:"Inicio Información de representación espacial"} )} ),
+							new ObjectProxy ( {label:"Número de dimensiones" , value:event.result.MD_Metadata.spatialRepresentationInfo.MD_GridSpatialRepresentation.numberOfDimensions.Integer } ),
+							new ObjectProxy ( {label:"Nombre de la dimensión" , value:event.result.MD_Metadata.spatialRepresentationInfo.MD_GridSpatialRepresentation.axisDimensionProperties[0].MD_Dimension.dimensionName.MD_DimensionNameTypeCode.codeListValue } ),
+							new ObjectProxy ( {label:"Tamaño de la dimensión" , value:event.result.MD_Metadata.spatialRepresentationInfo.MD_GridSpatialRepresentation.axisDimensionProperties[0].MD_Dimension.dimensionSize.Integer } ),
+							new ObjectProxy ( {label:"Resolución de la dimensión" , value: event.result.MD_Metadata.spatialRepresentationInfo.MD_GridSpatialRepresentation.axisDimensionProperties[0].MD_Dimension.resolution.Measure.value } ),
+							new ObjectProxy ( {label:"Nombre de la dimensión" , value:event.result.MD_Metadata.spatialRepresentationInfo.MD_GridSpatialRepresentation.axisDimensionProperties[1].MD_Dimension.dimensionName.MD_DimensionNameTypeCode.codeListValue } ),
+							new ObjectProxy ( {label:"Tamaño de la dimensión" , value:event.result.MD_Metadata.spatialRepresentationInfo.MD_GridSpatialRepresentation.axisDimensionProperties[1].MD_Dimension.dimensionSize.Integer } ),
+							new ObjectProxy ( {label:"Resolución de la dimensión" , value: event.result.MD_Metadata.spatialRepresentationInfo.MD_GridSpatialRepresentation.axisDimensionProperties[1].MD_Dimension.resolution.Measure.value } ),
+							new ObjectProxy ( {label:"Nombre de la dimensión" , value:event.result.MD_Metadata.spatialRepresentationInfo.MD_GridSpatialRepresentation.axisDimensionProperties[2].MD_Dimension.dimensionName.MD_DimensionNameTypeCode.codeListValue } ),
+							new ObjectProxy ( {label:"Tamaño de la dimensión" , value:event.result.MD_Metadata.spatialRepresentationInfo.MD_GridSpatialRepresentation.axisDimensionProperties[2].MD_Dimension.dimensionSize.Integer } ),
+							new ObjectProxy ( {label:"Resolución de la dimensión" , value: event.result.MD_Metadata.spatialRepresentationInfo.MD_GridSpatialRepresentation.axisDimensionProperties[2].MD_Dimension.resolution.Measure.value } ),
+							new ObjectProxy ( {label:"Geometría de la celda" , value:event.result.MD_Metadata.spatialRepresentationInfo.MD_GridSpatialRepresentation.cellGeometry.MD_CellGeometryCode.codeListValue } ),
+							new ObjectProxy ( {label:"Disponibilidad de parámetros de transformación" , value:(event.result.MD_Metadata.spatialRepresentationInfo.MD_GridSpatialRepresentation.transformationParameterAvailability.Boolean==true?"Si":"No") } ),
+							new ObjectProxy ( {separador:new ObjectProxy ( {nivel:0 , color:paletaColores[0] , tip:"Fin Información de representación espacial"} )} )
+						]
+					}
+				);
+				
+				
+				var grupoInfoSistReferencia:ObjectProxy = new ObjectProxy(
+					{
+						grupo : new ObjectProxy ( {label:"Información del sistema de referencia",color:paletaColores[0]} ),
+						children :
+						[
+							new ObjectProxy ( {separador:new ObjectProxy ( {nivel:0 , color:paletaColores[0] , tip:"Inicio Información del sistema de referencia"} )} ),
+							new ObjectProxy ( {label:"Código" , value:event.result.MD_Metadata.referenceSystemInfo.MD_ReferenceSystem.referenceSystemIdentifier.RS_Identifier.code.CharacterString } ),
+							new ObjectProxy ( {separador:new ObjectProxy ( {nivel:0 , color:paletaColores[0] , tip:"Fin Información del sistema de referencia"} )} )
+						]
+					}
+				);
+					
+				
+				var grupoInfoCalidad:ObjectProxy = new ObjectProxy(
+					{
+						grupo : new ObjectProxy ( {label:"Información de calidad",color:paletaColores[0]} ),
+						children : 
+						[
+							new ObjectProxy ( {separador:new ObjectProxy ( {nivel:0 , color:paletaColores[0] , tip:"Inicio Información de Calidad"} )} ),
+							new ObjectProxy ( {label:"Declaración" , value:event.result.MD_Metadata.dataQualityInfo.DQ_DataQuality.lineage.LI_Lineage.statement.CharacterString } ),
+							new ObjectProxy ( {separador:new ObjectProxy ( {nivel:0 , color:paletaColores[0] , tip:"Fin Información de Calidad"} )} )
+						]
+					}
+				);
+				
+				
+				var grupoComplementoRaster:ObjectProxy = new ObjectProxy(
+					{
+						grupo : new ObjectProxy ( {label:"Complemento Raster",color:paletaColores[0]} ),
+						children : 
+						[
+							new ObjectProxy ( {separador:new ObjectProxy ( {nivel:0 , color:paletaColores[0] , tip:"Inicio Complemento Raster"} )} ),
+							new ObjectProxy ( {label:"Nombre del objeto" , value:event.result.MD_Metadata.raster.RASTER_NOMBRE_OBJETO } ),
+							new ObjectProxy ( {label:"Sensor/Programa" , value:event.result.MD_Metadata.raster.RASTER_SENSOR } ),
+							new ObjectProxy ( {label:"Path-Row / Código" , value:event.result.MD_Metadata.raster.RASTER_PATH_ROW_CODIGO } ),
+							new ObjectProxy ( {label:"Línea de vuelo" , value:event.result.MD_Metadata.raster.RASTER_LINEA_VUELO } ),
+							new ObjectProxy ( {label:"Centro de foto" , value:event.result.MD_Metadata.raster.RASTER_CENTRO_FOTO } ),
+							new ObjectProxy ( {label:"Número de bandas" , value:event.result.MD_Metadata.raster.RASTER_NUMERO_BANDAS } ),
+							new ObjectProxy ( {label:"Bandas" , value:event.result.MD_Metadata.raster.RASTER_BANDAS } ),
+							new ObjectProxy ( {label:"Porcentaje de afectación" , value:event.result.MD_Metadata.raster.RASTER_PORCENTAJE_AFECTACION } ),
+							new ObjectProxy ( {label:"Formato de imágen" , value:event.result.MD_Metadata.raster.RASTER_FORMATO_IMAGEN } ),
+							new ObjectProxy ( {label:"Tipo de objeto" , value:event.result.MD_Metadata.raster.RASTER_TIPO_OBJETO } ),
+							new ObjectProxy ( {label:"Ángulo de elevación" , value:event.result.MD_Metadata.raster.RASTER_ANGULO_ELEVACION } ),
+							new ObjectProxy ( {label:"Ángulo de azimut" , value:event.result.MD_Metadata.raster.RASTER_ANGULO_AZIMUT } ),
+							new ObjectProxy ( {label:"Tipo de compresión" , value:event.result.MD_Metadata.raster.RASTER_TIPO_COMPRESION } ),
+							new ObjectProxy ( {label:"DCON_CDSCRPCION" , value:event.result.MD_Metadata.raster.DCON_CDSCRPCION } ),
+							new ObjectProxy ( {label:"DTIC_CDSCRPCION" , value:event.result.MD_Metadata.raster.DTIC_CDSCRPCION } ),
+							new ObjectProxy ( {separador:new ObjectProxy ( {nivel:0 , color:paletaColores[0] , tip:"Fin Complemento Raster"} )} )
+						]
+					}
+				);
+				
+				dataProviderAdvancedDataGrid = 
+					new ArrayCollection([grupoInfoIdentificacion, grupoInfoRepEspacial, grupoInfoSistReferencia, grupoInfoCalidad, grupoComplementoRaster]);
+				
+				grdMetadato.expandAll();
+			}
+			
+			
+			protected function servicio_faultHandler(event:FaultEvent):void
+			{
+				dataProviderAdvancedDataGrid = new ArrayCollection([{label:"No fué posible consultar el metadato del producto seleccionado"}]);
+			}
+			
+			
+
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<s:HTTPService id="servicio" method="POST" showBusyCursor="true" result="servicio_resultHandler(event)" fault="servicio_faultHandler(event)"/>
+		
+	</fx:Declarations>
+	
+	<viewer:WidgetTemplate id="wTemplate" width="580" height="440"
+					minimized="{widgetMinimizedHandler(event)}" 
+					closed="{widgetClosedHandler(event)}" 
+					open="{widgetOpenedHandler(event)}">
+		<mx:ViewStack id="viewstack1" width="100%" height="100%">
+			<mx:Canvas label="Raster" width="100%" height="100%">
+				<mx:VBox width="100%" height="100%" x="0" y="0">
+					<mx:HBox width="100%" horizontalAlign="center">
+						<mx:Label text="Metadatos del producto con ID DANE:" fontSize="12"/>
+						<mx:Text text="{idDane}" fontSize="12"/>
+					</mx:HBox>
+					<mx:AdvancedDataGrid id="grdMetadato" 
+										 designViewDataType="tree" 
+										 headerHeight="0" 
+										 verticalGridLines="false" 
+										 variableRowHeight="true" 
+										 wordWrap="true"
+										 width="100%"
+										 height="100%"
+										 verticalAlign="middle"
+										 folderClosedIcon="{null}"
+										 folderOpenIcon="{null}"
+										 defaultLeafIcon="{null}"
+										 contentBackgroundColor="{getStyle('contentBackgroundColor')}"
+										 color="{getStyle('color')}"
+										 alternatingItemColors="{[getStyle('contentBackgroundColor'),getStyle('contentBackgroundColor')]}"
+										 >
+						<mx:columns>
+							<mx:AdvancedDataGridColumn headerText="" dataField="label" width="200"/>
+							<mx:AdvancedDataGridColumn headerText="" dataField="value" />
+						</mx:columns>
+						<mx:rendererProviders>
+							<mx:AdvancedDataGridRendererProvider dataField="grupo" columnIndex="0" columnSpan="2">
+								<mx:renderer>
+									<fx:Component>
+										<mx:HBox verticalAlign="middle" horizontalGap="1">
+											
+											<fx:Script>
+												<![CDATA[
+													[Bindable] private var isCollapsed:Boolean = false;
+													
+													protected function imgExpand_clickHandler(event:MouseEvent):void
+													{
+														outerDocument.grdMetadato.expandItem(outerDocument.grdMetadato.selectedItem,true,true);
+														isCollapsed = false;
+													}
+													protected function imgCollapse_clickHandler(event:MouseEvent):void
+													{
+														outerDocument.grdMetadato.expandItem(outerDocument.grdMetadato.selectedItem,false,true);
+														isCollapsed = true;
+													}
+													
+												]]>
+											</fx:Script>
+											
+											<mx:Image id="imgExpand"
+													  source="assets/images/Expand.png" 
+													  useHandCursor="true" 
+													  buttonMode="true" 
+													  toolTip="Expandir" 
+													  width="20" height="20" 
+													  click="imgExpand_clickHandler(event)"
+													  visible="{isCollapsed}" includeInLayout="{isCollapsed}"
+													  />
+											<mx:Image id="imgCollapse"
+													  source="assets/images/Collapse.png" 
+													  useHandCursor="true" 
+													  buttonMode="true" 
+													  toolTip="Contraer" 
+													  width="20" height="20" 
+													  click="imgCollapse_clickHandler(event)"
+													  visible="{!isCollapsed}" includeInLayout="{!isCollapsed}"
+													  />
+											<mx:Label text="{data.grupo.label}" fontWeight="bold" textAlign="left" fontSize="11" fontFamily="Verdana" color="{data.grupo.color}"/>
+										</mx:HBox>
+									</fx:Component>
+								</mx:renderer>
+							</mx:AdvancedDataGridRendererProvider>
+							<mx:AdvancedDataGridRendererProvider dataField="cubrimiento" 
+																 columnIndex="0" 
+																 columnSpan="2">
+								<mx:renderer>
+									<fx:Component>
+										<mx:Canvas label="Cubrimiento general" width="100%" height="100%"
+												   borderStyle="solid" borderColor="0x0066CC" cornerRadius="10">
+											<fx:Script>
+												<![CDATA[
+													import com.esri.ags.Graphic;
+													import com.esri.ags.geometry.Extent;
+													import com.esri.ags.geometry.MapPoint;
+													import com.esri.ags.geometry.Polygon;
+													import com.esri.ags.layers.GraphicsLayer;
+													import com.esri.ags.symbols.SimpleFillSymbol;
+													import com.esri.ags.symbols.SimpleLineSymbol;
+													
+													import mx.events.FlexEvent;
+												
+												protected function map1_creationCompleteHandler(event:FlexEvent):void
+												{
+												var extent:Extent = (event.currentTarget as Map).extent;
+												var graphicsLayerExtent:GraphicsLayer = new GraphicsLayer();
+												var rings:Array = new Array();
+												rings.push([new MapPoint(extent.xmin,extent.ymin,extent.spatialReference),
+												new MapPoint(extent.xmin,extent.ymax,extent.spatialReference),
+												new MapPoint(extent.xmax,extent.ymax,extent.spatialReference),
+												new MapPoint(extent.xmax,extent.ymin,extent.spatialReference),
+												new MapPoint(extent.xmin,extent.ymin,extent.spatialReference)]);
+												
+												var geo:Polygon = new Polygon(rings);
+												var gra:Graphic = new Graphic(geo);
+												var outlineSym:SimpleLineSymbol = new SimpleLineSymbol("solid",0x0066CC, 1, 2);
+												var polySym:SimpleFillSymbol = new SimpleFillSymbol("solid", 0x0066CC, 0.25, outlineSym);
+												gra.symbol = polySym;
+												
+												graphicsLayerExtent.add(gra);
+												
+												
+												(event.currentTarget as Map).addLayer(graphicsLayerExtent);
+												(event.currentTarget as Map).level -= 3;
+												}
+												
+												]]>
+											</fx:Script>
+											<mx:Label x="175" y="10" text="Límite Norte" color="{getStyle('color')}"/>
+											<mx:TextInput x="175" y="28" width="100" text="{(data.cubrimiento as Extent).ymax}" contentBackgroundColor="{getStyle('contentBackgroundColor')}" color="{getStyle('color')}" textAlign="center"/>
+											<mx:Label x="175" y="206" text="Límite Sur" color="{getStyle('color')}"/>
+											<mx:TextInput x="175" y="225" width="100" text="{(data.cubrimiento as Extent).ymin}" contentBackgroundColor="{getStyle('contentBackgroundColor')}" color="{getStyle('color')}" textAlign="center"/>
+											<mx:Label x="348" y="101" text="Límite Este" color="{getStyle('color')}"/>
+											<mx:TextInput x="348" y="120" width="100" text="{(data.cubrimiento as Extent).xmax}" contentBackgroundColor="{getStyle('contentBackgroundColor')}" color="{getStyle('color')}" textAlign="center"/>
+											<mx:Label x="10" y="101" text="Límite Oeste" color="{getStyle('color')}"/>
+											<mx:TextInput x="10" y="120" width="100" text="{(data.cubrimiento as Extent).xmin}" contentBackgroundColor="{getStyle('contentBackgroundColor')}" color="{getStyle('color')}" textAlign="center"/>
+											<mx:Canvas x="125" y="58" width="215" height="140" styleName="WidgetCanvas">	
+												<ags:Map width="100%" height="100%"
+														  mapNavigationEnabled="true"
+														  panArrowsVisible="false"
+														  scaleBarVisible="false"
+														  zoomSliderVisible="false"
+														  extent="{data.cubrimiento as Extent}"
+														  horizontalCenter="0" verticalCenter="0"
+														  creationComplete="map1_creationCompleteHandler(event)"
+														  logoVisible="false">
+													<layers:ArcGISTiledMapServiceLayer width="100%" height="100%" url="http://server.arcgisonline.com/ArcGIS/rest/services/ESRI_StreetMap_World_2D/MapServer"/>
+												</ags:Map>
+											</mx:Canvas>
+										</mx:Canvas>
+									</fx:Component>
+								</mx:renderer>
+							</mx:AdvancedDataGridRendererProvider>
+							<mx:AdvancedDataGridRendererProvider dataField="separador" 
+																 columnIndex="0" 
+																 columnSpan="2">
+								<mx:renderer>
+									<fx:Component>
+										<mx:HBox verticalAlign="middle" horizontalAlign="center" toolTip="{data.separador.tip}">
+											<mx:HRule width="{400 - 50 * data.separador.nivel}" height="15" strokeColor="{data.separador.color}"/>
+										</mx:HBox>
+									</fx:Component>
+								</mx:renderer>
+							</mx:AdvancedDataGridRendererProvider>
+							<mx:AdvancedDataGridRendererProvider dataField="verExtent" 
+																 columnIndex="0" 
+																 columnSpan="2">
+								<mx:renderer>
+									<fx:Component>
+										<mx:HBox verticalAlign="middle" horizontalAlign="center" >
+											
+											<fx:Script>
+												<![CDATA[
+													import com.esri.ags.Graphic;
+													import com.esri.ags.geometry.Extent;
+													import com.esri.ags.geometry.MapPoint;
+													import com.esri.ags.geometry.Polygon;
+													import com.esri.ags.symbols.SimpleFillSymbol;
+													import com.esri.ags.symbols.SimpleLineSymbol;
+													
+													
+													
+													protected function btnVerExtent_clickHandler(event:MouseEvent):void
+													{
+														var extent:Extent = data.verExtent;
+														var rings:Array = new Array();
+														rings.push([new MapPoint(extent.xmin,extent.ymin,extent.spatialReference),
+															new MapPoint(extent.xmin,extent.ymax,extent.spatialReference),
+															new MapPoint(extent.xmax,extent.ymax,extent.spatialReference),
+															new MapPoint(extent.xmax,extent.ymin,extent.spatialReference),
+															new MapPoint(extent.xmin,extent.ymin,extent.spatialReference)]);
+														
+														var geo:Polygon = new Polygon(rings);
+														var gra:Graphic = new Graphic(geo);
+														var outlineSym:SimpleLineSymbol = new SimpleLineSymbol("solid",0x0066CC, 1, 2);
+														var polySym:SimpleFillSymbol = new SimpleFillSymbol("solid", 0x0066CC, 0.25, outlineSym);
+														gra.symbol = polySym;
+														
+														outerDocument.graphicsLayer.clear();
+														outerDocument.graphicsLayer.add(gra);
+														outerDocument.graphicsLayer.map.extent = extent;
+														if (!outerDocument.graphicsLayer.map.extent.contains(gra.geometry))
+														{
+															outerDocument.graphicsLayer.map.level--;
+														}
+													}
+													
+													protected function btnBorrar_clickHandler(event:MouseEvent):void
+													{
+														outerDocument.graphicsLayer.clear();
+													}
+													
+												]]>
+											</fx:Script>
+											
+											<mx:LinkButton id="btnVerExtent" label="Ver cubrimiento" click="btnVerExtent_clickHandler(event)" toolTip="Dibujar el cubrimiento en el mapa"/>
+											<mx:LinkButton id="btnBorrar" label="Borrar Dibujo" click="btnBorrar_clickHandler(event)" toolTip="Eliminar el dibujo del mapa"
+														   visible="{outerDocument.graphicsLayer.graphicProvider.length > 0}"
+														   includeInLayout="{outerDocument.graphicsLayer.graphicProvider.length > 0}"/>
+										</mx:HBox>
+									</fx:Component>
+								</mx:renderer>
+							</mx:AdvancedDataGridRendererProvider>
+						</mx:rendererProviders>
+						<mx:dataProvider>
+							<mx:HierarchicalData source="{dataProviderAdvancedDataGrid}"/>
+						</mx:dataProvider>
+					</mx:AdvancedDataGrid>
+				</mx:VBox>
+			</mx:Canvas>
+		</mx:ViewStack>
+	</viewer:WidgetTemplate>
+</viewer:BaseWidget>

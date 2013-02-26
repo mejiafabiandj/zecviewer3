@@ -1,0 +1,16 @@
+<?xml version="1.0" ?>
+<configuration>
+    <usebasemaps>false</usebasemaps>
+    <useoperationallayers>true</useoperationallayers>
+    <respectcurrentmapscale>true</respectcurrentmapscale>
+    
+    <excludelayer>Imagery</excludelayer>
+    <excludelayer>Topographic</excludelayer>
+    <excludelayer>Terrain with Labels</excludelayer>
+    <excludelayer>Thematic Selection Layer</excludelayer>
+</configuration>
+
+<!--
+    See Legend widget documentation at
+    http://links.esri.com/legendwidget
+-->

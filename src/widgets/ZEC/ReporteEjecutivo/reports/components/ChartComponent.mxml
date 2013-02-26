@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" 
+		 contentBackgroundColor="#FFFFFF"
+		 currentState="{_estado}">
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			
+
+			/**
+			 * Estado
+			 */
+			[Bindable] private var _estado:String = "pie";
+			public function get estado():String
+			{
+				return _estado;
+			}
+			public function set estado(value:String):void
+			{
+				_estado = value;
+			}
+
+			
+			/**
+			 * Datos de la gráfica
+			 */
+			[Bindable]private var _properties:ArrayCollection;
+			[Bindable]public function get properties():ArrayCollection
+			{
+				return _properties;
+			}
+			public function set properties(properties:ArrayCollection):void
+			{
+				_properties = properties;
+			}
+			
+			/**
+			 * Posición del Label
+			 */
+			[Bindable] private var _labelPosition:String = "none";
+			[Bindable]public function get labelPosition():String
+			{
+				return _labelPosition;
+			}
+			public function set labelPosition(labelPosition:String):void
+			{
+				_labelPosition= labelPosition;
+			}
+			
+			/**
+			 * Titulo
+			 */
+			[Bindable] private var _titulo:String = "";
+			[Bindable]public function get titulo():String
+			{
+				return _titulo;
+			}
+			public function set titulo(titulo:String):void
+			{
+				_titulo= titulo;
+			}
+			
+			/**
+			 * Función de syntaxis del Label
+			 */			
+			private var _functionLabel:Function;
+			[Bindable]public function get functionLabel():Function
+			{
+				return _functionLabel;
+			}
+			public function set functionLabel(functionLabel:Function):void
+			{
+				_functionLabel=functionLabel;
+			}
+			
+			private var _legendLabel:String;
+			[Bindable]public function get legendLabel():String
+			{
+				return _legendLabel;
+			}
+			public function set legendLabel(value:String):void
+			{
+				_legendLabel = value;
+			}
+
+			
+		]]>
+	</fx:Script>
+
+	<s:states>
+		<s:State name="pie"/>
+		<s:State name="pie_legend"/>
+		<s:State name="bar"/>
+		<s:State name="bar_legend"/>
+	</s:states>
+		
+	<s:Label text="{titulo}" height="17" y="0" fontWeight="bold" verticalAlign="middle" width="100%" x="0" textAlign="center"/>
+	<s:Group includeIn="pie,pie_legend" left="5" top="5" right="5" bottom="5">
+		<s:layout>
+			<s:HorizontalLayout verticalAlign="middle" horizontalAlign="center"/>
+		</s:layout>
+		
+		<mx:PieChart id="pie" showDataTips="true" width="100%" height="100%" dataProvider="{properties}"  height.pie="97%">
+			<mx:series>
+				<mx:PieSeries id="pieSeries" nameField="label" field="value" labelPosition="{labelPosition}" labelFunction="{functionLabel}"/>
+			</mx:series>
+		</mx:PieChart>
+		
+		<mx:Legend includeIn="pie_legend" dataProvider="{pie}" legendItemClass="widgets.DANE.ReporteEjecutivo.reports.components.LegendItemCharSymbol"/>
+	</s:Group>
+	<s:Group includeIn="bar,bar_legend" left="5" top="5" right="5" bottom="5">
+		<s:layout>
+			<s:HorizontalLayout verticalAlign="middle" horizontalAlign="center"/>
+		</s:layout>
+		
+		<mx:ColumnChart id="bar" width="100%" height="100%" color="0x323232" showDataTips="true" dataProvider="{properties}">
+			<mx:horizontalAxis>
+				<mx:CategoryAxis categoryField="label"/>
+			</mx:horizontalAxis>
+			<mx:series>
+				<mx:ColumnSeries xField="label" yField="value" displayName="{legendLabel}"/>
+			</mx:series>
+		</mx:ColumnChart>
+		
+		<mx:Legend includeIn="bar_legend" dataProvider="{bar}" />
+	</s:Group>
+</s:Group>

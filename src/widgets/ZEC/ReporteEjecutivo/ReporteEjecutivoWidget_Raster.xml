@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<configuration>
+	
+	<criterio nombre="Cubrimiento LANDSAT"
+			  porDefecto="true">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/Imagenes/Inventario_Raster/MapServer/1" where="DPTO_DPTO_CCDGO = '15' OR DPTO_DPTO_CCDGO = '25'">
+			<outFields>*</outFields>
+			<configMapa metodo="II"
+						tipoVariable="C"
+						clases="6"
+						field="LANDSAT"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="Departamento" fieldLabel="DPTO" field="DPTO" value="" tipo="D">
+						
+		</filtro>
+
+		<tabla>
+			<columnas field="MPIO_CNMBRE" nombre="Municipio"/>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="MPIO_CCNCTNDO" nombre="ID DANE"/>
+			<columnas field="LANDSAT" nombre="LANDSAT"/>
+			<columnas field="ALOS" nombre="ALOS"/>
+			<columnas field="SPOT" nombre="SPOT"/>
+			<columnas field="IKONOS" nombre="IKONOS"/>
+			<columnas field="ORTOFOTOS" nombre="ORTOFOTOS"/>
+		</tabla>
+	</criterio>
+	
+	<criterio nombre="Cubrimiento SPOT"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/Imagenes/Inventario_Raster/MapServer/1" where="1=1">
+			<outFields>*</outFields>
+			<configMapa metodo="II"
+						tipoVariable="C"
+						clases="6"
+						field="SPOT"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="Departamento" fieldLabel="DPTO" field="DPTO" value="" tipo="D">
+						
+		</filtro>
+
+		<tabla>
+			<columnas field="MPIO_CNMBRE" nombre="Municipio"/>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="MPIO_CCNCTNDO" nombre="ID DANE"/>
+			<columnas field="LANDSAT" nombre="LANDSAT"/>
+			<columnas field="ALOS" nombre="ALOS"/>
+			<columnas field="SPOT" nombre="SPOT"/>
+			<columnas field="IKONOS" nombre="IKONOS"/>
+			<columnas field="ORTOFOTOS" nombre="ORTOFOTOS"/>
+		</tabla>
+	</criterio>
+	
+
+</configuration>

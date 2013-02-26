@@ -1,0 +1,683 @@
+<?xml version="1.0" encoding="utf-8"?>
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" 
+				   xmlns:viewer="com.esri.viewer.*" 
+				   layout="absolute"
+				   widgetConfigLoaded="basewidget1_widgetConfigLoadedHandler(event)"
+				   creationComplete="init()" xmlns:CargarServicio="widgets.DANE.CargarServicio.*">
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.SpatialReference;
+			import com.esri.ags.layers.ArcGISDynamicMapServiceLayer;
+			import com.esri.ags.layers.ArcGISTiledMapServiceLayer;
+			import com.esri.ags.layers.FeatureLayer;
+			import com.esri.ags.layers.OpenStreetMapLayer;
+			import com.esri.ags.utils.JSONUtil;
+			
+			import gov.dane.util.TokenUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.HierarchicalData;
+			import mx.controls.Alert;
+			import mx.events.ListEvent;
+			import mx.events.TreeEvent;
+			import mx.messaging.messages.HTTPRequestMessage;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.utils.ObjectProxy;
+			
+			import spark.events.IndexChangeEvent;
+			
+			[Bindable] [Embed(source="assets/images/i_demographics_small.png")] private var imgAutenticacion:Class;
+			
+			
+			[Bindable] private var providerComboTipoNivel:ArrayCollection = new ArrayCollection();
+			
+			[Bindable] private var providerTreeArcgisServices:ArrayCollection = new ArrayCollection();
+				
+			[Bindable] private var servicioArcGISSeleccionado:ObjectProxy = new ObjectProxy();
+			
+			[Bindable] private var providerCapasServicioArcGIS:ArrayCollection = new ArrayCollection();
+			
+			[Bindable] private var providerGridServicios:ArrayCollection = new ArrayCollection();
+			
+			[Bindable] private var descargarShp:Boolean = false;
+			
+			[Bindable] private var isTokenBasedSecurity:Boolean = false;
+			
+			[Bindable] private var tokenServicesUrl:String;
+			
+
+			
+			private var urlRest:String;
+
+			private function init():void
+			{
+				
+				wTemplate.addTitlebarButton("assets/images/add_layer.png","Añadir servicio",
+					function():void
+					{
+						if(currentState != "default" && currentState != "arcgisServer" && currentState != "listaArcgisServer" && currentState != "infoServicioArcgisServer")
+						{
+							currentState = "default"
+							
+							cmbTipoServicio.selectedIndex = -1;
+							cmbTipoServicio.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-1,-1));
+						}
+					},true);
+				
+				wTemplate.addTitlebarButton("assets/images/i_table.png","Ver servicios",
+					function():void
+					{
+						if(currentState != "listaServicios")
+						{
+							currentState = "listaServicios"
+						}
+					},true);
+			}
+			
+			
+			protected function basewidget1_widgetConfigLoadedHandler(event:Event):void
+			{
+				if(configObject)
+				{
+					if(configObject.configuration.servicios)
+					{
+						providerComboTipoNivel.removeAll();
+						if(configObject.configuration.servicios.servicio is ArrayCollection)
+						{
+							providerComboTipoNivel.addAll(configObject.configuration.servicios.servicio);
+						}else if(configObject.configuration.servicios.servicio)
+						{
+							providerComboTipoNivel.addItem(configObject.configuration.servicios.servicio);
+						}
+					}
+					
+					descargarShp = configObject.configuration.descargarshp;
+					
+				}
+			}
+
+
+			protected function cmbTipoServicio_changeHandler(event:IndexChangeEvent):void
+			{
+				if(event.newIndex != -1)
+				{
+					switch(cmbTipoServicio.selectedItem.tipo)
+					{
+						case "osm":
+						{
+							var osm:OpenStreetMapLayer = new OpenStreetMapLayer();
+							osm.id = "OpenStreetMap";
+							osm.name = "Open Street Map";
+							map.addLayer(osm);
+						}break;
+						case "arcgisServer":
+						{
+							currentState = "arcgisServer";
+						}break;
+						case "shp":
+						{
+							currentState = "shp";
+						}break;
+						default:
+						{
+							Alert.show("El servicio de tipo: " + cmbTipoServicio.selectedItem.tipo + ", no es soportado, por favor verifique el archivo de configuración");
+						}
+					}
+				}else
+				{
+					currentState = "default";
+				}
+					
+			}
+
+
+			protected function btnConectarArcgisServer_clickHandler(event:MouseEvent):void
+			{
+				if(txtUrlArcgisServer.text != "")
+				{
+					providerTreeArcgisServices.removeAll();
+						
+					urlRest = txtUrlArcgisServer.text;
+					if(urlRest.toLowerCase().lastIndexOf("http") != -1 && urlRest.toLowerCase().lastIndexOf("arcgis/rest/services") != -1 )
+					{
+						
+						servicio.url = urlRest;
+						servicio.send({f:"json",op:"serviciosRaiz",token:TokenUtil.buscarToken(servicio.url)});
+					}else
+					{
+						Alert.show("La dirección URL ingresada no posee la estructura adecuada.\n\nLa URL debe ser así: http://sytema47.dane.gov.co:8399/arcgis/rest/services");
+					}
+				}
+			}
+
+
+			protected function servicio_resultHandler(event:ResultEvent):void
+			{
+				var result:Object;
+				switch(event.token.message.body.op)
+				{
+					//Operación resultado de la peticion por los servicios en el Rest de ArcGISServer
+					case "serviciosRaiz":
+					{
+						result = JSONUtil.decode(event.result.toString());
+						
+						if(result.currentVersion < 9.3)
+						{
+							Alert.show("El servidor de ArcGIS seleccionado corresponde a una version no soportada, solo se aceptan versiones superiores a 9.3");
+							return;
+						}
+						
+						if(result.folders is Array)
+						{
+							for each (var fldr:String in result.folders)
+							{
+								providerTreeArcgisServices.addItem(
+									new ObjectProxy(
+										{
+											name:fldr, 
+											children:[]
+										}
+									)
+								);
+								
+								
+								servicio.url = urlRest + "/" + fldr;
+								servicio.send({f:"json",op:"serviciosHijos",folder:fldr,token:TokenUtil.buscarToken(servicio.url)});
+							}
+						}else if(result.folders)
+						{
+							providerTreeArcgisServices.addItem(
+								new ObjectProxy(
+									{
+										name:result.folders,
+										children:[]
+									}
+								)
+							);
+							
+							servicio.url = urlRest + "/" + result.folders;
+							servicio.send({f:"json",op:"serviciosHijos",folder:result.folders,token:TokenUtil.buscarToken(servicio.url)});
+						}
+						
+						
+						if(result.services is Array)
+						{
+							for each (var service:Object in result.services)
+							{
+								if(service.type == "MapServer")
+								{
+									service.fullName = service.name;
+									providerTreeArcgisServices.addItem(new ObjectProxy(service));
+								}
+							}
+						}else if(result.services && result.services.type == "MapServer")
+						{
+							result.services.fullName = result.services.name;
+							providerTreeArcgisServices.addItem(new ObjectProxy(result.services));
+						}
+						
+						
+						//Obtener informacion adicional del servidor
+						servicio.url = urlRest.replace("services","info");
+						servicio.send({f:"json",op:"infoServer",token:TokenUtil.buscarToken(servicio.url)});
+						
+						currentState = "listaArcgisServer";
+					}break;
+					
+					//Operación resultado de la peticion por los servicios contenidos dentro de un folder en el Rest de ArcGISServer
+					case "serviciosHijos":
+					{
+						result = JSONUtil.decode(event.result.toString());
+						
+						
+						for each(var folder:ObjectProxy in providerTreeArcgisServices)
+						{
+							if(folder.name == event.token.message.body.folder && folder.children)
+							{
+								if(result.services is Array)
+								{
+									for each (var srv:Object in result.services)
+									{
+										if(srv.type == "MapServer")
+										{
+											srv.fullName = srv.name;
+											srv.name = srv.name.toString().replace(event.token.message.body.folder + "/","");	
+											folder.children.push(new ObjectProxy(srv));
+										}
+									}
+								}else if(result.services && result.services.type == "MapServer")
+								{
+									result.services.fullName = result.services.name;
+									result.services.name = result.services.name.toString().replace(event.token.message.body.folder + "/","");
+									
+									folder.children.push(new ObjectProxy(result.services));
+								}
+								break;
+							}
+						}
+					}break;
+					//Operación resultado de la peticion por la informacion de un servicio en el Rest de ArcGISServer
+					case "informacionServicio":
+					{
+						servicioArcGISSeleccionado = new ObjectProxy(JSONUtil.decode(event.result.toString()));
+						
+						currentState = "infoServicioArcgisServer";
+
+						
+						providerCapasServicioArcGIS.removeAll();
+						
+						if(servicioArcGISSeleccionado && servicioArcGISSeleccionado.layers)
+						{
+							for each(var layer:Object in servicioArcGISSeleccionado.layers)
+							{
+								if(!layer.subLayerIds)
+								{
+									servicio.url = (event.token.message as Object).url + "/" + layer.id;
+									servicio.send({f:"json",op:"informacionLayerServicio",token:TokenUtil.buscarToken(servicio.url)});
+								}
+							}
+						}
+					}break;
+					
+					case "informacionLayerServicio":
+					{
+						result = JSONUtil.decode(event.result.toString());
+						
+						if(result.type == "Feature Layer")
+						{
+							providerCapasServicioArcGIS.addItem(result);
+						}
+					}break;
+					
+					case "infoServer":
+					{
+						result = JSONUtil.decode(event.result.toString());
+						
+						if(result.authInfo)
+						{
+							isTokenBasedSecurity = result.authInfo.isTokenBasedSecurity;
+							if(isTokenBasedSecurity)
+							{
+								tokenServicesUrl = result.authInfo.tokenServicesUrl;
+							}
+						}
+						
+					}break;
+					case "login":
+					{
+						//TODO: ajustar
+						providerTreeArcgisServices.removeAll();
+						servicio.url = urlRest;
+						servicio.send({f:"json",op:"serviciosRaiz",token:TokenUtil.buscarToken(servicio.url)});
+					}break;
+				}
+			}
+
+
+			protected function servicio_faultHandler(event:FaultEvent):void
+			{
+				Alert.show(event.message.toString());
+			}
+
+			
+
+
+			protected function treeArcgisServices_itemClickHandler(event:ListEvent):void
+			{
+				if(event.itemRenderer.data && event.itemRenderer.data.type == "MapServer")
+				{
+					servicio.cancel();
+					servicio.disconnect();
+					
+					servicio.url = urlRest + "/" +  event.itemRenderer.data.fullName + "/MapServer";
+					servicio.send({f:"json",op:"informacionServicio",token:TokenUtil.buscarToken(servicio.url,configData)});
+				}
+				
+				if(!treeArcgisServices.selectedItem)
+				{
+					currentState = "listaArcgisServer";
+				}
+			}
+
+
+			protected function btnCargarServicioArcgisServer_clickHandler(event:MouseEvent):void
+			{
+				var url:String;
+				var nombre:String;
+				var i:Number;
+					
+				if(rdoServicioCompletoArcgis.selected)
+				{
+					url = urlRest + "/" +  treeArcgisServices.selectedItem.fullName + "/MapServer";
+					if(rdoServicioDinamico.selected)
+					{
+						var dynamic:ArcGISDynamicMapServiceLayer = new ArcGISDynamicMapServiceLayer(url);
+						dynamic.token = TokenUtil.buscarToken(dynamic.url);
+						
+						if(map.getLayer(treeArcgisServices.selectedItem.name))
+						{
+							nombre = treeArcgisServices.selectedItem.name;
+							i = 1;
+							while(map.getLayer(nombre + " (" + i + ")"))
+							{
+								i++;
+							}
+							
+							dynamic.id = nombre + " (" + i + ")";
+							dynamic.name = nombre + " (" + i  + ")";
+						}else
+						{
+							dynamic.id = treeArcgisServices.selectedItem.name;
+							dynamic.name = treeArcgisServices.selectedItem.name;
+						}
+						
+						map.addLayer(dynamic);
+						
+						providerGridServicios.addItem(new ObjectProxy({nombre:dynamic.id,eliminar:false, tipo:"ArcGISDynamicMapServiceLayer"}));
+						
+						currentState = "listaArcgisServer";
+						
+					}else if(rdoServicioEstatico.selected)
+					{
+						var tiled:ArcGISTiledMapServiceLayer = new ArcGISTiledMapServiceLayer(url);
+						tiled.token = TokenUtil.buscarToken(tiled.url);
+						
+						if(map.getLayer(treeArcgisServices.selectedItem.name))
+						{
+							nombre = treeArcgisServices.selectedItem.name;
+							i = 1;
+							while(map.getLayer(nombre + " (" + i  + ")"))
+							{
+								i++;
+							}
+							
+							tiled.id = nombre + " (" + i + ")";
+							tiled.name = nombre + " ("  + i  + ")";
+						}else
+						{
+							tiled.id = treeArcgisServices.selectedItem.name;
+							tiled.name = treeArcgisServices.selectedItem.name;
+						}
+						map.addLayer(tiled);
+						
+						providerGridServicios.addItem(new ObjectProxy({nombre:tiled.id , eliminar:false, tipo:"arcGISTiledMapServiceLayer"}));
+						
+						currentState = "listaArcgisServer";
+					}
+				}else if(rdoCapaServicioArcgis.selected)
+				{
+					if(cmbCapaServicioArcGIS.selectedItem)
+					{
+						url = urlRest + "/" +  treeArcgisServices.selectedItem.fullName + "/MapServer/" + cmbCapaServicioArcGIS.selectedItem.id;
+						
+						var featureLayer:FeatureLayer = new FeatureLayer(url);
+						featureLayer.token = TokenUtil.buscarToken(featureLayer.url);
+						
+						if(map.getLayer(cmbCapaServicioArcGIS.selectedItem.name))
+						{
+							nombre = cmbCapaServicioArcGIS.selectedItem.name;
+							i = 1;
+							while(map.getLayer(nombre + " (" + i + ")"))
+							{
+								i++;
+							}
+							
+							featureLayer.id = nombre + " (" + i + ")";
+							featureLayer.name = nombre + " (" + i + ")";
+						}else
+						{
+							featureLayer.id = cmbCapaServicioArcGIS.selectedItem.name;
+							featureLayer.name = cmbCapaServicioArcGIS.selectedItem.name;
+						}
+						
+						featureLayer.outFields = ['*'];
+						featureLayer.mode = rdoModoFeatureLayerDemanda.selected ? FeatureLayer.MODE_ON_DEMAND : FeatureLayer.MODE_SNAPSHOT;
+						
+						map.addLayer(featureLayer);
+						
+						providerGridServicios.addItem(new ObjectProxy({nombre:featureLayer.id,eliminar:false, tipo:"featureLayer"}));
+						
+						currentState = "listaArcgisServer";
+					}else
+					{
+						Alert.show("Debe seleccionar una capa");
+					}
+				}
+			}
+
+
+			protected function grdServicios_itemClickHandler(event:ListEvent):void
+			{
+				if(event.itemRenderer is GridServiciosEliminarItemRenderer)
+				{
+					if(event.itemRenderer.data && event.itemRenderer.data.eliminar)
+					{
+						if(map.getLayer(event.itemRenderer.data.nombre))
+						{
+							map.removeLayer(map.getLayer(event.itemRenderer.data.nombre));
+							
+							if(providerGridServicios.getItemIndex( event.itemRenderer.data ) != -1)
+							{
+								providerGridServicios.removeItemAt( providerGridServicios.getItemIndex( event.itemRenderer.data ) );
+							}
+						}
+					}
+				}else if(event.itemRenderer is GridServiciosDescargarShpItemRenderer)
+				{
+					if(event.itemRenderer.data && event.itemRenderer.data.descargar)
+					{
+						if(map.getLayer(event.itemRenderer.data.nombre))
+						{
+							event.itemRenderer.data.descargar = false;
+							DescargarShp.descargar(map.getLayer(event.itemRenderer.data.nombre));
+						}
+					}
+				}
+			}
+
+
+			protected function btnIniciarSesionServer_clickHandler(event:MouseEvent):void
+			{
+				if(tokenServicesUrl)
+				{
+					servicio.url = urlRest.replace("services","login");
+					servicio.send(
+						{
+							username:"dig_web",password:"d3s4rr0110",redirect:urlRest + "?f=json",op:"login"
+						});
+				}
+			}
+
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<s:HTTPService id="servicio" showBusyCursor="true" result="servicio_resultHandler(event)" fault="servicio_faultHandler(event)" resultFormat="text" method="POST"/>
+		<s:RadioButtonGroup id="rdoGroupTipoServicioArcgis"/>
+		<s:RadioButtonGroup id="rdoGroupServicioDinamicoArcgis"/>
+		
+		<s:RadioButtonGroup id="rdoGroupModoFeatureLayer"/>
+		
+	</fx:Declarations>
+	
+	<viewer:states>
+		<s:State name="default"/>
+		<s:State name="arcgisServer" stateGroups="['arcgisServerGroup']"/>
+		<s:State name="listaArcgisServer" stateGroups="['arcgisServerGroup']"/>
+		<s:State name="infoServicioArcgisServer" stateGroups="['arcgisServerGroup']"/>
+		
+		
+		<s:State name="shp"/>
+		
+		<s:State name="listaServicios"/>
+	</viewer:states>
+	<viewer:WidgetTemplate id="wTemplate" 
+						   width="450" 
+						   height="190" 
+						   height.listaArcgisServer="300" 
+						   height.infoServicioArcgisServer="425"
+						   height.listaServicios="220">
+		<s:BorderContainer cornerRadius="5" top="15" bottom="0" right="0" left="0" backgroundAlpha="0" 
+						   minHeight="50" excludeFrom="listaServicios"
+						   >
+			<s:VGroup horizontalCenter="0" verticalCenter="0" verticalAlign="middle" 
+					  horizontalAlign="center" left="5" top="5" right="5" bottom="5"
+					  >
+				<mx:Grid verticalAlign="middle" horizontalAlign="center" width="100%">
+					<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle">
+						<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+							<s:Label text="Tipo de capa:"/>
+						</mx:GridItem>
+						<mx:GridItem verticalAlign="middle" width="100%">
+							<s:DropDownList id="cmbTipoServicio" width="100%" 
+											dataProvider="{providerComboTipoNivel}"
+											labelField="nombre"
+											prompt="Seleccione"
+											change="cmbTipoServicio_changeHandler(event)"/>
+						</mx:GridItem>
+					</mx:GridRow>
+					
+					<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle" includeIn="arcgisServer">
+						<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+							<s:Label text="URL del servidor"/>
+						</mx:GridItem>
+						<mx:GridItem verticalAlign="middle" width="100%">
+							<s:VGroup width="100%" horizontalAlign="left">
+								<s:TextInput width="100%" id="txtUrlArcgisServer" text="http://dg_est45.dane.gov.co/arcgis/rest/services"/>
+								<s:HGroup gap="0" verticalAlign="middle">
+									<s:Label text="Ejemplo:" fontSize="10" />
+									<s:Label text="http://sytema47.dane.gov.co:8399/arcgis/rest/services" fontStyle="italic"
+											 maxWidth="280" maxDisplayedLines="3" fontSize="10" fontWeight="normal"/>
+								</s:HGroup>
+							</s:VGroup>
+						</mx:GridItem>
+					</mx:GridRow>
+				</mx:Grid>
+				
+				<s:Group width="100%" includeIn="listaArcgisServer,infoServicioArcgisServer">
+					<s:VGroup bottom="5" top="10" width="100%">						
+						<s:BorderContainer right="5" bottom="0" left="5" top="0" width="100%" minHeight="0" backgroundAlpha="0" borderAlpha="0.5">
+							<mx:Tree right="10" bottom="10" left="10" top="10" maxHeight="120"
+									 id="treeArcgisServices"
+									 showRoot="false"
+									 dataProvider="{providerTreeArcgisServices}"
+									 labelField="name"
+									 selectionColor="{getStyle('rollOverColor')}"
+									 itemClick="treeArcgisServices_itemClickHandler(event)"
+									 />
+						</s:BorderContainer>
+						<s:BorderContainer right="5" bottom="0" left="5" top="0" width="100%" minHeight="0" backgroundAlpha="0" borderAlpha="0.5"
+										   includeIn="infoServicioArcgisServer">
+							<s:VGroup width="100%" left="5" bottom="0" top="5" right="5"
+									  horizontalAlign="center">
+								
+								<!---Texto error de servicio-->
+								<s:Label width="100%" maxDisplayedLines="5"
+										 text="{servicioArcGISSeleccionado.error.message || ''}"
+										 visible="{servicioArcGISSeleccionado.error}" 
+										 includeInLayout="{servicioArcGISSeleccionado.error}"/>
+								
+								<!---Tipo de servicio a cargar (Completo o Capa determinada)-->
+								<s:HGroup width="100%" horizontalAlign="center"
+										  visible="{!servicioArcGISSeleccionado.error}" 
+										  includeInLayout="{!servicioArcGISSeleccionado.error}">
+									<s:RadioButton label="Servicio Completo" groupName="rdoGroupTipoServicioArcgis" id="rdoServicioCompletoArcgis" selected="true"/>
+									<s:RadioButton label="Capa seleccionada" groupName="rdoGroupTipoServicioArcgis" id="rdoCapaServicioArcgis"/>
+								</s:HGroup>
+								
+								<s:Line width="90%" visible="{!servicioArcGISSeleccionado.error}" includeInLayout="{!servicioArcGISSeleccionado.error}">
+									<s:stroke>
+										<s:SolidColorStroke alpha="0.5"/>
+									</s:stroke>
+								</s:Line>
+								
+								<!---Selectores mapa Dinámico o Estático-->
+								<s:HGroup width="100%" 
+										  horizontalAlign="center"
+										  visible="{rdoServicioCompletoArcgis.selected &amp;&amp; !servicioArcGISSeleccionado.error}" 
+										  includeInLayout="{rdoServicioCompletoArcgis.selected &amp;&amp; !servicioArcGISSeleccionado.error}">
+									<s:RadioButton label="Dinámico" groupName="rdoGroupServicioDinamicoArcgis" id="rdoServicioDinamico" selected="true"/>
+									<s:RadioButton label="Estático" groupName="rdoGroupServicioDinamicoArcgis" id="rdoServicioEstatico"
+												   enabled="{servicioArcGISSeleccionado.singleFusedMapCache}"/>
+								</s:HGroup>
+								
+								<!---Selector de capa-->
+								<s:VGroup width="100%" left="10" right="10" bottom="5"
+										  visible="{rdoCapaServicioArcgis.selected  &amp;&amp; !servicioArcGISSeleccionado.error}" 
+										  includeInLayout="{rdoCapaServicioArcgis.selected  &amp;&amp; !servicioArcGISSeleccionado.error}">
+									
+									<s:HGroup width="100%" 
+											  horizontalAlign="center"
+											  verticalAlign="middle"
+											  >
+										<s:Label text="Capa:"/>
+										<s:DropDownList id="cmbCapaServicioArcGIS" 
+														dataProvider="{providerCapasServicioArcGIS}" 
+														prompt="Seleccione..."
+														labelField="name"
+														width="100%" />
+										<mx:Spacer height="30"/>
+									</s:HGroup>
+									<s:HGroup width="100%" 
+											  horizontalAlign="center" verticalAlign="middle">
+										<s:Label text="Modo de carga"/>
+										<s:RadioButton label="Según el área visible" groupName="rdoGroupModoFeatureLayer" id="rdoModoFeatureLayerDemanda" selected="true"/>
+										<s:RadioButton label="Todos los datos" groupName="rdoGroupModoFeatureLayer" id="rdoModoFeatureLayerInstantanea"
+													   />
+									</s:HGroup>
+								</s:VGroup>
+							</s:VGroup>
+						</s:BorderContainer>
+					</s:VGroup>
+					
+					<s:Label left="16" y="6" text="►Servicio" backgroundColor="{getStyle('contentBackgroundColor')}" fontWeight="bold"/>
+					
+				</s:Group>
+				<s:HGroup width="100%" visible="{isTokenBasedSecurity}" includeInLayout="{isTokenBasedSecurity}" includeIn="arcgisServer, listaArcgisServer">
+					<mx:LinkButton height="16" right="16" y="6" icon="{imgAutenticacion}"
+								   label="Iniciar sesión en el servidor" 
+								   id="btnIniciarSesionServer" click="btnIniciarSesionServer_clickHandler(event)"/>
+				</s:HGroup>
+				
+				<s:Button id="btnConectarArcgisServer" label="Conectar" includeIn="arcgisServer" 
+						  enabled="{txtUrlArcgisServer.text != ''}"
+						  click="btnConectarArcgisServer_clickHandler(event)"/>
+				
+				<s:Button id="btnCargarServicioArcgisServer" label="Cargar" 
+						  includeIn="infoServicioArcgisServer"
+						  click="btnCargarServicioArcgisServer_clickHandler(event)"/>
+					
+				
+				
+				<CargarServicio:CargarSHP width="100%" includeIn="shp"
+										  map="{map}">
+				</CargarServicio:CargarSHP>
+				
+				
+			</s:VGroup>
+		</s:BorderContainer>
+		
+		
+		<s:BorderContainer cornerRadius="5" top="15" bottom="0" right="0" left="0" backgroundAlpha="0" 
+						   minHeight="50" includeIn="listaServicios"
+						   >
+			<s:VGroup horizontalCenter="0" verticalCenter="0" verticalAlign="middle" 
+					  horizontalAlign="center" left="5" top="5" right="5" bottom="5"
+					  >
+				<mx:DataGrid id="grdServicios" dataProvider="{providerGridServicios}"
+							 width="100%" maxHeight="120"
+							 itemClick="grdServicios_itemClickHandler(event)">
+					<mx:columns>
+						<mx:DataGridColumn width="25" itemRenderer="widgets.DANE.CargarServicio.GridServiciosEliminarItemRenderer" resizable="false"/>
+						<mx:DataGridColumn headerText="Servicio" dataField="nombre"/>
+						<mx:DataGridColumn width="25" visible="{descargarShp}" itemRenderer="widgets.DANE.CargarServicio.GridServiciosDescargarShpItemRenderer"/>
+					</mx:columns>
+				</mx:DataGrid>
+			</s:VGroup>
+		</s:BorderContainer>
+		
+		
+	</viewer:WidgetTemplate>
+</viewer:BaseWidget>

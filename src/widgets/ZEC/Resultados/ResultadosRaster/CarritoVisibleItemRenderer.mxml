@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXAdvancedDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								  xmlns:s="library://ns.adobe.com/flex/spark" 
+								  xmlns:mx="library://ns.adobe.com/flex/mx" 
+								  focusEnabled="true"
+								  >
+	<fx:Script>
+		<![CDATA[
+			import mx.events.ColorPickerEvent;
+			import mx.events.FlexEvent;
+			
+			protected function checkbox1_changeHandler(event:Event):void
+			{
+				data.visible = (event.currentTarget as CheckBox).selected;
+				parentDocument.cambiaVisibilidad(data.label,data.visible);
+				
+			}
+
+
+			protected function colorpicker1_changeHandler(event:ColorPickerEvent):void
+			{
+				data.color = (event.currentTarget as ColorPicker).selectedColor;
+				parentDocument.cambiaColor(data.label,data.color);
+			}
+
+		]]>
+	</fx:Script>
+
+	<s:HGroup width="100%" horizontalAlign="center" verticalAlign="middle">
+		<s:CheckBox height="20" width="20" selected="{data.visible}" change="checkbox1_changeHandler(event)"/>
+		<mx:ColorPicker height="20" width="20" selectedColor="{data.color}" change="colorpicker1_changeHandler(event)"/>					
+	</s:HGroup>
+</s:MXAdvancedDataGridItemRenderer>

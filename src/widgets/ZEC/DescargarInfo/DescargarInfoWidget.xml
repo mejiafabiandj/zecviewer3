@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<configuration>
+	<textos>
+		<txtNivelInfo>Nivel de información</txtNivelInfo>
+		<txtNivelDepartamento>Departamento</txtNivelDepartamento>
+		<txtNivelMunicipio>Municipio</txtNivelMunicipio>
+		<txtBotonConsulta>Consultar</txtBotonConsulta>
+	</textos>
+	<servicio>
+		<url_download>http://190.25.231.241:8030/VECTOR/Exportar</url_download>
+		<url_alfa>http://190.25.231.241:8030/VECTOR/ConsultaBasica</url_alfa>
+		<niveles>
+			<nivel label="Seleccione..." criterios="pais" operacion=""/>
+			<nivel label="Pais" criterios="pais" operacion="consultaPais"/>
+			<nivel label="Departamento" criterios="pais" operacion="consultaDepartamento"/>
+			<nivel label="Municipio" criterios="pais" operacion="consultaMunicipio"/>
+			<nivel label="Sector Rural" criterios="departamento" operacion="consultaSectorRural"/>
+			<nivel label="Sección Rural" criterios="departamento" operacion="consultaSeccionRural"/>
+			<nivel label="Zonas urbanas" criterios="departamento" operacion="consultaCentroPoblado"/>
+			<nivel label="Sector Urbano" criterios="municipio" operacion="consultaSectorUrbano"/>
+			<nivel label="Sección Urbana" criterios="municipio" operacion="consultaSeccionUrbana"/>
+			<nivel label="Manzana" criterios="municipio" operacion="consultaManzana"/>
+			<nivel label="Resguardo Indígena" criterios="pais" operacion="consultaResguardoIndigena"/>
+			<nivel label="Comunidades Negras" criterios="pais" operacion="consultaComunidadNegra"/>
+		</niveles>
+	</servicio>
+</configuration>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<configuration>
+	<servicio url="http://dg_est45.dane.gov.co/ArcGIS/rest/services/Fuentes/FuentesJoin/MapServer/0" 
+			  useAMF="true"
+			  campoDireccion="DIG_LMONTERO.MGN_FGE_EDIFICACION.EDIF_CDRCION_EDFCCION"
+			  campoNumerico="false"
+			  useProxy="false"
+			  />
+</configuration>

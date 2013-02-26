@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:TextInput xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			 xmlns:s="library://ns.adobe.com/flex/spark" 
+			 xmlns:mx="library://ns.adobe.com/flex/mx"
+			 text=""
+			 change="textinput1_changeHandler(event)"
+			 keyDown="textinput1_keyDownHandler(event)"
+			 creationComplete="textinput1_creationCompleteHandler(event)"
+			 
+			 focusOut="{timer.start()}"
+			 focusIn="{timer.stop();}"
+			 
+			 render="textinput1_renderHandler(event)"
+			 >
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.core.FlexGlobals;
+			import mx.events.FlexEvent;
+			import mx.events.MoveEvent;
+			import mx.managers.PopUpManager;
+			
+			import spark.events.IndexChangeEvent;
+			import spark.events.TextOperationEvent;
+			
+			private var _opciones:Array = [];
+			
+			private var timerBuscar:Timer = new Timer(200);
+
+			/**Listado de objetos String sobre los cuales se autocompletara cuando el usuario ingrese o remueva texto**/
+			public function get opciones():Array
+			{
+				return _opciones;
+			}
+
+			public function set opciones(value:Array):void
+			{
+				_opciones = value;
+			}
+			
+			
+			[Bindable] private var encontrados:ArrayCollection = new ArrayCollection(); 
+			
+			private var timer:Timer = new Timer(100);
+			
+			protected function textinput1_creationCompleteHandler(event:FlexEvent):void
+			{
+				timer.addEventListener(TimerEvent.TIMER,timer_tic);
+				timerBuscar.addEventListener(TimerEvent.TIMER,timerBuscar_tic);
+			}
+			
+			
+			protected function textinput1_changeHandler(event:TextOperationEvent):void
+			{
+				timerBuscar.stop();
+				timerBuscar.start();
+			}
+			
+			private function buscar():void
+			{
+				if(text != "")
+				{
+					encontrados.removeAll();
+					for each(var opcion:Object in opciones)
+					{
+						if(estandarizar(opcion.toString()).lastIndexOf(estandarizar(text)) != -1)
+						{
+							encontrados.addItem(opcion.toString());
+						}
+					}
+					
+					if(encontrados.length > 0)
+					{
+						var p:Point = localToGlobal(new Point(0,height));
+						
+						lista.x = p.x;
+						lista.y = p.y + 5;
+						lista.width = width;
+						
+						PopUpManager.addPopUp(lista,Sprite(FlexGlobals.topLevelApplication));
+						
+					}
+				}else if(lista)
+				{
+					PopUpManager.removePopUp(lista);
+				}
+			}
+			
+			private function estandarizar(cadenaOriginal:String):String
+			{
+				var cadena:String = cadenaOriginal.toUpperCase();
+				
+				var caracteresEspeciales:ArrayCollection = new ArrayCollection(["Á","É","Í","Ó","Ú","Ä","Ë","Ï","Ö","Ü","À","È","Ì","Ò","Ù","Â","Ê","Î","Ô","Û"]);
+				var caracteresReemplazos:ArrayCollection = new ArrayCollection(["A","E","I","O","U","A","E","I","O","U","A","E","I","O","U","A","E","I","O","U"]);
+				
+				for(var j:Number = 0 ; j < cadena.length ; j ++)
+				{
+					if(caracteresEspeciales.contains(cadena.charAt(j)))
+					{
+						cadena = cadena.replace(cadena.charAt(j) , caracteresReemplazos.getItemAt( caracteresEspeciales.getItemIndex(cadena.charAt(j))) );
+					}
+				}
+				return cadena;
+			}
+
+			private function timer_tic(event:TimerEvent):void
+			{
+				PopUpManager.removePopUp(lista);
+				timer.stop();
+			}
+
+			private function timerBuscar_tic(event:TimerEvent):void
+			{
+				timerBuscar.stop();
+				buscar()
+			}
+
+			protected function lista_clickHandler(event:MouseEvent):void
+			{
+				if(event.currentTarget.selectedItem)
+				{
+					text = event.currentTarget.selectedItem;
+					timer.start();
+				}
+			}
+
+
+			protected function lista_changeHandler(event:IndexChangeEvent):void
+			{
+				if(event.currentTarget.selectedItem)
+				{
+					text = event.currentTarget.selectedItem;
+				}
+			}
+
+			protected function textinput1_keyDownHandler(event:KeyboardEvent):void
+			{
+				if(lstDatos)
+				{
+					if(event.keyCode == 40 )
+					{
+						if(lstDatos.selectedIndex < lstDatos.dataProvider.length - 1)
+						{
+							lstDatos.selectedIndex ++;
+							lstDatos.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-1,lstDatos.selectedIndex));
+						}else
+						{
+							lstDatos.selectedIndex = 0;
+							lstDatos.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-1,0));
+						}
+					}else if(event.keyCode == 38)
+					{
+						if(lstDatos.selectedIndex > 0)
+						{
+							lstDatos.selectedIndex --;
+							lstDatos.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-1,lstDatos.selectedIndex));
+						}else
+						{
+							lstDatos.selectedIndex = lstDatos.dataProvider.length - 1;
+							lstDatos.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-1,lstDatos.selectedIndex));
+						}
+					}else if(event.keyCode == 13)
+					{
+						if(lstDatos.selectedItem)
+						{
+							text = lstDatos.selectedItem;
+							timer.start();
+						}
+					}
+				}
+			}
+
+
+			protected function textinput1_renderHandler(event:Event):void
+			{
+				if(lista)
+				{
+					var p:Point = localToGlobal(new Point(0,height));
+					
+					lista.x = p.x;
+					lista.y = p.y + 5;
+					lista.width = width;
+				}
+			}
+
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+		<s:BorderContainer id="lista" visible="{encontrados.length > 0}"
+						   focusOut="{timer.start()}"
+						   focusIn="{timer.stop();}"
+						   cornerRadius="4"
+						   minHeight="0"
+						   minWidth="100"
+						   >
+			<s:List id="lstDatos" dataProvider="{encontrados}" left="0" right="0" top="0" bottom="0"
+					minHeight="20" minWidth="100"
+					
+					maxHeight="150"
+					click="lista_clickHandler(event)"
+					change="lista_changeHandler(event)"/>
+		</s:BorderContainer>
+	</fx:Declarations>
+	
+</s:TextInput>

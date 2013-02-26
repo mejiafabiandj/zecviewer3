@@ -1,0 +1,318 @@
+<?xml version="1.0" encoding="utf-8"?>
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" 
+				   xmlns:viewer="com.esri.viewer.*" 
+				   layout="absolute"
+				   creationComplete="ConsultaDireccionWidget_creationCompleteHandler(event)"
+				   widgetConfigLoaded="ConsultaDireccionWidget_widgetConfigLoadedHandler(event)" xmlns:esri="http://www.esri.com/2008/ags">
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.FeatureSet;
+			import com.esri.ags.Graphic;
+			import com.esri.ags.events.LocatorEvent;
+			import com.esri.ags.layers.Layer;
+			import com.esri.ags.layers.supportClasses.Field;
+			import com.esri.ags.tasks.supportClasses.AddressCandidate;
+			import com.esri.viewer.AppEvent;
+			import com.esri.viewer.ViewerContainer;
+			import com.esri.viewer.WidgetStates;
+			
+			import gov.dane.util.Constantes;
+			import gov.dane.util.geoprocess.geocoder.GeocoderControl;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.FlexEvent;
+			import mx.rpc.AsyncResponder;
+			import mx.rpc.AsyncToken;
+			import mx.rpc.Fault;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			import spark.events.IndexChangeEvent;
+
+			[Bindable] private var providerCmbDepartamento:ArrayCollection = new ArrayCollection();
+			[Bindable] private var providerCmbMunicipio:ArrayCollection = new ArrayCollection();
+			
+			private var tokenServlet:AsyncToken;
+			
+			
+			protected function ConsultaDireccionWidget_creationCompleteHandler(event:FlexEvent):void
+			{
+				AppEvent.addListener(AppEvent.BASEMAP_SWITCH, basemapMenuClicked);
+			}
+
+
+			protected function ConsultaDireccionWidget_widgetConfigLoadedHandler(event:Event = null):void
+			{
+				if(configObject)
+				{
+					servlet.url = configObject.configuration.servicio.url_alfa;
+					
+					var basemap:String = selectedBasemap(); 
+					if(basemap)
+					{
+						providerCmbDepartamento = new ArrayCollection();
+						tokenServlet = servlet.send(
+							{
+								operacionConsultaDireccion:"departamentosConMallaVial",
+								vigencia:basemap
+							});
+					}else
+					{
+						showError("No fué posible encontrar la vigencia seleccionada");
+					}
+				}
+			}
+
+
+			protected function wTemplate_openHandler(event:Event):void
+			{
+				ConsultaDireccionWidget_widgetConfigLoadedHandler();
+				if(txtDireccion)
+					txtDireccion.text = "";
+			}
+
+
+			protected function wTemplate_closedHandler(event:Event):void
+			{
+				// TODO Auto-generated method stub
+			}
+
+
+			protected function wTemplate_minimizedHandler(event:Event):void
+			{
+				// TODO Auto-generated method stub
+			}
+
+
+			protected function servlet_resultHandler(event:ResultEvent):void
+			{
+				var provider:ArrayCollection;
+				var combo:DropDownList;
+				var operacion:String;
+				var labelField:String;
+				
+				if(!tokenServlet)
+				{
+					showError("Ocurrió un error de sincronía en la consulta realizada");
+					return;
+				}
+				
+				switch (tokenServlet.message.body.operacionConsultaDireccion)
+				{
+					case "departamentosConMallaVial":
+					{
+						provider = providerCmbDepartamento;
+						combo = cmbDepartamento;
+						operacion = "Consultar los departamentos con malla vial disponible";
+						labelField = "NOMBRE_DEPARTAMENTO";
+						break;
+					}
+					case "municipiosDepartamentoConMallaVial":
+					{
+						provider = providerCmbMunicipio;
+						combo =  cmbMunicipio;
+						operacion = "Consultar los municipios con malla vial disponible";
+						labelField = "NOMBRE_MUNICIPIO";
+						break;
+					}
+				}
+				
+				if(provider)
+				{
+					try
+					{
+						provider.removeAll();
+						var itemSeleccione:Object = new Object();
+						itemSeleccione[labelField] = "Seleccione...";
+						provider.addItem(itemSeleccione);
+						
+						if(event.result.Resultados)
+						{
+							if(event.result.Resultados.Resultado is ArrayCollection)
+							{
+								provider.addAll(event.result.Resultados.Resultado);
+							}else
+							{
+								provider.addItem(event.result.Resultados.Resultado);
+							}
+						}else
+						{
+							provider.removeAll()
+							itemSeleccione[labelField] = "No hay resultados";
+							provider.addItem(itemSeleccione);
+						}
+						
+						if(combo)
+						{
+							combo.selectedIndex = 0;
+							combo.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-1,0))
+						}
+					}catch(e:Error)
+					{
+						showError("No fué posible " + operacion + ".\n\n" + e.message);
+					}
+				}
+			}
+
+
+			protected function servlet_faultHandler(event:FaultEvent):void
+			{
+				showError("No fué posible realizar la consulta.\n\n" + event.message);
+			}
+			
+			/**
+			 * Evento resultado de el cambio del mapa base
+			 **/
+			private function basemapMenuClicked(event:AppEvent):void
+			{
+				ConsultaDireccionWidget_widgetConfigLoadedHandler();
+			}
+			
+			/**
+			 * Retorna el nombre del mapa base que se encuentra activo
+			 **/
+			public function selectedBasemap():String
+			{
+				var selectedBasemap:String;
+				
+				for each(var layer:Layer in map.layers)
+				{
+					for each(var basemap:Object in configData.basemaps)
+					{
+						if(layer.id == basemap.label)
+						{
+							if(layer.visible)
+							{
+								selectedBasemap = layer.id;
+							}
+						}
+					}
+					
+				}
+				
+				return selectedBasemap;
+			}
+
+
+			protected function cmbDepartamento_changeHandler(event:IndexChangeEvent):void
+			{
+				providerCmbMunicipio.removeAll();
+				
+				if(cmbDepartamento.selectedItem.CODIGO_DEPARTAMENTO)
+				{
+					tokenServlet = servlet.send(
+						{
+							operacionConsultaDireccion:"municipiosDepartamentoConMallaVial",
+							vigencia:selectedBasemap(),
+							codigoDepartamento:cmbDepartamento.selectedItem.CODIGO_DEPARTAMENTO
+						});
+				}
+				
+				validar();
+			}
+
+
+			protected function cmbMunicipio_changeHandler(event:IndexChangeEvent):void
+			{
+				validar();
+			}
+			
+			private function validar():void
+			{
+				if(btnConsultar)
+					btnConsultar.enabled = cmbMunicipio.selectedItem && cmbMunicipio.selectedItem.CODIGO_MUNICIPIO && cmbMunicipio.selectedItem.NOMBRE_MUNICIPIO && txtDireccion.text && txtDireccion.text != "";
+			}
+
+
+			protected function btnConsultar_clickHandler(event:MouseEvent):void
+			{
+				var municipio:String = cmbMunicipio.selectedItem.NOMBRE_MUNICIPIO;
+				if(cmbMunicipio.selectedItem.NOMBRE_MUNICIPIO.toString().toLowerCase().lastIndexOf("bogot") != -1)
+				{
+					municipio = "BOGOTA";
+				}
+				
+				GeocoderControl.Geocode({DIRECCION:txtDireccion.text,MUNICIPIO:municipio},
+					configObject.configuration.servicio.url_geocoder,
+					map.spatialReference,
+					new AsyncResponder(geocodeResult,geocodeFault),
+					configObject.configuration.servicio.proxyURL);
+			}
+			
+			private function geocodeResult(featureSet:FeatureSet, token:Object = null):void
+			{
+				if(featureSet.features && featureSet.features.length > 0)
+				{
+					setState(WidgetStates.WIDGET_MINIMIZED);
+					addSharedData(Constantes.OPERACION_ABRIR_WIDGET,new ArrayCollection([{label:"Resultados",data:{featureSet:featureSet,token:null}}]));
+				}else
+				{
+					Alert.show("No se encontró la dirección especificada, por favor verifique su dirección","Dirección incorrecta");
+				}
+			}
+			
+			private function geocodeFault(fault:Fault, token:Object = null):void
+			{
+				showError("No fué posible realizar la consulta de la dirección.\n\n" + fault.message);
+			}
+
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<s:HTTPService id="servlet" result="servlet_resultHandler(event)" fault="servlet_faultHandler(event)" showBusyCursor="true"/>
+		<mx:Validator id="validator" source="{txtDireccion}" property="text" triggerEvent="change" required="true" requiredFieldError="Debe ingresar un valor" />
+	</fx:Declarations>
+	
+	<viewer:WidgetTemplate id="wTemplate" 
+						   open="wTemplate_openHandler(event)"
+						   closed="wTemplate_closedHandler(event)"
+						   minimized="wTemplate_minimizedHandler(event)"
+						   width="350" height="190">
+		<s:BorderContainer cornerRadius="5" top="15" bottom="0" right="0" left="0" backgroundAlpha="0" 
+						   minHeight="50"
+						   >
+			<s:VGroup horizontalCenter="0" verticalCenter="0" verticalAlign="middle" horizontalAlign="center" left="5" top="5" right="5" bottom="5"
+					  >
+				<mx:Grid verticalAlign="middle" horizontalAlign="center" width="100%">
+					<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle">
+						<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+							<s:Label text="Departamento"/>
+						</mx:GridItem>
+						<mx:GridItem verticalAlign="middle" width="100%">
+							<s:DropDownList id="cmbDepartamento" width="100%" 
+											dataProvider="{providerCmbDepartamento}" change="cmbDepartamento_changeHandler(event)"
+											labelField="NOMBRE_DEPARTAMENTO"
+											selectionColor="{getStyle('rollOverColor')}"
+											/>
+						</mx:GridItem>
+					</mx:GridRow>
+					<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle">
+						<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+							<s:Label text="Municipio"/>
+						</mx:GridItem>
+						<mx:GridItem verticalAlign="middle" width="100%">
+							<s:DropDownList id="cmbMunicipio" width="100%" 
+											dataProvider="{providerCmbMunicipio}" change="cmbMunicipio_changeHandler(event)"
+											labelField="NOMBRE_MUNICIPIO"
+											selectionColor="{getStyle('rollOverColor')}"
+											/>
+						</mx:GridItem>
+					</mx:GridRow>
+					<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle">
+						<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+							<s:Label text="Dirección"/>
+						</mx:GridItem>
+						<mx:GridItem verticalAlign="middle" width="100%">
+							<s:TextInput id="txtDireccion" width="100%" change="validar()" enter="{btnConsultar.dispatchEvent(new MouseEvent(MouseEvent.CLICK))}"/>
+						</mx:GridItem>
+					</mx:GridRow>
+				</mx:Grid>
+				<s:Button id="btnConsultar" label="Consultar" click="btnConsultar_clickHandler(event)"/>
+			</s:VGroup>
+		</s:BorderContainer>
+	</viewer:WidgetTemplate>	
+			
+</viewer:BaseWidget>

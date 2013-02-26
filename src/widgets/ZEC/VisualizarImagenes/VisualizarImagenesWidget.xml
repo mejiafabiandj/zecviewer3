@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<configuration>
+<!-- Documentacion de los valores de las propiedades method, operation y lockRasterIds:	
+	http://help.arcgis.com/en/webapi/flex/apiref/com/esri/ags/layers/supportClasses/MosaicRule.html 
+-->
+	<descripcionEditar><![CDATA[A continuación seleccione un método de realce para ajustar el contraste de la imágen y los parámetros necesarios]]></descripcionEditar>
+	
+	<descripcionSinImagenes><![CDATA[En este momento no hay imágenes cargadas en el mapa base, para visualizar imágenes, realice una consulta raster y en los resultados seleccione la opción "Cargar Imagen"]]></descripcionSinImagenes>
+	
+	<!-- 
+	<imageservice url="http://systema47.dane.gov.co:8399/arcgis/rest/services/Imagenes/IKONOS/ImageServer"
+				  label="IKONOS"
+				  method="esriMosaicLockRaster"
+				  operation="MT_MEAN"
+				  lockRasterIds="1"
+				  useproxy="false"
+				  bandIds="0,1,2"
+				  >
+	</imageservice>
+	
+	<imageservice url="http://systema47.dane.gov.co:8399/arcgis/rest/services/Imagenes/SPOT/ImageServer"
+				  label="Mosaico SPOT"
+				  method="esriMosaicLockRaster"
+				  operation="MT_MEAN"
+				  lockRasterIds="1"
+				  useproxy="false"
+				  noData="0"
+				  ></imageservice>
+	
+	 -->
+	 <!--NO BORRAR-->
+	<!-- Ejemplo imageService
+	<imageservice url="http://systema47.dane.gov.co:8399/arcgis/rest/services/Imagenes/SPOT/ImageServer"
+				  label="Barranquilla"
+				  method="esriMosaicLockRaster"
+				  operation="MT_MEAN"
+				  lockRasterIds="1,2"
+				  useproxy="false"
+				  bandIds="0,2,1"
+				  noData="255"
+				  >
+				  <!--stretchType: 0 = None, 3 = StandardDeviation, 4 = Histogram Equalization, 5 = MinMax --
+				  <stretch stretchType="4"
+				  		   numberOfStandardDeviations="2"
+				  		   >
+				  		   <statistics min="0" max="255" mean="40" stdv="51"></statistics>
+						   <statistics min="0" max="255" mean="40" stdv="51"></statistics>
+						   <statistics min="0" max="255" mean="40" stdv="51"></statistics>
+						   <statistics min="0" max="255" mean="40" stdv="51"></statistics>
+		  		  </stretch>
+	</imageservice>
+	<!--NO BORRAR-->
+	 -->
+</configuration>

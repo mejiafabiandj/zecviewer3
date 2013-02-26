@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Panel xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 
+		 >
+	<fx:Script>
+		<![CDATA[
+			import mx.core.IFlexDisplayObject;
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			
+			private static var okLabelOverride:String = "Aceptar";
+			
+			private static var detallesLabelOverride:String = "Detalles";
+			
+			private static var volverLabelOverride:String = "Volver";
+			
+			
+			[Bindable] private var okLabel:String;
+			
+			[Bindable] private var detallesLabel:String;
+			
+			[Bindable] private var volverLabel:String;
+			
+			
+			private var _text:String = "";
+
+			[Bindable]public function get text():String
+			{
+				return _text;
+			}
+
+			public function set text(value:String):void
+			{
+				_text = value;
+			}
+			
+			private var _detalles:String = "";
+			
+			[Bindable]public function get detalles():String
+			{
+				return _detalles;
+			}
+			
+			public function set detalles(value:String):void
+			{
+				_detalles = value;
+			}
+			
+			
+			public static function showAlert(text:String = "",
+											 detalles:String = "",
+											 title:String = "",
+											 parent:Sprite = null, 
+											 closeHandler:Function = null
+											 ):void
+			{
+				var alert:AlertInfo = new AlertInfo();
+				
+				alert.text = text;
+				alert.detalles = detalles;
+				alert.title = title;
+				
+				alert.addEventListener(FlexEvent.CREATION_COMPLETE, static_creationCompleteHandler);
+				PopUpManager.addPopUp(alert, parent, true);
+			}
+			
+			
+			private static function static_creationCompleteHandler(event:FlexEvent):void
+			{
+				if (event.target is IFlexDisplayObject && event.eventPhase == EventPhase.AT_TARGET)
+				{
+					var alert:AlertInfo = AlertInfo(event.target);
+					alert.removeEventListener(FlexEvent.CREATION_COMPLETE, static_creationCompleteHandler);
+					
+					alert.setActualSize(alert.getExplicitOrMeasuredWidth(),
+						alert.getExplicitOrMeasuredHeight());
+					PopUpManager.centerPopUp(IFlexDisplayObject(alert));
+				}
+			}
+
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	
+	<s:states>
+		<s:State name="mensaje"/>
+		<s:State name="detalles"/>
+	</s:states>
+	
+	<s:VGroup left="5" right="5" top="5" bottom="5" horizontalAlign="center">
+		<mx:Text id="txtMensaje" text="{text}" width="100%" includeIn="mensaje"/>
+		<mx:Text id="txtDetalles" text="{detalles}" width="100%" includeIn="mensaje"/>
+		<s:HGroup width="100%" horizontalAlign="center" verticalAlign="middle">
+			<s:Button id="btnOk" label="{okLabel}"/>
+			<s:Button id="btnDetalles" includeIn="mensaje" label="{detallesLabel}"/>
+			<s:Button id="btnVolver" includeIn="detalles" label="{volverLabel}"/>
+		</s:HGroup>
+	</s:VGroup>
+	
+</s:Panel>

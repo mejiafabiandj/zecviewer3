@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="utf-8"?>
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" 
+				   xmlns:viewer="com.esri.viewer.*" layout="absolute"
+				   creationComplete="menu_creationCompleteHandler(event)"
+				   widgetConfigLoaded="menu_widgetConfigLoadedHandler(event)" 
+				   xmlns:Menu="com.dane.widgets.Menu.*"
+				   width="{menuWidth}"
+				   height="{menuHeight}"
+				   width.minimized="150"
+				   height.minimized="30"
+				   verticalScrollPolicy="off"
+				   horizontalScrollPolicy="off"
+				   >
+	<fx:Script>
+		<![CDATA[
+			import com.esri.viewer.AppEvent;
+			import com.esri.viewer.ViewerContainer;
+			import com.esri.viewer.WidgetStates;
+			import com.esri.viewer.managers.EventBus;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.FlexEvent;
+			import mx.utils.ObjectProxy;
+			
+			[Bindable] private var widgetGroup:ArrayCollection = new ArrayCollection();
+			[Bindable] private var providerMenu:ArrayCollection = new ArrayCollection();
+			
+			[Bindable] private var menuWidth:Number = 300;
+			[Bindable] private var menuHeight:Number = 150;
+			
+			[Bindable] private var hasSelectedGroup:Boolean = false
+
+			protected function menu_creationCompleteHandler(event:FlexEvent):void
+			{
+				
+				widgetGroup = new ArrayCollection();
+				for each(var w:Object in configData.widgets)
+				{
+					var widget:ObjectProxy = new ObjectProxy(w);
+					
+					if(!widget.grouped)
+					{
+						widgetGroup.addItem(new ObjectProxy({label:widget.label, data:widget}));
+					}
+					else
+					{
+						var hasGroup:Boolean = false;
+						for each (var group:ObjectProxy in widgetGroup)
+						{
+							if(group.label != null)
+							{
+								if(group.label == widget.groupLabel)
+								{
+									group.children.addItem(new ObjectProxy({label:widget.label, data:widget, parent:group.label}));
+									hasGroup = true;
+									break;
+								}
+							}
+						}
+						if(!hasGroup)
+						{
+							var data:ObjectProxy = new ObjectProxy(
+								{
+									groupIcon:widget.groupIcon, 
+									groupLabel:widget.groupLabel, 
+									groupLength:widget.groupLength, 
+									icon:widget.groupIcon
+								}
+							);
+							widgetGroup.addItem( new ObjectProxy(
+								{
+									label:widget.groupLabel, 
+									data:data, 
+									children:new ArrayCollection(
+										[
+											new ObjectProxy(
+												{
+													label:widget.label, 
+													data:widget, 
+													parent:widget.groupLabel
+												}
+											)
+										]
+									)
+								}
+							));
+						}
+					}
+				}
+				
+				providerMenu.addAll(widgetGroup);
+				
+				resize();
+					
+				AppEvent.addListener("menuItemClick",
+					function(event:AppEvent):void
+					{
+						if(event.data)
+						{
+							if(event.data.children)
+							{
+								imgGroup.source = event.data.data.icon;
+								
+								providerMenu.removeAll();
+								if(event.data.children is ArrayCollection)
+								{
+									providerMenu.addAll(event.data.children);
+								}else
+								{
+									providerMenu.addItem(event.data.children);
+								}
+								
+								menuLabel.text = event.data.label;
+								hasSelectedGroup = true;
+								
+								moveEffect.play();
+								resize();
+							}else
+							{
+								if(event.data.data.id != null)
+								{
+									EventBus.instance.dispatchEvent(new AppEvent(AppEvent.WIDGET_RUN,event.data.data.id));
+									//currentState = "minimized";
+								}
+								
+							}
+						}
+						 
+					});
+			}
+
+			private function resize():void
+			{
+				if(providerMenu.length < 3)
+				{
+					menuWidth = 90 * (providerMenu.length) + 35;
+				}else
+				{
+					menuWidth = 305;
+				}
+				
+				menuHeight = 0;
+				
+				for (var i:Number = 0; i < providerMenu.length; i += 3)
+				{
+					menuHeight += 90;
+					if(menuHeight > contentGroup.maxHeight)
+					{
+						menuHeight = contentGroup.maxHeight;
+					}
+				}
+				
+				menuHeight += hasSelectedGroup == true? 65 : 35;
+				
+				/*
+				if(providerMenu.length % 3 == 0){
+					menuHeight = providerMenu.length/3*90;	
+				}else{
+					menuHeight = (Math.floor((providerMenu.length)/3)+1)*90;
+				}
+				menuHeight += hasSelectedGroup == true? 65 : 35;
+				*/
+			}
+
+			protected function menu_widgetConfigLoadedHandler(event:Event):void
+			{
+				// TODO Auto-generated method stub
+			}
+
+
+			protected function btnMinimizar_clickHandler(event:MouseEvent):void
+			{
+				if(currentState == "open")
+				{
+					currentState = "minimized";
+				}else
+				{
+					currentState = "open";
+				}
+			}
+
+
+			protected function btnVolver_clickHandler(event:MouseEvent):void
+			{
+				hasSelectedGroup = false;
+				providerMenu.removeAll();
+				providerMenu.addAll(widgetGroup);
+				menuLabel.text = "Menú";
+				resize();
+			}
+
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+		<s:Bounce id="bounce"/>
+		<s:Parallel id="moveEffect">
+			<s:Fade alphaFrom="0" alphaTo="1" target="{imgGroup}" duration="200"/>
+			<s:Move target="{imgGroup}" easer="{bounce}" xTo="-20" yTo="0" xFrom="40" yFrom="30" duration="500"/>
+		</s:Parallel>
+		
+	</fx:Declarations>
+	
+	<viewer:states>
+		<s:State name="open"/>
+		<s:State name="minimized"/>
+	</viewer:states>
+	
+	<viewer:transitions>
+		<s:Transition fromState="open" toState="minimized">
+			<s:Sequence>
+				<s:Fade duration="100" target="{contentGroup}"/>
+				<s:Fade duration="100" easer="{bounce}" target="{menuLabel}"/>
+				<s:Fade duration="100" target="{this}"/>
+				<s:Resize heightTo="30"
+						  targets="{[this,contenedor]}"
+						  widthTo="150"/>
+				<s:Move easer="{bounce}" target="{btnMinimizar}"/>
+			</s:Sequence>
+		</s:Transition>
+		<s:Transition fromState="*" toState="open">
+			<s:Sequence>
+				<s:Move target="{icon}"/>
+				<s:Resize heightTo="{menuHeight}"
+						  target="{this}"
+						  widthTo="{menuWidth}"/>
+				<s:Fade duration="200" target="{contentGroup}"/>
+				<s:Fade duration="200" target="{menuLabel}"/>
+			</s:Sequence>
+		</s:Transition>
+	</viewer:transitions>
+	
+	
+	
+	<s:BorderContainer cornerRadius="5" top="0" bottom="0" right="0" left="0"
+					   backgroundAlpha="{getStyle('contentBackgroundAlpha')}"
+					   backgroundColor="{getStyle('contentBackgroundColor')}"
+					   minHeight="0"
+					   textAlign="right"
+					   id="contenedor"
+					   width.minimized="150"
+					   height.minimized="30"
+					   >
+		<s:Label id="menuLabel"
+				 width="100%"
+				 maxDisplayedLines="1"
+				 showTruncationTip="true"
+				 styleName="WidgetTitle"
+				 color="{getStyle('focusColor')}"
+				 text="Menú" 
+				 top="8" right.open="10"
+				 left.minimized="30" textAlign.minimized="left"
+				 useHandCursor.minimized="true"
+				 buttonMode.minimized="true"
+				 click.minimized="btnMinimizar_clickHandler(event)"/>
+		<s:BorderContainer top="25" bottom="5" right="5" left="15" cornerRadius="5"
+						   backgroundAlpha="{getStyle('contentBackgroundAlpha')}"
+						   backgroundColor="{getStyle('contentBackgroundColor')}"
+						   minHeight="0"
+						   id="contentGroup"
+						   maxHeight="280"
+						   visible.minimized="false"
+						   includeInLayout.minimized="false"
+						   visible.open="true"
+						   >
+			<mx:HBox top="5" bottom="5" right="5" left="5" maxWidth="340" maxHeight="250">
+				<s:DataGroup itemRenderer="widgets.DANE.Menu.MenuItem"
+							 maxWidth="320"
+							 >
+					<s:dataProvider>
+						{providerMenu}
+					</s:dataProvider>
+					<s:layout>
+						<s:TileLayout horizontalAlign="center" verticalAlign="middle" verticalGap="5" horizontalGap="5" requestedColumnCount="3"/>
+					</s:layout>
+				</s:DataGroup>
+			</mx:HBox>
+			
+		</s:BorderContainer>
+		
+		<s:BorderContainer  id="btnMinimizar"
+							bottom.open="0" top.open="25" left.open="-2" 
+							bottom.minimized="0" left.minimized="-2" top.minimized="0"
+							useHandCursor="true" buttonMode="true"
+							backgroundAlpha="0"
+							borderAlpha="0"
+							contentBackgroundAlpha="0" 
+							minWidth="0" minHeight="0"
+							toolTip.open="Minimizar"
+							toolTip.minimized="Abrir"
+							click="btnMinimizar_clickHandler(event)" 
+							>
+			<mx:Image source="assets/images/w_collapse.png" width="20" height="20" verticalCenter="0" left="0" visible.minimized="false" visible.open="true"/>
+			<mx:Image source="assets/images/w_expand.png" width="20" height="20" verticalCenter="0" left="0" visible.minimized="true" visible.open="false"/>
+		</s:BorderContainer>
+		
+		<s:Image  id="btnVolver"
+				  useHandCursor="true" buttonMode="true"
+				  source="assets/images/i_expand2.png"
+				  toolTip="Regresa al menú principal"
+				  visible.minimized="false"
+				  visible="{hasSelectedGroup}" 
+				  includeInLayout.minimized="false"
+				  bottom.open="2"
+				  right.open="2"
+				  click="btnVolver_clickHandler(event)"/>
+		
+		<mx:Image id="imgGroup" width="40" height="40" 
+				  source="assets/images/i_widget.png"
+				  visible="{hasSelectedGroup}"
+				  visible.minimized="false"
+				  /> 
+		
+		<!--Efecto visual del contenedor-->
+		<!--s:filters>
+			<s:DropShadowFilter alpha="0.5"
+								blurX="10"
+								blurY="10"/>
+		</s:filters-->
+	</s:BorderContainer>
+</viewer:BaseWidget>

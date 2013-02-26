@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<configuration>
+	<archivo label="Normatividad resguardos" url="assets/docs/NormatividadResguardosIndigenas.pdf"/>
+	<archivo label="Documento metodológico" url="assets/docs/ConstruccionRegiones.pdf"/>
+	<archivo label="Listado Resguardos 2013" url="assets/docs/ListadoResguardosIndigeneas2013.xls"/>
+	<campos>
+		<campo label="Nombre" campo="label" ancho="200"/>
+		<campo label="Descripción" campo="descripcion" ancho="150"/>
+	</campos>
+</configuration>

@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:viewer="com.esri.viewer.*" layout="absolute" xmlns:supportClasses="com.esri.ags.tasks.supportClasses.*" xmlns:tasks="com.esri.ags.tasks.*">
+
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.FeatureSet;
+			import com.esri.ags.utils.JSON;
+			import com.as3shplib.ShpWriter;
+			
+			import mx.controls.Alert;
+			import mx.rpc.AsyncResponder;
+			import mx.rpc.Fault;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			private var shpWriter:ShpWriter;
+			
+			protected function btnConsultar_clickHandler(event:MouseEvent):void
+			{
+				var min:Number = 0;
+				var max:Number = 500;
+				
+				query.where = "OBJECTID >= " + min + " and OBJECTID < " + max ;
+				query.outFields = ["*"];
+				queryTask.url = txtURL.text;
+				
+				queryTask.execute(query,new AsyncResponder(queryTask_Result,queryTask_Fault,
+					{
+						min:min,
+						max:max
+					}));
+			}
+			
+			
+			private function queryTask_Result(featureSet:FeatureSet,token:Object = null):void
+			{
+				if (featureSet.features.length == 0) {
+					
+					return;
+				}
+				
+				if(!shpWriter)
+				{
+					shpWriter = new ShpWriter("queryshp", featureSet.geometryType, featureSet.spatialReference.wkid, featureSet.fields);
+				}
+				shpWriter.write(featureSet.features);
+				
+				btnDescargar.enabled = true;
+				/*
+				var min:Number = token.min + 500;
+				var max:Number = token.max + 500;
+				
+				query.where = "OBJECTID >= " + min + " and OBJECTID < " + max ;
+				query.outFields = ["*"];
+				queryTask.url = txtURL.text;
+				
+				queryTask.execute(query,new AsyncResponder(queryTask_Result,queryTask_Fault,
+					{
+						min:min,
+						max:max
+					}));
+				
+				*/
+			}
+			
+			private function queryTask_Fault(fault:Fault,token:Object = null):void
+			{
+				Alert.show("No se pudo realizar la consulta");
+			}
+
+
+			protected function btnDescargar_clickHandler(event:MouseEvent):void
+			{
+				if (shpWriter != null) {
+					var fr:FileReference = new FileReference();
+					fr.save(shpWriter.getData(), "queryshp.zip");
+				}
+			}
+
+		]]>
+	</fx:Script>
+
+	<fx:Declarations>
+		
+		
+		<supportClasses:Query id="query" returnGeometry="true" 
+							  outSpatialReference="{map.spatialReference}"
+							  />
+		<tasks:QueryTask id="queryTask" method="POST" showBusyCursor="true" />
+	</fx:Declarations>
+	
+	<viewer:WidgetTemplate id="wTemplate" 
+						   width="450" height="300">
+		<s:BorderContainer cornerRadius="5" top="15" bottom="0" right="0" left="0" backgroundAlpha="0" 
+						   minHeight="50"
+						   >
+			<s:VGroup horizontalCenter="0" verticalCenter="0" verticalAlign="middle" horizontalAlign="center" left="5" top="5" right="5" bottom="5">
+				<s:TextInput id="txtURL" text="http://dg_est45.dane.gov.co/arcgis/rest/services/marcos_manizales/MapServer/0" width="100%"/>
+				<s:Button id="btnConsultar" click="btnConsultar_clickHandler(event)" label="consultar"/>
+				<s:Button id="btnDescargar" click="btnDescargar_clickHandler(event)" enabled="false" label="descargar"/>
+			</s:VGroup>
+		</s:BorderContainer>
+	</viewer:WidgetTemplate>
+</viewer:BaseWidget>

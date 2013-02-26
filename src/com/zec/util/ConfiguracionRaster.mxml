@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			   xmlns:s="library://ns.adobe.com/flex/spark" 
+			   xmlns:mx="library://ns.adobe.com/flex/mx" 
+			   title="Configuración Raster"
+			   creationComplete="titlewindow1_creationCompleteHandler(event)"
+			   close="titlewindow1_closeHandler(event)"
+			   >
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.core.FlexGlobals;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			
+			private static var _instancia:ConfiguracionRaster;
+
+			/**
+			 * Muestra el panel de configuración para las consultas geográficas a la información Raster.
+			 * @params modal Establece si la ventana emergente se muestra de forma modal o no.
+			 **/
+			public static function show(modal:Boolean = true):ConfiguracionRaster
+			{
+				PopUpManager.removePopUp(instancia);
+				
+				
+				PopUpManager.addPopUp(instancia,Sprite(FlexGlobals.topLevelApplication),modal);
+				PopUpManager.centerPopUp(instancia);
+				
+				return instancia;
+			}
+			
+			public static function get instancia():ConfiguracionRaster
+			{
+				if(!_instancia)
+				{
+					_instancia = new ConfiguracionRaster();
+				}
+				return _instancia;
+			}
+			
+			
+			private var _hacerBuffer:Boolean = true;
+
+			[Bindable] public function get hacerBuffer():Boolean
+			{
+				return _hacerBuffer;
+			}
+
+			public function set hacerBuffer(value:Boolean):void
+			{
+				_hacerBuffer = value;
+			}
+
+			
+			private var _colorBuffer:uint = 0xE0AF00;
+
+			[Bindable]public function get colorBuffer():uint
+			{
+				return _colorBuffer;
+			}
+
+			public function set colorBuffer(value:uint):void
+			{
+				_colorBuffer = value;
+			}
+
+			
+			private static var _distanciaBuffer:Number = 5000;
+
+			[Bindable] public function get distanciaBuffer():Number
+			{
+				return _distanciaBuffer;
+			}
+
+			public function set distanciaBuffer(value:Number):void
+			{
+				_distanciaBuffer = value;
+			}
+
+			
+			protected function titlewindow1_creationCompleteHandler(event:FlexEvent):void
+			{
+				closeButton.visible = false;
+				_instancia = this;
+			}
+
+			protected function titlewindow1_closeHandler(event:CloseEvent):void
+			{
+				PopUpManager.removePopUp(instancia);
+			}
+
+			protected function btnAceptar_clickHandler(event:MouseEvent):void
+			{
+				dispatchEvent(new CloseEvent(CloseEvent.CLOSE));
+			}
+
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	
+	<s:BorderContainer cornerRadius="5" top="5" bottom="5" right="5" left="5" backgroundAlpha="0" 
+					   minWidth="0" minHeight="0">
+		<s:VGroup verticalAlign="middle" horizontalAlign="center" left="5" top="5" right="5"
+				  minWidth="0" minHeight="0" bottom="5">
+			<mx:Spacer height="10"/>
+			<s:Label text="Configuración de las consultas geográficas a la información Raster"
+					 width = "100%"
+					 textAlign="left" id="txtDistancia"/>
+			<mx:HRule width = "90%"
+					  height = "6"/>
+			
+			<s:HGroup width="70%" horizontalAlign="center" verticalAlign="middle">
+				<mx:CheckBox id="chkDibujarAreaInfluencia" label="Dibujar el área de influencia" selected="{hacerBuffer}"/>
+				<mx:ColorPicker id="colorPicker" selectedColor="{colorBuffer}" visible="{chkDibujarAreaInfluencia.selected}" includeInLayout="{chkDibujarAreaInfluencia.selected}"/>
+			</s:HGroup>
+			<s:HGroup width="100%" horizontalAlign="center" verticalAlign="middle" visible="{chkDibujarAreaInfluencia.selected}" includeInLayout="{chkDibujarAreaInfluencia.selected}">
+				<mx:HSlider width="190" labels="['0','10 Km']" value="{distanciaBuffer}" maximum="10000" snapInterval="50" liveDragging="true" id="sldrDistancia"/>
+			</s:HGroup>
+			
+			<mx:HRule width = "90%"
+					  height = "6"/>
+			
+			<s:Button label="Aplicar cambios" id="btnAceptar" click="btnAceptar_clickHandler(event)"/>
+		</s:VGroup>
+	</s:BorderContainer>
+</s:TitleWindow>

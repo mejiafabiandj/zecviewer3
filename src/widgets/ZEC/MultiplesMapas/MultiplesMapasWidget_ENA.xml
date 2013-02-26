@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<configuration>
+	<maxNumPaneles>4</maxNumPaneles>
+	<numPanelesIniciales>2</numPanelesIniciales>
+	<timeextent>
+		<timestamp starttime="01/01/2011;DD/MM/YYYY"
+				   endtime="01/08/2011;DD/MM/YYYY"
+				   label="Semestre I 2011"/>
+	    <timestamp starttime="01/08/2011;DD/MM/YYYY"
+				   endtime="01/01/2012;DD/MM/YYYY"
+				   label="Semestre II 2011"/>
+	    <timestamp starttime="01/01/2012;DD/MM/YYYY"
+				   endtime="01/08/2012;DD/MM/YYYY"
+				   label="Semestre I 2012"/>
+	</timeextent>
+</configuration>

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+	DANE 2011
+	Dirección de geoestadística
+	Grupo sistemas de consulta
+	
+	Sandra Liliana Moreno Mayorga			slmorenom@DANE.gov.co
+	Fabian Ricardo Mejía Ospina				frmejiao@DANE.gov.co
+	Leonardo Alexander Cardona Piedrahita	lacardona@DANE.gov.co
+-->
+<mx:LegendItem xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			   xmlns:s="library://ns.adobe.com/flex/spark" 
+			   xmlns:mx="library://ns.adobe.com/flex/mx"
+			   creationComplete="legenditem1_creationCompleteHandler(event)"
+			   fontWeight="bold" fontFamily="Verdana">
+	<fx:Script>
+		<![CDATA[
+			import mx.charts.series.PieSeries;
+			import mx.controls.Alert;
+			import mx.events.FlexEvent;
+			import mx.formatters.NumberFormatter;
+
+			protected function legenditem1_creationCompleteHandler(event:FlexEvent):void
+			{
+				var dato:Object;
+				var suma:Number = 0;
+				try{
+					for each(dato in (element as Object).dataProvider)
+					{
+						suma += Number(dato.value);
+					}
+					for each(dato in (element as Object).dataProvider)
+					{
+						if(dato.label == label)
+						{
+							label = dato.label.toString().split("_").join(" ") + ": " + ((dato.value/suma)*100).toFixed(1) +"%";
+							break;
+						}
+					}
+				}catch(errObject:Error){
+					Alert.show(errObject.message);
+				}
+			}
+
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	
+</mx:LegendItem>

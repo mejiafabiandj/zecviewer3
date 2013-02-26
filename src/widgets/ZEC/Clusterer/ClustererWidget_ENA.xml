@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <layer url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" 
+    	   useproxy="false"
+		   useAMF = "true"
+    	   label="Georreferenciación Correcta"
+    	   visible="true"
+    	   alpha="1"
+    	   borderColor="0x686868"
+    	   backgroundColor="0x00FF00"
+    	   textColor="0x000000"
+    	   textSize="12"
+    	   definitionExpression="COINCIDE='SI'"
+    	   
+    	   />
+	<layer url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" 
+    	   useproxy="false"
+		   useAMF = "true"
+    	   label="Georreferenciación Incorrecta"
+    	   visible="true"
+    	   alpha="1"
+    	   borderColor="0x686868"
+    	   backgroundColor="0xFF0000"
+    	   textColor="0x000000"
+    	   textSize="12"
+    	   definitionExpression="COINCIDE='NO'"
+    	   
+    	   />
+     
+ 
+ 	<!--<layer url="http://dg_est45.dane.gov.co/arcgis/rest/services/Unidades_Economicas/BOG_Unidades/MapServer/6"
+ 		   useproxy="false"
+		   useAMF = "false" 
+    	   label="Fuentes ICCP-ICCV"
+    	   visible="true"
+    	   alpha="1"
+    	   borderColor="0xAEC0FE"
+    	   backgroundColor="0x005CE6"
+    	   textColor="0xFFFFFF"
+    	   textSize="12"
+    	   outFields=""
+    	   />
+    	   
+	<layer url="http://dg_est45.dane.gov.co/arcgis/rest/services/Unidades_Economicas/BOG_Unidades/MapServer/7"
+		   useproxy="false"
+		   useAMF = "false" 
+    	   label="Fuentes IPC"
+    	   visible="true"
+    	   alpha="1"
+    	   borderColor="0x653863"
+    	   backgroundColor="0x70A800"
+    	   textColor="0xFFFFFF"
+    	   textSize="12"
+    	   outFields=""
+    	   >
+    	   <groupField name="LOCALIDAD" 
+    	   			   alias="Localidad" 
+    	   			   defaultValue="Otros"
+    	   			   values="ANTONIO NARIÑO,BARRIOS UNIDOS,BOSA,CIUDAD BOLIVAR,CHAPINERO,ENGATIVA,FONTIBON,KENNEDY,LA CANDELARIA,LOS MARTIRES,PUENTE ARANDA,RAFAEL URIBE,SAN CRISTOBAL,SANTA FE,SUBA,TEUSAQUILLO,TUNJUELITO,USAQUEN,USME" 
+    	   			   /> 
+    </layer>
+  -->
+	
+</configuration>

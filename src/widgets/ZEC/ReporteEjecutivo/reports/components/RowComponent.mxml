@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:GridRow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			xmlns:s="library://ns.adobe.com/flex/spark" 
+			xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:reports="reports.*"
+			width="100%" height="100%" xmlns:components="widgets.DANE.ReporteEjecutivo.reports.components.*">
+
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			
+			/**
+			 * Objeto de datos
+			 **/
+			private var _datos:Object;
+			[Bindable]public function get datos():Object
+			{
+				return _datos;
+			}
+			public function set datos(value:Object):void
+			{
+				_datos = value;
+			}
+
+		]]>
+	</fx:Script>
+
+	<mx:GridItem width="100%" height="100%" horizontalAlign="center">
+		<components:ChartComponent properties="{datos.data}" width="100%" height="100%" functionLabel="{datos.functionLabel?datos.functionLabel:null}" labelPosition="{datos.labelPosition?datos.labelPosition:'callout'}" estado="{datos.tipo?datos.tipo:'pie'}" titulo="{datos.titulo?datos.titulo:''}" legendLabel="{datos.legendLabel?datos.legendLabel:''}">
+		</components:ChartComponent>
+	</mx:GridItem>
+</mx:GridRow>

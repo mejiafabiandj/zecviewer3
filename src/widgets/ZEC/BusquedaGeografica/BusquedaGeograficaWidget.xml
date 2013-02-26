@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<configuration>
+
+	<criterios>
+		<criterio alias="Índices de planchas DANE" 
+				  url="http://dg_est45.dane.gov.co/ArcGIS/rest/services/BancoDatos/Indices_2011/MapServer/0" 
+				  where="1=1"
+				  useAMF="true"
+				  useProxy="false">
+		</criterio>
+	</criterios>
+</configuration>

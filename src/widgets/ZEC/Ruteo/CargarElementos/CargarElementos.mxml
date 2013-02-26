@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 >
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.Map;
+			import com.esri.ags.events.GraphicEvent;
+			import com.esri.ags.events.MapEvent;
+			import com.esri.ags.geometry.Geometry;
+			import com.esri.ags.layers.ArcGISDynamicMapServiceLayer;
+			import com.esri.ags.layers.ArcGISTiledMapServiceLayer;
+			import com.esri.ags.layers.FeatureLayer;
+			import com.esri.ags.layers.GraphicsLayer;
+			import com.esri.ags.layers.supportClasses.LayerInfo;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.CollectionEvent;
+			
+			import spark.events.IndexChangeEvent;
+			
+			
+			[Bindable] private var incluirSubCapas:Boolean = false;
+			
+			[Bindable] private var subCapas:ArrayCollection = new ArrayCollection();
+			
+			[Bindable] public var providerGraphics:ArrayCollection = new ArrayCollection();
+			
+			private var _map:Map;
+
+			[Bindable] public function get map():Map
+			{
+				return _map;
+			}
+
+			public function set map(value:Map):void
+			{
+				_map = value;
+				map.addEventListener(MapEvent.LAYER_ADD,actualizar);
+				map.addEventListener(MapEvent.LAYER_REMOVE,actualizar);
+				map.addEventListener(MapEvent.LAYER_REMOVE_ALL,actualizar);
+				map.addEventListener(MapEvent.LAYER_REORDER,actualizar);
+				
+				function actualizar(e:MapEvent):void
+				{
+					layers.source = value.layers.toArray();
+				}
+				layers.source = value.layers.toArray(); 
+			}
+
+			private function filterFunction(item:Object):Boolean
+			{
+				var tipo:String = item.className;
+				//return (tipo == "ArcGISTiledMapServiceLayer" || tipo == "ArcGISDynamicMapServiceLayer" || tipo == "FeatureLayer" || tipo == "GraphicsLayer");
+				/*
+				switch(tipo)
+				{
+					case "FeatureLayer":
+					{
+						var featureLayer:FeatureLayer = item as FeatureLayer;
+						if(featureLayer.layerDetails)
+						{
+							return featureLayer.layerDetails.geometryType == Geometry.MAPPOINT;
+						}else
+						{
+							return true;
+						}
+					}break;
+					case "GraphicsLayer":
+					{
+						return true;
+					}break;
+					//
+				}*/
+				return (tipo == "FeatureLayer" || tipo == "GraphicsLayer");
+			}
+			
+
+			protected function cmbNiveles_changeHandler(event:IndexChangeEvent):void
+			{
+				if(!cmbNiveles.selectedItem)
+				{
+					providerGraphics = new ArrayCollection();
+					return;
+				}
+				
+				var tipo:String = cmbNiveles.selectedItem.className;
+				incluirSubCapas = (tipo == "ArcGISTiledMapServiceLayer" || tipo == "ArcGISDynamicMapServiceLayer");
+				
+				if(incluirSubCapas)
+				{
+					subCapas.removeAll();
+					
+					for each (var info:LayerInfo in cmbNiveles.selectedItem.layerInfos)
+					{
+						if(!info.subLayerIds)
+						{
+							subCapas.addItem(info);
+						}
+					}
+				}else
+				{
+					if(tipo == "FeatureLayer")
+					{
+						var featureLayer:FeatureLayer = cmbNiveles.selectedItem;
+						featureLayer.addEventListener(GraphicEvent.GRAPHIC_ADD,actualizarGraphics);
+						featureLayer.addEventListener(GraphicEvent.GRAPHIC_REMOVE,actualizarGraphics);
+						providerGraphics = featureLayer.graphicProvider as ArrayCollection;
+					}
+					if(tipo == "GraphicsLayer")
+					{
+						var graphicsLayer:GraphicsLayer = cmbNiveles.selectedItem;
+						graphicsLayer.addEventListener(GraphicEvent.GRAPHIC_ADD,actualizarGraphics);
+						graphicsLayer.addEventListener(GraphicEvent.GRAPHIC_REMOVE,actualizarGraphics);
+						providerGraphics = graphicsLayer.graphicProvider as ArrayCollection;
+					}
+				}
+				
+			}
+			
+			private function actualizarGraphics(event:GraphicEvent):void
+			{
+				if(event.currentTarget == cmbNiveles.selectedItem)
+				{
+					providerGraphics = event.currentTarget.graphicProvider;
+				}else
+				{
+					event.currentTarget.removeEventListener(GraphicEvent.GRAPHIC_ADD,actualizarGraphics);
+					event.currentTarget.removeEventListener(GraphicEvent.GRAPHIC_REMOVE,actualizarGraphics);
+				}
+			}
+
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<s:ArrayCollection id="layers" filterFunction="filterFunction" sort="{ordenar}"/>
+		<s:Sort id="ordenar">
+			<s:fields>
+				<mx:SortField name="name"/>
+			</s:fields>
+		</s:Sort>
+	</fx:Declarations>
+	
+	<s:VGroup width="100%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+		<mx:Grid width="100%" height="100%">
+			<mx:GridRow width="100%" verticalAlign="middle">
+				<mx:GridItem horizontalAlign="right" verticalAlign="middle">
+					<s:Label text="Nivel de información"/>
+				</mx:GridItem>
+				<mx:GridItem width="100%">
+					<s:DropDownList id="cmbNiveles" width="100%"
+									dataProvider="{layers}"
+									labelField="name"
+									change="cmbNiveles_changeHandler(event)"
+									prompt="Seleccione..."
+									/>
+				</mx:GridItem>
+			</mx:GridRow>
+			
+			<mx:GridRow width="100%" visible="{incluirSubCapas}" includeInLayout="{incluirSubCapas}"
+						verticalAlign="middle">
+				<mx:GridItem horizontalAlign="right" verticalAlign="middle">
+					<s:Label text="capas"/>
+				</mx:GridItem>
+				<mx:GridItem width="100%">
+					<s:DropDownList id="cmbCapas" width="100%"
+									dataProvider="{layers}"
+									labelField="name"
+									prompt="Seleccione..."
+									/>
+				</mx:GridItem>
+			</mx:GridRow>
+			
+			<mx:GridRow width="100%" verticalAlign="middle">
+				<mx:GridItem horizontalAlign="right" verticalAlign="middle">
+					<s:Label text="{providerGraphics.length +' elementos'}"/>
+				</mx:GridItem>
+				<mx:GridItem width="100%">
+					
+				</mx:GridItem>
+			</mx:GridRow>
+		</mx:Grid>
+	</s:VGroup>
+	
+</s:Group>

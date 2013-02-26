@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<configuration>
+	<maxNumPaneles>4</maxNumPaneles>
+	<numPanelesIniciales>2</numPanelesIniciales>
+	<timeextent>
+		<timestamp starttime="01/01/2012;DD/MM/YYYY"
+				   endtime="01/02/2012;DD/MM/YYYY"
+				   label="Mes 1"/>
+	    <timestamp starttime="01/02/2012;DD/MM/YYYY"
+				   endtime="01/03/2012;DD/MM/YYYY"
+				   label="Mes 2"/>
+	    <timestamp starttime="01/03/2012;DD/MM/YYYY"
+				   endtime="01/04/2012;DD/MM/YYYY"
+				   label="Mes 3"/>
+	</timeextent>
+</configuration>

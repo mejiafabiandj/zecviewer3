@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			   xmlns:s="library://ns.adobe.com/flex/spark" 
+			   xmlns:mx="library://ns.adobe.com/flex/mx" 
+			   title="Autenticación" 
+			   minHeight="0" 
+			   creationComplete="panel1_creationCompleteHandler(event)"
+			   close="{visible = false}"
+			   chromeColor="#545559"
+			   color="0xFFFFFF"
+			   fontSize="12" 
+			   fontWeight="bold" 
+			   fontFamily="Verdana"
+			   
+			   show="titlewindow1_showHandler(event)"
+			   showEffect="{mostrar}"
+			   hideEffect="{ocultar}"
+			   >
+	
+	<fx:Metadata>
+		[Event(name="abrirLoggin", type="com.esri.viewer.AppEvent")]
+	</fx:Metadata>
+
+	<fx:Script>
+		<![CDATA[
+			import com.esri.viewer.AppEvent;
+			import com.hurlant.util.Base64;
+			
+			import gov.dane.util.Constantes;
+			
+			import mx.controls.Alert;
+			import mx.core.FlexGlobals;
+			import mx.effects.Effect;
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			
+			public static const ABRIR_LOGGIN:String = "abrirLoggin";
+			public static const CAMBIO_USUARIO_LOGGIN:String = "cambioUsuarioLoggin";
+			public static const CERRAR_SESION:String = "cerrarSesion";
+			
+			
+			
+			[Bindable] public var urlSeguridad:String = new String;
+			[Bindable] private var configuracion:Object;
+			
+			[Bindable] public var panelVisible:Number = 100;
+			
+			[Bindable] private var w:Number;
+			[Bindable] private var h:Number;
+			
+			//Parametros evento
+			[Bindable] public var parametros:Object = {};
+			
+			[Bindable] public var callBack:Function;
+			
+			[Bindable] private var usuario:String;
+			[Bindable] private var clave:String;
+			
+			[Bindable] private var recordarUsuario:Boolean;
+			
+			protected function panel1_creationCompleteHandler(event:FlexEvent):void
+			{
+				urlSeguridad = FlexGlobals.topLevelApplication.parameters.urlSeguridad;
+				
+				w = width;
+				h = height;
+				
+				obtenerUsuario();
+				AppEvent.addListener(CERRAR_SESION,cerrarSession);
+			}
+			
+			protected function validarLdap(event:MouseEvent=null):void
+			{
+				var parametros:Object = {};
+				parametros.hg = encriptar.encrypt(Constantes.OTHERKEY,Math.random() + usuario +Math.random());
+				parametros.op = encriptar.encrypt(Constantes.KEY,usuario);
+				parametros.tp = encriptar.encrypt(Constantes.KEY, clave);
+				parametros.kf = encriptar.encrypt(Constantes.OTHERKEY,Math.random()+ clave +Math.random());
+				parametros.gh = encriptar.encrypt(Constantes.OTHERKEY,Math.random()+"DANE"+Math.random());
+				parametros.sd = encriptar.encrypt(Constantes.OTHERKEY,Math.random()+"Colombia"+Math.random());
+				
+				validacionLdap.url= urlSeguridad; 
+				validacionLdap.send(parametros);
+				
+			}
+
+			protected function validacionLdap_resultHandler(event:ResultEvent):void
+			{
+				limpiarUsuario();
+				
+				if(event.token.message.body.operacion == "cerrarSession")
+				{
+					AppEvent.dispatch(CAMBIO_USUARIO_LOGGIN);
+				}else
+				{
+				
+					if(event.result != null){						
+						if(event.result.Resultados && event.result.Resultados.Resultado.validacion == true){
+							
+							if(recordarUsuario)
+							{
+								guardarUsuario();
+							}
+							
+							parametros.usuario = usuario;
+							parametros.validacion = event.result.Resultados.Resultado.validacion;
+							parametros.idSession = event.result.Resultados.Resultado.idSession;
+							parametros.callBack = callBack;
+							
+							AppEvent.dispatch(CAMBIO_USUARIO_LOGGIN, parametros);
+							visible = false;
+							callBack = null;
+						}else{
+							Alert.show("Usuario invalido, por favor verifique sus datos");
+						}
+					}
+				}
+			}
+			
+			protected function validacionLdap_faultHandler(event:FaultEvent):void
+			{
+				Alert.show("No fué posible validar su usuario, puede que no se encuentre registrado en el módulo de seguridad, consulte al administrador");
+			}
+			
+
+			protected function titlewindow1_showHandler(event:FlexEvent = null):void
+			{
+				usuario = "";
+				clave = "";
+				
+				txtUsuario.dispatchEvent(new FocusEvent(FocusEvent.FOCUS_IN));
+			}
+			
+			
+			private function obtenerUsuario():void
+			{
+				var datos:SharedObject = SharedObject.getLocal("registroUsuarioGeoportalDANE");
+				
+				if(datos.data && datos.data.usuario && datos.data.clave)
+				{
+					usuario = encriptar.decrypt(Constantes.KEY,Base64.decode(datos.data.usuario)) || "";
+					clave = encriptar.decrypt(Constantes.KEY,Base64.decode(datos.data.clave)) || "";
+					
+					if(usuario && usuario != "" && clave && clave != "")
+					{
+						recordarUsuario = true;
+						validarLdap();
+					}
+				}
+			}
+			
+			private function guardarUsuario():void
+			{
+				var datos:SharedObject = SharedObject.getLocal("registroUsuarioGeoportalDANE");
+				datos.data.usuario = Base64.encode(encriptar.encrypt(Constantes.KEY,usuario));
+				datos.data.clave = Base64.encode(encriptar.encrypt(Constantes.KEY,clave));
+			}
+			
+			private function limpiarUsuario():void
+			{
+				var datos:SharedObject = SharedObject.getLocal("registroUsuarioGeoportalDANE");
+				datos.clear();
+			}
+
+
+			protected function bordercontainer1_keyDownHandler(event:KeyboardEvent):void
+			{
+				if(event.keyCode == Keyboard.ENTER)
+				{
+					validarLdap();
+				}
+			}
+			
+			protected function cerrarSession(event:AppEvent):void
+			{
+				validacionLdap.url = FlexGlobals.topLevelApplication.parameters.urlServicio;
+				validacionLdap.send(
+					{
+						operacion:"cerrarSession", 
+						od:new Date().time
+					});
+				
+				var datos:SharedObject = SharedObject.getLocal("registroUsuarioGeoportalDANE");
+				datos.clear();
+			}
+
+		]]>
+	</fx:Script>
+
+	<fx:Declarations>
+		<s:HTTPService id="validacionLdap" 
+					   method="POST"
+					   result="validacionLdap_resultHandler(event)" fault="validacionLdap_faultHandler(event)"
+					   showBusyCursor="true"
+					   concurrency="single"/>
+		
+		<s:Animate id="mostrar" duration="500" effectEnd="titlewindow1_showHandler()">
+			<s:easer>
+				<s:Sine/>
+			</s:easer>
+			
+			<s:SimpleMotionPath property="verticalCenter" valueFrom="0" valueTo="0"/>
+			<s:SimpleMotionPath property="horizontalCenter" valueFrom="0" valueTo="0"/>
+			<s:SimpleMotionPath property="panelVisible" valueFrom="0" valueTo="100"/>
+			<s:SimpleMotionPath property="width" valueFrom="0" valueTo="{w}"/>
+			<s:SimpleMotionPath property="height" valueFrom="0" valueTo="{h}"/>
+			<s:SimpleMotionPath property="alpha" valueFrom="0" valueTo="1"/>
+		</s:Animate>
+		
+		<s:Animate id="ocultar" duration="500">
+			<s:easer>
+				<s:Sine/>
+			</s:easer>
+			
+			<s:SimpleMotionPath property="verticalCenter" valueFrom="0" valueTo="0"/>
+			<s:SimpleMotionPath property="horizontalCenter" valueFrom="0" valueTo="0"/>
+			<s:SimpleMotionPath property="panelVisible" valueFrom="100" valueTo="0"/>
+			<s:SimpleMotionPath property="width" valueFrom="{w}" valueTo="0"/>
+			<s:SimpleMotionPath property="height" valueFrom="{h}" valueTo="0"/>
+			<s:SimpleMotionPath property="alpha" valueFrom="1" valueTo="0"/>
+		</s:Animate>
+		
+		
+	</fx:Declarations>
+	
+	
+	<s:BorderContainer left="5" top="5" bottom="5" right="5" minHeight="0" fontWeight="normal" 
+					   visible="{panelVisible == 100}"
+					   keyDown="bordercontainer1_keyDownHandler(event)">
+		<s:VGroup left="5" top="5" right="5" minHeight="0" horizontalAlign="center" bottom="5">
+			<mx:Grid width="100%">
+				<mx:GridRow width="100%">
+					<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+						<s:Label text="Usuario"/>
+					</mx:GridItem>
+					<mx:GridItem verticalAlign="middle" horizontalAlign="left" width="100%">
+						<s:TextInput id="txtUsuario" text="@{usuario}" width="150" />
+					</mx:GridItem>
+				</mx:GridRow>
+				
+				<mx:GridRow width="100%">
+					<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+						<s:Label text="Contraseña"/>
+					</mx:GridItem>
+					<mx:GridItem verticalAlign="middle" horizontalAlign="left" width="100%">
+						<s:TextInput id="txtClave" text="@{clave}" width="100%" displayAsPassword="true" />
+					</mx:GridItem>
+				</mx:GridRow>
+			</mx:Grid>
+			<s:CheckBox label="Recordarme" id="chkRecordar" selected="@{recordarUsuario}"/>
+			<s:Button id="btnAutenticarLdap" label="Ingresar" click="validarLdap(event)" />
+		</s:VGroup>		
+	</s:BorderContainer>
+</s:TitleWindow>

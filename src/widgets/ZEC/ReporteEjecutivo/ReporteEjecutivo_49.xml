@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<configuration>
+	<criterio nombre="Total Minas" porDefecto="true" >
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/Minero/Minero/MapServer/0" where="CENSO_MINERO_SEGMENTO.COINCIDE='SI'">
+			<outFields>*</outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="CENSO_MINERO_SEGMENTO.TIPO_MINA"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		<filtro nombre="Departamento" fieldLabel="CENSO_MINERO_SEGMENTO.DPTO_CNM" field="CENSO_MINERO_SEGMENTO.DPTO_CNM" value="" tipo="D">
+			<filtro nombre="Municipio" fieldLabel="CENSO_MINERO_SEGMENTO.COD_MPIO" field="CENSO_MINERO_SEGMENTO.COD_MPIO" value="" tipo="D">
+				<filtro nombre="Punto georreferenciado" fieldLabel="CENSO_MINERO.PUNTO_GEOR" field="CENSO_MINERO.PUNTO_GEOR" value="" tipo="D">
+				</filtro>
+			</filtro>
+		</filtro>
+		<tabla descargar="false">
+			<groupby>CENSO_MINERO_SEGMENTO.DPTO_CNM</groupby>
+			<groupby>CENSO_MINERO_SEGMENTO.COD_MPIO</groupby>
+			<columnas field="CENSO_MINERO_SEGMENTO.DPTO_CNM" nombre="Departamento"/>
+			<columnas field="CENSO_MINERO_SEGMENTO.COD_MPIO" nombre="Municipio"/>
+			<columnas field="CENSO_MINERO.NOMBRE_MIN" nombre="Mina"/>
+			<columnas field="CENSO_MINERO_SEGMENTO.TIPO_MINA" nombre="Tipo mina"/>
+			<columnas field="CENSO_MINERO_SEGMENTO.TAMANO" nombre="Tamaño"/>
+			<columnas field="CENSO_MINERO.PUNTO_GEOR" nombre="Punto georreferenciado"/>
+			<columnas field="CENSO_MINERO.INFRAESTRU" nombre="Infraestructura"/>
+			<columnas field="CENSO_MINERO.TIPO_EMPRE" nombre="Tipo empresa"/>
+			<columnas field="CENSO_MINERO.DIRECCION" nombre="Dirección"/>
+			<columnas field="CENSO_MINERO.NUM_TRABAJ" nombre="Trabajadores"/>
+			<columnas field="CENSO_MINERO.EXPLOTACIO" nombre="Explotación"/>
+			<columnas field="CENSO_MINERO.MINERAL" nombre="Mineral"/>
+			<columnas field="CENSO_MINERO.ANOS" nombre="Años"/>
+			<columnas field="total" nombre="Total Minas"/>
+		</tabla>
+	</criterio>
+	
+	<criterio nombre="Censo Minero" porDefecto="false" >
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/Minero/Minero/MapServer/0" where="CENSO_MINERO_SEGMENTO.COINCIDE='SI'">
+			<outFields>*</outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="CENSO_MINERO_SEGMENTO.TIPO_MINA"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		<filtro nombre="Departamento" fieldLabel="CENSO_MINERO_SEGMENTO.DPTO_CNM" field="CENSO_MINERO_SEGMENTO.DPTO_CNM" value="" tipo="D">
+			<filtro nombre="Municipio" fieldLabel="CENSO_MINERO_SEGMENTO.COD_MPIO" field="CENSO_MINERO_SEGMENTO.COD_MPIO" value="" tipo="D">
+				<filtro nombre="Punto georreferenciado" fieldLabel="CENSO_MINERO.PUNTO_GEOR" field="CENSO_MINERO.PUNTO_GEOR" value="" tipo="D">
+				</filtro>
+			</filtro>
+		</filtro>
+		<tabla>
+			<columnas field="CENSO_MINERO_SEGMENTO.DPTO_CNM" nombre="Departamento"/>
+			<columnas field="CENSO_MINERO_SEGMENTO.COD_MPIO" nombre="Municipio"/>
+			<columnas field="CENSO_MINERO_SEGMENTO.MANZ_CCNCT" nombre="Código manzana"/>
+			<columnas field="CENSO_MINERO_SEGMENTO.ETAPA_OPE" nombre="Etapa GEIH"/>
+			<columnas field="CENSO_MINERO_SEGMENTO.COINCIDE" nombre="Coincide"/>
+			<columnas field="CENSO_MINERO.NOMBRE_MIN" nombre="Mina"/>
+			<columnas field="CENSO_MINERO_SEGMENTO.TIPO_MINA" nombre="Tipo mina"/>
+			<columnas field="CENSO_MINERO_SEGMENTO.TAMANO" nombre="Tamaño"/>
+			<columnas field="CENSO_MINERO.PUNTO_GEOR" nombre="Punto georreferenciado"/>
+			<columnas field="CENSO_MINERO.INFRAESTRU" nombre="Infraestructura"/>
+			<columnas field="CENSO_MINERO.TIPO_EMPRE" nombre="Tipo empresa"/>
+			<columnas field="CENSO_MINERO.DIRECCION" nombre="Dirección"/>
+			<columnas field="CENSO_MINERO.NUM_TRABAJ" nombre="Trabajadores"/>
+			<columnas field="CENSO_MINERO.EXPLOTACIO" nombre="Explotación"/>
+			<columnas field="CENSO_MINERO.MINERAL" nombre="Mineral"/>
+			<columnas field="CENSO_MINERO.ANOS" nombre="Años"/>
+		</tabla>
+	</criterio>
+</configuration>

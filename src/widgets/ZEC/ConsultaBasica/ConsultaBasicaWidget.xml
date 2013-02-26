@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<configuration>
+	<textos>
+		<txtNivel>Nivel de información</txtNivel>
+	</textos>
+	
+	<!-- dejar por defecto la opcion consulta raster -->
+	<consultaRaster>false</consultaRaster>
+	
+	<servicio>
+		<url_alfa>http://190.25.231.241:8030/VECTOR/ConsultaBasica</url_alfa>
+		<niveles>
+			<nivel label="Seleccione..."/>
+			<nivel label="Departamento"/>
+			<nivel label="Municipio"/>
+			<nivel label="Zonas urbanas"/>
+		</niveles>
+		
+		<vigencias>
+			<vigencia label="Vigencia_2005">
+				<niveles>
+					<nivel 	label="Departamento" 
+							url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2005/MapServer/7" 
+							useAMF="true" 
+							useproxy="false"
+							pkGeo="DPTO_CCDGO"
+							displayField="DPTO_CNMBRE"
+							/>
+					<nivel 	label="Municipio" 
+							url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2005/MapServer/10" 
+							useAMF="true" 
+							useproxy="false"
+							pkGeo="MPIO_CCNCTNDO"
+							displayField="MPIO_CNMBRE"/>
+					<nivel 	label="Zonas urbanas" 
+							url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2005/MapServer/18" 
+							useAMF="true" 
+							useproxy="false"
+							pkGeo="CPOB_CCNCTNDO"
+							displayField="CPOB_CNMBRE"/>
+				</niveles>
+			</vigencia>
+			<vigencia label="Vigencia_2006">
+				<niveles>
+					<nivel 	label="Departamento" 
+							url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2006/MapServer/7" 
+							useAMF="true" 
+							useproxy="false"
+							pkGeo="DPTO_CCDGO"
+							displayField="DPTO_CNMBRE"
+							/>
+					<nivel 	label="Municipio" 
+							url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2006/MapServer/10" 
+							useAMF="true" 
+							useproxy="false"
+							pkGeo="MPIO_CCNCTNDO"
+							displayField="MPIO_CNMBRE"/>
+					<nivel 	label="Zonas urbanas" 
+							url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2006/MapServer/18" 
+							useAMF="true" 
+							useproxy="false"
+							pkGeo="CPOB_CCNCTNDO"
+							displayField="CPOB_CNMBRE"/>
+				</niveles>
+			</vigencia>
+			<vigencia label="Vigencia_2008">
+				<niveles>
+					<nivel 	label="Departamento" 
+							url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2008/MapServer/7" 
+							useAMF="true" 
+							useproxy="false"
+							pkGeo="DPTO_CCDGO"
+							displayField="DPTO_CNMBRE"
+							/>
+					<nivel 	label="Municipio" 
+							url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2008/MapServer/10" 
+							useAMF="true" 
+							useproxy="false"
+							pkGeo="MPIO_CCNCTNDO"
+							displayField="MPIO_CNMBRE"/>
+					<nivel 	label="Zonas urbanas" 
+							url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2008/MapServer/18" 
+							useAMF="true" 
+							useproxy="false"
+							pkGeo="CPOB_CCNCTNDO"
+							displayField="CPOB_CNMBRE"/>
+				</niveles>
+			</vigencia>
+			<vigencia label="Vigencia_2011">
+				<niveles>
+					<nivel 	label="Departamento" 
+							url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2006/MapServer/7" 
+							useAMF="true" 
+							useproxy="false"
+							pkGeo="DPTO_CCDGO"
+							displayField="DPTO_CNMBRE"
+							/>
+					<nivel 	label="Municipio" 
+							url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2006/MapServer/10" 
+							useAMF="true" 
+							useproxy="false"
+							pkGeo="MPIO_CCNCTNDO"
+							displayField="MPIO_CNMBRE"/>
+					<nivel 	label="Zonas urbanas" 
+							url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2006/MapServer/18" 
+							useAMF="true" 
+							useproxy="false"
+							pkGeo="CPOB_CCNCTNDO"
+							displayField="CPOB_CNMBRE"/>
+				</niveles>
+			</vigencia>
+		</vigencias>
+	</servicio>
+</configuration>

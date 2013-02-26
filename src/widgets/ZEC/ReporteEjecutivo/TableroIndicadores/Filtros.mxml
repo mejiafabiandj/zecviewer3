@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.ComboBox;
+			import mx.controls.DateField;
+			import mx.controls.Label;
+			import mx.events.CalendarLayoutChangeEvent;
+			import mx.events.DropdownEvent;
+			import mx.messaging.AbstractConsumer;
+			
+			public var data:Provider = null;
+			public var config:Object = {};
+			private var distinc_data:Dictionary = null;
+			public var callback:Function = null;
+			
+			public function actualizar(clear:Boolean=false):void{
+				var lfiltros:Array = [];
+				this.filtrosToArray(this.config, lfiltros);
+				this.contenedor.removeAllElements();
+				if(this.distinc_data == null || clear){
+					this.distinc_data = this.data.distinc(lfiltros) as Dictionary;
+				}
+				var nombre:String="";
+				var field:String="";
+				var cur:Dictionary=this.distinc_data;
+				var nxt:Dictionary=null;
+				var inicial:Boolean = true;
+				for each(var f:Object in lfiltros){
+					if(nxt!=null || inicial){
+						nxt = null;
+						inicial = false;
+						var p:ArrayCollection= new ArrayCollection();
+						var item_selected:Number = 0;
+						for each(var item:Object in cur){
+							p.addItem({label:item.label, data:item.data});
+							nombre = item.nombre;
+							field = item.field;
+							if(item.data==f.value){
+								nxt = item.children;
+								item_selected = p.length;
+							}
+						}
+						if(f.hasOwnProperty("tipo")){
+							if(f.tipo=="F"){
+								this.createFiltersDate(nombre, field, f.value);
+							}else{
+								this.createFilters(nombre, p, field, item_selected);
+							}
+						}else{
+							this.createFilters(nombre, p, field, item_selected);
+						}
+						cur = nxt;
+					}else{
+						break;
+					}
+				}
+			}
+			
+			public function clear():void{
+				this.contenedor.removeAllElements();
+			}
+			
+			private function createFiltersDate(nombre:String, field:String, def:String):void{
+				
+				var fechas:Array = def.split('-');
+				var desde:Number = 0;
+				var hasta:Number = 0;
+				if(fechas.length==2){
+					desde = Number(fechas[0]);
+					hasta = Number(fechas[1]);
+				}
+				
+				var fecha1:DateField = new DateField();
+				fecha1.id = field+"-1";
+				fecha1.name = field+"-1";
+				fecha1.width = 100;
+				if(desde>0)
+					fecha1.selectedDate = new Date(desde);
+				fecha1.addEventListener( CalendarLayoutChangeEvent.CHANGE, dateChange);
+				
+				var fecha2:DateField = new DateField();
+				fecha2.id = field+"-2";
+				fecha2.name = field+"-2";
+				fecha2.width = 100;
+				if(hasta>0)
+					fecha2.selectedDate = new Date(hasta);
+				fecha2.addEventListener( CalendarLayoutChangeEvent.CHANGE, dateChange);
+								
+				var l:Label = new Label();
+				l.text = nombre+":";
+				var l1:Label = new Label();
+				l1.text = "Desde";
+				var l2:Label = new Label();
+				l2.text = "Hasta";
+				
+				this.contenedor.addElement(l);
+				this.contenedor.addElement(l1);
+				this.contenedor.addElement(fecha1);
+				this.contenedor.addElement(l2);
+				this.contenedor.addElement(fecha2);
+			}
+			
+			private function createFilters(nombre:String, d:ArrayCollection, field:String, item_selected:Number=0):void{
+				var combo:ComboBox = new ComboBox();
+				var dp:ArrayCollection = new ArrayCollection();
+				dp.addItem({ label: "Todos", data: "%" });
+				dp.addAll(d);
+				dp = new ArrayCollection(dp.toArray().sortOn("data"));
+				combo.dataProvider = dp;
+				combo.id = field;
+				combo.name = field;
+				combo.width = 100;
+				combo.selectedIndex = item_selected;
+				combo.addEventListener( DropdownEvent.CLOSE, filterChange);
+				var l:Label = new Label();
+				l.text = nombre;
+				this.contenedor.addElement(l);
+				this.contenedor.addElement(combo);
+			}
+			
+			private function setFiltro(field:String, valor:String):Boolean{
+				if(this.config.field == field){
+					if(this.config.value != valor){
+						if( valor !="%" ){
+							this.config.value = valor;
+						}else{
+							this.config.value = "";
+						}
+						return true;
+					}else{
+						return false;
+					}
+				}else{
+					if (Object(this.config).hasOwnProperty("filtro")) {
+						return _setFiltro(this.config.filtro, field, valor);
+					}else{
+						return false;
+					}
+				}
+			}
+			
+			private function _setFiltro(filtro:Object, field:String, valor:String):Boolean{
+				if(filtro.field == field){
+					if(filtro.value != valor){
+						if( valor !="%" ){
+							filtro.value = valor;
+						}else{
+							filtro.value = "";
+						}
+						return true;
+					}else{
+						return false;
+					}
+				}else{
+					if (Object(filtro).hasOwnProperty("filtro")) {
+						return _setFiltro(filtro.filtro, field, valor);
+					}else{
+						return false;
+					}
+				}
+			}
+			
+			private function filtrosToArray(fil:Object, arr:Array):void{
+				if(fil!=null){
+					if(fil.hasOwnProperty("tipo")){
+						arr.push({field:fil.field, label:fil.fieldLabel, nombre:fil.nombre, value:fil.value, tipo:fil.tipo});
+					}else{
+						arr.push({field:fil.field, label:fil.fieldLabel, nombre:fil.nombre, value:fil.value});
+					}
+					if (fil.hasOwnProperty("filtro")) {
+						this.filtrosToArray(fil.filtro, arr);
+					}
+				}
+			}
+			
+			private function filterChange(event:Event):void{
+				if(callback !=null){
+					if(this.setFiltro(event.currentTarget.id, event.currentTarget.selectedItem.data)){
+						callback(config, data, event.currentTarget.id);
+					}
+				}
+			}
+			
+			private function dateChange(event:CalendarLayoutChangeEvent):void{
+				if(callback !=null){
+					var a:Array = event.currentTarget.id.split('-');
+					if(a.length==2){
+						var o:DateField=(this.contenedor.getChildByName(a[0]+"-1") as DateField);
+						var o2:DateField=(this.contenedor.getChildByName(a[0]+"-2") as DateField);
+						if(o.selectedDate!=null && o2.selectedDate!=null){
+							var desde:Date = new Date(o.selectedDate.getFullYear(),o.selectedDate.getMonth(),o.selectedDate.getDate(),0,0,0,0);
+							var hasta:Date = new Date(o2.selectedDate.getFullYear(),o2.selectedDate.getMonth(),o2.selectedDate.getDate(),23,59,59);
+							if(o.selectedDate.getTime()<=o2.selectedDate.getTime()){
+								if(this.setFiltro(a[0], desde.getTime()+"-"+hasta.getTime())){
+									callback(config, data, a[0]);
+								}
+							}
+						}
+					}
+				}
+			}
+		]]>
+	</fx:Script>
+	<s:Group id="contenedor">
+		<s:layout>
+			<s:HorizontalLayout />
+		</s:layout>
+	</s:Group>
+</s:Group>

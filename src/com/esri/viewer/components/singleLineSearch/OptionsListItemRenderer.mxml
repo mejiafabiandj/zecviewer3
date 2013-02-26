@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				autoDrawBackground="false"
+				dataChange="itemrenderer1_dataChangeHandler(event)"
+				>
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.events.FlexEvent;
+			
+			protected function itemrenderer1_dataChangeHandler(event:FlexEvent):void
+			{
+				txt.setStyle("fontWeight",data.selected ? 'bold' : 'normal');
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<s:HGroup verticalAlign="middle" 
+			  paddingTop="5"
+			  paddingBottom="3"
+			  paddingLeft="5">
+		<s:Image width="23" height="23" source="{data.src}"/>		
+		<s:Label id="txt" text="{data.label}"/>
+	</s:HGroup>
+</s:ItemRenderer>

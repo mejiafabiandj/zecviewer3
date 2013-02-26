@@ -1,0 +1,671 @@
+<?xml version="1.0" encoding="utf-8"?>
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" 
+				   xmlns:viewer="com.esri.viewer.*" layout="absolute"
+				   widgetConfigLoaded="init()" 
+				   xmlns:esri="http://www.esri.com/2008/ags" xmlns:util="gov.dane.util.*"
+				   creationComplete="ruteo_creationCompleteHandler(event)">
+
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.FeatureSet;
+			import com.esri.ags.Graphic;
+			import com.esri.ags.Units;
+			import com.esri.ags.events.DrawEvent;
+			import com.esri.ags.events.RouteEvent;
+			import com.esri.ags.geometry.Geometry;
+			import com.esri.ags.geometry.MapPoint;
+			import com.esri.ags.tasks.GeometryServiceSingleton;
+			import com.esri.ags.tasks.supportClasses.RouteParameters;
+			import com.esri.ags.tasks.supportClasses.RouteResult;
+			import com.esri.ags.tools.DrawTool;
+			import com.esri.ags.utils.JSON;
+			import com.esri.viewer.AppEvent;
+			import com.hurlant.util.Base64;
+			
+			import flash.sampler.getInvocationCount;
+			
+			import gov.dane.util.ListaJerarquica;
+			import gov.dane.util.TokenUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.core.FlexGlobals;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			import mx.messaging.Channel;
+			import mx.messaging.ChannelSet;
+			import mx.messaging.channels.HTTPChannel;
+			import mx.rpc.AsyncResponder;
+			import mx.rpc.AsyncToken;
+			import mx.rpc.Fault;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.http.HTTPService;
+			import mx.rpc.http.mxml.HTTPMultiService;
+			import mx.utils.ObjectProxy;
+			
+			import spark.events.IndexChangeEvent;
+			
+			import widgets.DANE.BusquedaOperativa.RowSeleccionJerarquica;
+			
+			
+			[Embed(source="assets/images/loader.swf")] private var esperando:Class;
+			
+			private var lastDrawTool:String;
+			
+			[Bindable] private var actualizarMuestra:Boolean = false;
+			
+			[Bindable] private var providerCriterios:ArrayCollection = new ArrayCollection();
+			
+			private var alertActualizar:Alert;
+			
+			private var timer:Timer = new Timer(100);
+			
+			private var directionswindow:DirectionsWindow;
+			
+			
+			protected function ruteo_creationCompleteHandler(event:FlexEvent):void
+			{
+				timer.addEventListener(TimerEvent.TIMER,timer_tic);
+				
+				AppEvent.addListener("reloadConfigWidget",reloadConfigWidget);
+				
+				if(configData && configData.data && configData.data.actualizarMuestra)
+				{
+					actualizarMuestra = configData.data.actualizarMuestra.value == "true";
+				}
+			}
+			
+			/**
+			 * Volver a leer en tiempo de ejecución el archivo de configuración del widget
+			 **/
+			protected function reloadConfigWidget(event:AppEvent):void
+			{
+				if(event.data.widgetId == widgetId)
+				{
+					
+					if(event.data.config.lastIndexOf("&_ts") != -1)
+					{
+						var i:Number = event.data.config.lastIndexOf("&_ts");
+						var f:Number = event.data.config.lastIndexOf("&");
+						f = f <= i ? int.MAX_VALUE: f;
+						
+						event.data.config = event.data.config.replace(event.data.config.substring(i,f),"");
+					}
+					
+					if(event.data.config.lastIndexOf("?") != -1)
+					{
+						event.data.config += "&_ts=" + Math.random();
+					}else
+					{
+						event.data.config += "?_ts=" + Math.random();
+					}
+					
+					config = event.data.config;
+					configXML = null;
+					setInfoConfig(event.data.config,false);
+				}
+			}
+			protected function init():void
+			{
+				
+				lista.currentState = "default";
+				providerCriterios.removeAll();
+				
+				if(configObject && configObject.configuration)
+				{
+					ruteo.url = configObject.configuration.urlnaservice;
+					
+					if(configObject.configuration.criterios)
+					{
+						
+						if(configObject.configuration.criterios.criterio is ArrayCollection)
+						{
+							providerCriterios.addAll(configObject.configuration.criterios.criterio as ArrayCollection);
+						}else if(configObject.configuration.criterios.criterio)
+						{
+							providerCriterios.addItem(configObject.configuration.criterios.criterio);
+						}
+					}else
+					{
+						Alert.show("El archivo de configuración no contiene criterios de búsqueda actualizados");
+					}
+				}
+				
+				/**Fabian definir tamaño del widget desde xml**/
+				if(configData && configData.widgets)
+				{
+					for each(var widget:Object in configData.widgets)
+					{
+						if(widget.id == widgetId)
+						{
+							if(widget.width > 0)
+								wTemplate.width = widget.width;
+							if(widget.height > 0)
+								wTemplate.height = widget.height;
+							break;
+						}
+					}
+				}
+			}
+			
+			private function timer_tic(event:TimerEvent):void
+			{
+				PopUpManager.removePopUp(lista);
+				timer.stop();
+			}
+			
+			protected function wTemplate_openHandler(event:Event):void
+			{
+				map.addLayer(graphicsLayerOrigen);
+				map.addLayer(graphicsLayerDestino);
+				map.addLayer(graphicsLayerRuta);
+				map.addLayer(graphicsLayerBarreras);
+			}
+
+			protected function wTemplate_closedHandler(event:Event):void
+			{
+				map.removeLayer(graphicsLayerOrigen);
+				map.removeLayer(graphicsLayerDestino);
+				map.removeLayer(graphicsLayerRuta);
+				map.removeLayer(graphicsLayerBarreras);
+				
+			}
+
+
+			protected function btnBuscar_clickHandler(event:MouseEvent):void
+			{
+				if(graphicsLayerOrigen.graphicProvider.toArray().concat(graphicsLayerDestino.graphicProvider.toArray()).length > 1)
+				{
+					graphicsLayerRuta.clear();
+					
+					var rp:RouteParameters = new RouteParameters();
+					var stops:FeatureSet = new FeatureSet(graphicsLayerOrigen.graphicProvider.toArray().concat(graphicsLayerDestino.graphicProvider.toArray()));
+					rp.stops = stops;
+					rp.directionsLengthUnits = Units.KILOMETERS;
+					rp.findBestSequence = true;
+					rp.ignoreInvalidLocations = true;
+					rp.preserveFirstStop = true;
+					rp.returnDirections = configObject.configuration.returndirections || false;
+					rp.directionsLanguage = "en-US";
+					//ACA VOY
+					
+					ruteo.proxyURL = (configObject.configuration.useproxy ? configData.proxyUrl :null);
+					ruteo.token = TokenUtil.buscarToken(queryTask.url,configData);
+					ruteo.solve(rp);
+				}
+			}
+
+
+			protected function btnPuntoInicial_clickHandler(event:MouseEvent):void
+			{
+				addSharedData("Deactivate_DrawTool", null); // desactivar drawTool en otros widgets
+				editTool.deactivate();
+				graphicsLayerOrigen.clear();
+				
+				var p:Point = new Point(event.stageX,event.stageY);
+				
+				lista.x = p.x;
+				lista.y = p.y + 5;
+				if(lista.cmbCriterios)
+				{
+					lista.cmbCriterios.selectedIndex = -1;
+					lista.cmbCriterios.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE));
+				}
+				lista.target = event.currentTarget;
+				
+				PopUpManager.addPopUp(lista,Sprite(FlexGlobals.topLevelApplication));
+				
+			}
+
+
+			protected function btnPuntoFinal_clickHandler(event:MouseEvent):void
+			{
+				addSharedData("Deactivate_DrawTool", null); // desactivar drawTool en otros widgets
+				editTool.deactivate();
+				
+				var p:Point = new Point(event.stageX,event.stageY);
+				
+				lista.x = p.x;
+				lista.y = p.y + 5;
+				if(lista.cmbCriterios)
+				{
+					lista.cmbCriterios.selectedIndex = -1;
+					lista.cmbCriterios.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE));
+				}
+				lista.target = event.currentTarget;
+				
+				PopUpManager.addPopUp(lista,Sprite(FlexGlobals.topLevelApplication));
+			}
+			
+			private function map_drawEndHandler(event:DrawEvent):void
+			{
+				if(event.graphic)
+				{
+					var drawType:String = lastDrawTool;
+					
+					switch(drawType)
+					{
+						case "Añadir punto inicial":
+						{
+							event.graphic.symbol = simboloOrigen;
+							graphicsLayerOrigen.add(event.graphic);
+						}break;
+						case "Añadir punto destino":
+						{
+							event.graphic.symbol = simboloDestino;
+							graphicsLayerDestino.add(event.graphic);
+						}break;
+					}
+				}
+					
+			}
+
+
+			protected function ruteo_solveCompleteHandler(event:RouteEvent):void
+			{
+				if(event.routeSolveResult && event.routeSolveResult.routeResults && event.routeSolveResult.routeResults.length > 0)
+				{
+					for each(var route:RouteResult in event.routeSolveResult.routeResults)
+					{
+						graphicsLayerRuta.add(route.route);
+						
+						if(route.directions)
+						{
+							if(directionswindow)
+							{
+								PopUpManager.removePopUp(directionswindow);
+							}
+							directionswindow = new DirectionsWindow();
+							directionswindow.directions = route.directions;
+							directionswindow.title = "Direcciones";
+							
+							var p:Point = localToGlobal(new Point(this.width,0));
+							directionswindow.x = p.x + 5;
+							directionswindow.y = p.y;
+							directionswindow.height = wTemplate.height;
+							
+							directionswindow.addEventListener(CloseEvent.CLOSE,
+								function(e:CloseEvent):void
+								{
+									PopUpManager.removePopUp(directionswindow);
+								});
+							
+							PopUpManager.addPopUp(directionswindow,Sprite(FlexGlobals.topLevelApplication),false);
+						}
+					}
+				}
+			}
+
+
+			protected function ruteo_faultHandler(event:FaultEvent):void
+			{
+				Alert.show("No fué posible resolver la ruta.\n\n\n" + event.fault.message);
+			}
+
+
+			protected function btnLimpiar_clickHandler(event:MouseEvent):void
+			{
+				if(directionswindow)
+				{
+					PopUpManager.removePopUp(directionswindow);
+				}
+				
+				graphicsLayerOrigen.clear();
+				graphicsLayerDestino.clear();
+				graphicsLayerRuta.clear();
+				graphicsLayerBarreras.clear();
+			}
+
+
+			/**Ultimo criterio seleccionado**/
+			private var lastCriterio:Array = [];
+			
+			protected function lista_aceptarHandler(event:AppEvent):void
+			{
+				if(event.data && event.data.criterio)
+				{
+					if(event.data.criterio.urlCapaOperativa)
+					{
+						servicio.url = event.data.criterio.urlCapaOperativa;
+						var token:AsyncToken = servicio.send({f:"json",op:"informacionCapa",token:TokenUtil.buscarToken(servicio.url)})
+						lastCriterio.push(
+							{
+								criterio:event.data,
+								token:token
+							}
+						);
+					}
+				}else if(event.data && event.data.accion)
+				{
+					if(event.data.target == btnPuntoInicial)
+					{
+						addSharedData("Deactivate_DrawTool", null); // desactivar drawTool en otros widgets
+						editTool.deactivate();
+						graphicsLayerOrigen.clear();
+						
+						lastDrawTool = "Añadir punto inicial";
+						setMapAction(DrawTool.MAPPOINT, lastDrawTool, null, map_drawEndHandler);
+					}else if(event.data.target == btnPuntoFinal)
+					{
+						addSharedData("Deactivate_DrawTool", null); // desactivar drawTool en otros widgets
+						editTool.deactivate();
+						
+						lastDrawTool = "Añadir punto destino";
+						setMapAction(DrawTool.MAPPOINT, lastDrawTool, null, map_drawEndHandler);
+					}
+				}
+				
+				PopUpManager.removePopUp(lista);
+			}
+
+
+			
+
+
+			protected function btnActualizarMuestra_clickHandler(event:MouseEvent):void
+			{
+				if(configData.data && configData.data.actualizarMuestra && configData.data.actualizarMuestra.urlActualizar)
+				{
+					Alert.show("La operación de actualizar puede tardar varios minutos, desea continuar?","Actializar Muestra",Alert.YES | Alert.NO,null,
+						function(e:CloseEvent):void
+						{
+							if(e.detail == Alert.YES)
+							{
+								var mes:String = "";
+								var anio:String = "";
+								if(config.indexOf("mes") != -1 && config.indexOf("ano") != -1)
+								{
+									mes = config.substring(config.indexOf("mes") + 4,config.indexOf("&",config.indexOf("mes")));
+									anio = config.substring(config.indexOf("ano") + 4,config.indexOf("&",config.indexOf("ano")));
+								}
+								
+								servicio.url = configData.data.actualizarMuestra.urlActualizar;
+								
+								servicio.send(
+									{
+										accion:"actualizar",
+										op:configData.data.actualizarMuestra.idAplicacion,
+										control: new Date().time,
+										mes:mes,
+										ano:anio
+									});
+								
+								alertActualizar = Alert.show("Actualizando muestra","",4,null,null,esperando);
+							}
+						});
+				}
+			}
+			
+			protected function servicio_resultHandler(event:ResultEvent):void
+			{
+				if(event.token.message.body.accion == "actualizar")
+				{
+					PopUpManager.removePopUp(alertActualizar);
+					//var url:String = configData.data.actualizarMuestra.urlObtener;
+					var url:String = config;
+					
+					if(url.lastIndexOf("&_ts") != -1)
+					{
+						var i:Number = url.lastIndexOf("&_ts");
+						var f:Number = url.lastIndexOf("&");
+						f = f <= i ? int.MAX_VALUE: f;
+						
+						url = url.replace(url.substring(i,f),"");
+					}
+					
+					if(url.lastIndexOf("?") != -1)
+					{
+						url += "&_ts=" + Math.random();
+					}else
+					{
+						url += "?_ts=" + Math.random();
+					}
+					
+					AppEvent.dispatch("reloadConfigWidget",{widgetId:widgetId,config:url});
+				}else if(event.token.message.body.op == "informacionCapa")
+				{
+					for each(var enviado:Object in lastCriterio)
+					{
+						if(enviado.token == event.token)
+						{
+							var result:Object = com.esri.ags.utils.JSON.decode(event.result.toString());
+							var useAMF:Boolean = result.currentVersion >= 10;
+							var where:String = "";
+							var separador:String = "";
+							var q:String;
+							
+							if(enviado.criterio.criterio.campo is ArrayCollection)
+							{
+								for each(var campo:ObjectProxy in enviado.criterio.criterio.campo)
+								{
+									var row:RowSeleccionJerarquica = enviado.criterio.rowJerarquia[enviado.criterio.criterio.campo.getItemIndex(campo)];
+									if(row.cmbJerarquias.selectedItem.valor && row.cmbJerarquias.selectedItem.valor != "null")
+									{
+										
+										q = (campo.numerico?"":"'");  
+										
+										where += separador + campo.nombreCampo + " = " + q + row.cmbJerarquias.selectedItem.valor + q;
+										
+										separador = " and ";
+									}
+								}
+							}else if(enviado.criterio.criterio.campo)
+							{
+								q = (enviado.criterio.criterio.campo.numerico?"":"'");  
+								
+								where += separador + enviado.criterio.criterio.campo.nombreCampo + " = " + q + enviado.criterio.autocompletarTexto.text + q;
+							}
+							
+							
+							query.outFields = ["*"];
+							query.where = where;
+							query.timeExtent = map.timeExtent;
+							
+							queryTask.url = enviado.criterio.criterio.urlCapaOperativa;
+							
+							queryTask.proxyURL = (enviado.criterio.criterio.useproxy ? configData.proxyUrl :null);
+							queryTask.useAMF = queryTask.proxyURL? false: useAMF;
+							queryTask.token = TokenUtil.buscarToken(queryTask.url,configData);
+							
+							queryTask.execute(query,new AsyncResponder(queryTask_Result,queryTask_Fault,enviado));
+							
+							var ac:ArrayCollection = new ArrayCollection(lastCriterio);
+							ac.removeItemAt(ac.getItemIndex(enviado));
+							lastCriterio = ac.toArray();
+							break;
+						}
+					}
+					
+				}
+			}
+			
+			
+			protected function servicio_faultHandler(event:FaultEvent):void
+			{
+				if(event.token.message.body.op == "informacionCapa")
+				{
+					Alert.show("No fué posible consultar el metadato de la capa asociada al criterio seleccionado\n\n\n" + event.message);
+				}else if(event.token.message.body.accion == "actualizar")
+				{
+					Alert.show("No fué posible actualizar la muestra operativa \n\n" + event.message);
+				}
+			}
+			
+			private function queryTask_Result(featureSet:FeatureSet,token:Object = null):void
+			{
+				if(featureSet.features.length == 0)
+				{
+					Alert.show("La consulta realizada no retornó resultados");
+				}else
+				{
+					token.featureSet = featureSet;
+					
+					switch(featureSet.geometryType)
+					{
+						case Geometry.MAPPOINT:
+						{
+							
+						}break;
+						case Geometry.POLYGON:
+						{
+							var poligonos:Array = [];
+							for each(var feature:Graphic in featureSet.features)
+							{
+								poligonos.push(feature.geometry);
+							}
+							
+							GeometryServiceSingleton.instance.labelPoints(poligonos,new AsyncResponder(labelPoints_Result,labelPoints_Fault,token));
+						}break;
+						default:
+						{
+							Alert.show("El tipo de geometría resultado de la consulta no es soportado por la operación de ruteo.\n\n" +
+								"Sólo se puede consultar por elementos de tipo punto o polígono.");
+						}
+					}
+						
+					
+					/*
+					if(token.criterio.target == btnPuntoInicial)
+					{
+						
+					}*/
+					
+					/* setState(WidgetStates.WIDGET_MINIMIZED);
+					addSharedData(Constantes.OPERACION_ABRIR_WIDGET,new ArrayCollection([{label:"Resultados",data:{featureSet:featureSet,token:null}}])); */
+				}
+			}
+			
+			private function queryTask_Fault(fault:Fault,token:Object = null):void
+			{
+				showError("No fué posible realizar la consulta\n\n" + fault.message);
+			}
+
+			
+			private function labelPoints_Result(points:Array,token:Object = null):void
+			{
+				
+				var i:Number = 0;
+				for each(var point:MapPoint in points)
+				{
+					var gra:Graphic = new Graphic(point);
+					
+					if(token.criterio.target == btnPuntoInicial)
+					{
+						graphicsLayerOrigen.add(gra);
+					}else if(token.criterio.target == btnPuntoFinal)
+					{
+						graphicsLayerDestino.add(gra);
+					}
+					i++;
+					
+				}
+			}
+			
+			private function labelPoints_Fault(fault:Fault,token:Object = null):void
+			{
+				showError("No fué posible Determinar los centroides de los elemntos consultados para el ruteo\n\n" + fault.message);
+			}
+
+		]]>
+	</fx:Script>
+
+	<fx:Declarations>
+		
+		<esri:GraphicsLayer id="graphicsLayerOrigen" name="Origen Ruta" symbol="{simboloOrigen}"/>
+		<esri:GraphicsLayer id="graphicsLayerDestino" name="Destino Ruta" symbol="{simboloDestino}"/>
+		<esri:GraphicsLayer id="graphicsLayerRuta" name="Ruta" symbol="{simboloRuta}"/>
+		<esri:GraphicsLayer id="graphicsLayerBarreras" name="Barreras Ruta"/>
+		
+		<esri:SimpleMarkerSymbol id="simboloOrigen" color="0x13BD43"/>
+		<esri:SimpleMarkerSymbol id="simboloDestino" color="0xBD2A1D"/>
+		<esri:SimpleLineSymbol id="simboloRuta" color="0x00FFFF" style="solid" width="4"/>
+		
+		<esri:EditTool id="editTool" map="{map}"/>
+		
+		<esri:RouteTask id="ruteo" solveComplete="ruteo_solveCompleteHandler(event)" fault="ruteo_faultHandler(event)" showBusyCursor="true"/>
+		
+		<util:ListaJerarquica id="lista" aceptar="lista_aceptarHandler(event)" providerCriterios="{providerCriterios}" 
+							  focusOut="{timer.start()}"
+							  focusIn="{timer.stop()}"/>
+		
+		
+		<s:HTTPService id="servicio" method="POST" showBusyCursor="true" 
+					   result="servicio_resultHandler(event)"
+					   fault="servicio_faultHandler(event)" requestTimeout="-1" concurrency="multiple" 
+					   resultFormat="text"/> 
+		
+		<esri:Query id="query" 
+					returnGeometry="true" 
+					outSpatialReference="{map.spatialReference}"
+					/>
+		<esri:QueryTask id="queryTask" method="POST" showBusyCursor="true" />
+	</fx:Declarations>
+	
+	<viewer:WidgetTemplate id="wTemplate" 
+						   width="350" 
+						   height="310"
+						   open="wTemplate_openHandler(event)"
+						   closed="wTemplate_closedHandler(event)"
+						   focusOut="{timer.start()}"
+						   focusIn="{timer.stop()}">
+		<s:BorderContainer cornerRadius="5" top="15" bottom="0" right="0" left="0" backgroundAlpha="0" 
+						   minHeight="50">
+			<s:VGroup horizontalCenter="0" verticalCenter="0" verticalAlign="middle" 
+					  horizontalAlign="center" left="5" top="5" right="5" bottom="5"
+					  >
+				
+				<s:VGroup visible="{actualizarMuestra}" 
+						  includeInLayout="{actualizarMuestra}"
+						  width="100%"
+						  horizontalAlign="center">
+					<s:HGroup width="100%">
+						<mx:Spacer width="5"/>
+						<mx:LinkButton label="Actualizar Muestra" 
+									   icon="@Embed(source='assets/images/refresh.png')"
+									   toolTip="Actualiza en el sistema la información de la muestra operativa"
+									   id="btnActualizarMuestra"
+									   click="btnActualizarMuestra_clickHandler(event)"/>
+					</s:HGroup>
+					<s:Line  width="90%" >
+						<s:stroke>
+							<s:SolidColorStroke color="{getStyle('focusColor')}"/>
+						</s:stroke>
+					</s:Line>
+					<mx:Spacer height="100%"/>
+				</s:VGroup>
+				
+				<mx:Grid>
+					<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle" >
+						<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+							<s:Label text=""/>
+						</mx:GridItem>
+						<mx:GridItem verticalAlign="middle" width="100%">
+							<mx:LinkButton id="btnPuntoInicial" label="Punto de partida" 
+										   icon="@Embed('assets/images/w_addstart.png')"
+										   click="btnPuntoInicial_clickHandler(event)"/>
+						</mx:GridItem>
+					</mx:GridRow>
+					<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle" >
+						<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+							<s:Label text=""/>
+						</mx:GridItem>
+						<mx:GridItem verticalAlign="middle" width="100%">
+							<mx:LinkButton id="btnPuntoFinal" label="Puntos de llegada" 
+										   icon="@Embed('assets/images/w_addend.png')"
+										   click="btnPuntoFinal_clickHandler(event)"/>
+						</mx:GridItem>
+					</mx:GridRow>
+				</mx:Grid>
+				<s:HGroup width="100%" horizontalAlign="right">
+					<mx:LinkButton label="Nueva Ruta" id="btnLimpiar" icon="@Embed('assets/images/w_delete.png')" click="btnLimpiar_clickHandler(event)"/>
+				</s:HGroup>
+				<s:Button id="btnBuscar" label="Buscar ruta" click="btnBuscar_clickHandler(event)"
+						  />
+			</s:VGroup>
+		</s:BorderContainer>
+	</viewer:WidgetTemplate>
+</viewer:BaseWidget>

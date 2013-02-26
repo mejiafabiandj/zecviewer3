@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			   xmlns:s="library://ns.adobe.com/flex/spark" 
+			   xmlns:mx="library://ns.adobe.com/flex/mx"
+			   close="titlewindow1_closeHandler(event)"
+			   title="{data.caption.titulo}">
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.FeatureSet;
+			import com.esri.ags.layers.supportClasses.Field;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			
+			private var _resultados:FeatureSet;
+
+			[Bindable]public function get resultados():FeatureSet
+			{
+				return _resultados;
+			}
+
+			public function set resultados(value:FeatureSet):void
+			{
+				_resultados = value;
+				
+				columns = [];
+				for each(var field:Field in resultados.fields)
+				{
+					if(field.type != Field.TYPE_GEOMETRY &&
+						field.type != Field.TYPE_GLOBAL_ID &&
+						field.type != Field.TYPE_GUID &&
+						field.type != Field.TYPE_OID &&
+						field.type != Field.TYPE_RASTER &&
+						field.type != Field.TYPE_BLOB
+					)
+					{
+						var col:DataGridColumn = new DataGridColumn();
+						col.dataField = field.name;
+						col.headerText = field.alias;
+						
+						columns.push(col);
+					}
+				}
+			}
+			
+			private var _data:Object;
+
+			[Bindable] public function get data():Object
+			{
+				return _data;
+			}
+
+			public function set data(value:Object):void
+			{
+				_data = value;
+			}
+
+			
+			[Bindable] private var columns:Array = [];
+			
+			protected function titlewindow1_closeHandler(event:CloseEvent):void
+			{
+				PopUpManager.removePopUp(this);
+			}
+
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<s:BorderContainer minHeight="0" cornerRadius="5" maxWidth="500" left="5" right="5" top="5" bottom="5"
+					   backgroundColor="{getStyle('contentBackgroundColor')}">
+		<s:filters>
+			<s:DropShadowFilter distance="8" alpha="0.8" color="{getStyle('rollOverColor')}"/>
+		</s:filters>
+		<mx:HBox horizontalAlign="center" horizontalScrollPolicy="auto"
+				 left="5" right="5" top="5" bottom="5" maxWidth="{width - 20}" minHeight="{grdResultados.height + 30}"
+				 >
+			<mx:DataGrid id="grdResultados" dataProvider="{resultados.attributes}" columns="{columns}" height="150"
+						 alternatingItemColors="{[getStyle('contentBackgroundColor'),getStyle('contentBackgroundColor')]}"/>
+		</mx:HBox>
+	</s:BorderContainer>
+</s:TitleWindow>

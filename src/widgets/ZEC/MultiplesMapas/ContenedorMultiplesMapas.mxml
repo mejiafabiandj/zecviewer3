@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:BorderContainer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" 
+				   xmlns:MultiplesMapas="widgets.DANE.MultiplesMapas.*"
+				   creationComplete="init(event)" xmlns:esri="http://www.esri.com/2008/ags"
+				   contentBackgroundColor="{applicationBackgroundColor}">
+	<s:layout>
+		<s:VerticalLayout/>
+	</s:layout>
+	
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.Map;
+			import com.esri.ags.events.ExtentEvent;
+			import com.esri.viewer.AppEvent;
+			import com.esri.viewer.ViewerContainer;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.BoxDirection;
+			import mx.events.FlexEvent;
+			import mx.utils.ObjectProxy;
+			
+			[Bindable] private var applicationBackgroundColor:uint = (ViewerContainer.getInstance().configData.styleColors[5] != null) ? ViewerContainer.getInstance().configData.styleColors[5] : 0xFFFFFF;
+			
+			[Bindable] public var map:Map; 
+			
+			[Bindable] public var paneles:ArrayCollection = new ArrayCollection();
+
+			[Bindable] public var maxPaneles:Number;
+			
+			[Bindable] public var timeExtent:ObjectProxy;
+			
+			private var _mapasIniciales:Number;
+			
+			[Bindable] public function get mapasIniciales():Number
+			{
+				return _mapasIniciales;
+			}
+
+			public function set mapasIniciales(value:Number):void
+			{
+				_mapasIniciales = value;
+				
+				paneles.removeAll();
+				for (var i:Number = 0; i < mapasIniciales && i < maxPaneles; i++)
+				{
+					var data:ObjectProxy = new ObjectProxy({contenedor:this})
+					paneles.addItem(data);
+				}
+			}
+			
+
+			protected function init(event:FlexEvent):void
+			{
+				paneles.removeAll();
+				for (var i:Number = 0; i < mapasIniciales && i < maxPaneles; i++)
+				{
+					var data:ObjectProxy = new ObjectProxy({contenedor:this})
+					paneles.addItem(data);
+				}
+				
+			}
+			
+
+			protected function linkbutton1_clickHandler(event:MouseEvent):void
+			{
+				if(paneles.length < maxPaneles)
+				{
+					var data:ObjectProxy = new ObjectProxy({contenedor:this})
+					paneles.addItem(data);
+					
+				}
+			}
+			
+		]]>
+	</fx:Script>
+
+	<fx:Declarations>
+		
+	</fx:Declarations>
+	
+	
+	<s:HGroup width="100%" minHeight="0" verticalAlign="middle">
+		<mx:LinkButton icon="@Embed('assets/images/edit_addtoselection.png')" 
+					   label="Añadir Panel" 
+					   click="linkbutton1_clickHandler(event)"
+					   visible="{maxPaneles > paneles.length}"
+					   includeInLayout="{maxPaneles > paneles.length}"/>
+	</s:HGroup>
+	
+	<s:DataGroup id="dataGroup" width="100%" height="100%" itemRenderer="widgets.DANE.MultiplesMapas.MapasItemRenderer" 
+				 dataProvider="{paneles}"
+				 rollOverColor="{applicationBackgroundColor}"
+				 >
+		<s:layout>
+			<s:TileLayout id="tileLayout" clipAndEnableScrolling="true" requestedColumnCount="2" columnAlign="justifyUsingWidth" rowAlign="justifyUsingHeight"/>
+		</s:layout>
+	</s:DataGroup>
+	
+
+</s:BorderContainer>

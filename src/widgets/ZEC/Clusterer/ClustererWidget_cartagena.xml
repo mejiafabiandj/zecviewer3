@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+   <layer url="http://10.57.28.159:8399/arcgis/rest/services/puntos/MapServer/0" 
+    	   useproxy="false"
+		   useAMF = "false"
+    	   label="Censo de Edificaciones: Comercio"
+    	   visible="true"
+    	   alpha="1"
+    	   borderColor="0xAEC0FE"
+    	   backgroundColor="0x005CE6"
+    	   textColor="0xFFFFFF"
+    	   textSize="12"
+    	   outFields="Id"
+    	   />
+    
+  
+	
+</configuration>

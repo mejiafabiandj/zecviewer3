@@ -1,0 +1,642 @@
+<?xml version="1.0" encoding="utf-8"?>
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:viewer="com.esri.viewer.*" 
+				   layout="absolute"
+				   widgetConfigLoaded="ConsultaBasicaWidget_widgetConfigLoadedHandler(event)"
+				   creationComplete="ConsultaBasicaWidget_creationCompleteHandler(event)" xmlns:esri="http://www.esri.com/2008/ags"
+				   currentStateChange="currentStateChangeHandler(event)"
+				   >
+
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.FeatureSet;
+			import com.esri.ags.Graphic;
+			import com.esri.ags.geometry.Geometry;
+			import com.esri.ags.layers.Layer;
+			import com.esri.ags.symbols.SimpleFillSymbol;
+			import com.esri.ags.symbols.SimpleLineSymbol;
+			import com.esri.ags.symbols.SimpleMarkerSymbol;
+			import com.esri.ags.symbols.Symbol;
+			import com.esri.viewer.AppEvent;
+			import com.esri.viewer.ViewerContainer;
+			import com.esri.viewer.WidgetStates;
+			
+			import gov.dane.util.ConfiguracionRaster;
+			import gov.dane.util.Constantes;
+			import gov.dane.util.GraphicsLayerInfoWindowRenderer;
+			import gov.dane.util.TokenUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.FlexEvent;
+			import mx.events.StateChangeEvent;
+			import mx.messaging.messages.IMessage;
+			import mx.rpc.AsyncResponder;
+			import mx.rpc.AsyncToken;
+			import mx.rpc.Fault;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.xml.SimpleXMLDecoder;
+			import mx.utils.ArrayUtil;
+			
+			import spark.events.IndexChangeEvent;
+			
+			import widgets.MapSwitcher.MapSwitcherWidget;
+			
+			[Bindable] private var lblNivelInformacion:String;  
+			[Bindable] private var providerCmbNivel:ArrayCollection = new ArrayCollection();
+			[Bindable] private var providerCmbDepartamento:ArrayCollection = new ArrayCollection();
+			[Bindable] private var providerCmbMunicipio:ArrayCollection = new ArrayCollection();
+			[Bindable] private var providerCmbCentroPoblado:ArrayCollection = new ArrayCollection();
+			
+			
+			[Bindable] private var isRasterConsultable:Boolean = false;
+			[Bindable] private var consultarRaster:Boolean = false;
+			
+			private var tokenServlet:AsyncToken;
+			
+			protected function ConsultaBasicaWidget_creationCompleteHandler(event:FlexEvent):void
+			{
+				currentState = "default";
+				map.addLayer(graphicsLayerConsultaBasicaWidget);
+				AppEvent.addListener(AppEvent.BASEMAP_SWITCH, basemapMenuClicked);
+			}
+			
+			protected function ConsultaBasicaWidget_widgetConfigLoadedHandler(event:Event):void
+			{
+				if(configXML && configObject)
+				{
+					lblNivelInformacion = configObject.configuration.textos.txtNivel || configXML.textos.txtNivel || 'Nivel de información';
+					providerCmbNivel.addAll(configObject.configuration.servicio.niveles.nivel);
+					
+					cmbNivel.selectedIndex = 0;
+					cmbNivel.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-1,0));
+					
+					
+					//realizar la consulta de los departamentos según la vigencia seleccionada 
+					servlet.url = configObject.configuration.servicio.url_alfa;
+					
+					var basemap:String = selectedBasemap(); 
+					if(basemap)
+					{
+						providerCmbDepartamento = new ArrayCollection();
+						tokenServlet = servlet.send(
+							{
+								operacionConsultaBasica:"consultarDepartamentos",
+								vigencia:basemap
+							});
+					}else
+					{
+						showError("No fué posible encontrar la vigencia seleccionada");
+					}
+					
+				}
+			}
+			
+			/**
+			 * Evento resultado de el cambio del mapa base
+			 **/
+			private function basemapMenuClicked(event:AppEvent):void
+			{
+				if(getState() == WidgetStates.WIDGET_CLOSED)
+				{
+					return;
+				}
+				var id:String = event.data as String;
+				if (id)
+				{
+					var selectedLabel:String;
+					for (var i:uint = 0; i < configData.basemaps.length; i++)
+					{
+						if (configData.basemaps[i].id == id)
+						{
+							selectedLabel = configData.basemaps[i].label;
+							break;
+						}
+					}
+					if (selectedLabel)
+					{
+						providerCmbDepartamento = new ArrayCollection();
+						tokenServlet = servlet.send(
+							{
+								operacionConsultaBasica:"consultarDepartamentos",
+								vigencia:selectedLabel
+							});
+					}
+				}
+			}
+			
+			
+			protected function cmbNivel_changeHandler(event:IndexChangeEvent):void
+			{
+				if(cmbNivel.selectedItem)
+				{
+					if(configObject.configuration.hasOwnProperty("consultaRaster") && configObject.configuration.consultaRaster)
+					{
+						consultarRaster = true;
+					}
+					
+					if(cmbDepartamento)
+					{
+						cmbDepartamento.selectedIndex = 0;
+						cmbDepartamento.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-1,0));
+					}
+					
+					providerCmbMunicipio = new ArrayCollection();
+					providerCmbCentroPoblado = new ArrayCollection();
+					
+					switch(cmbNivel.selectedItem.label)
+					{
+						case "Departamento":
+						{
+							currentState = "departamento";
+							break;
+						}
+						case "Municipio":
+						{
+							currentState = "municipio";
+							break;
+						}
+						case "Zonas urbanas":
+						{
+							currentState = "centroPoblado";
+							break;
+						}
+						default:
+						{
+							currentState = "default";
+							break;
+						}
+					}
+				}
+				validarSeleccion();
+			}
+			
+			protected function cmbDepartamento_changeHandler(event:IndexChangeEvent):void
+			{
+				providerCmbMunicipio = new ArrayCollection();
+				providerCmbCentroPoblado = new ArrayCollection();
+				
+				if(currentState == "municipio" || currentState == "centroPoblado")
+				{
+					if(cmbDepartamento.selectedItem && cmbDepartamento.selectedItem.CODIGO_DEPARTAMENTO)
+					{
+						tokenServlet = servlet.send(
+							{
+								
+								operacionConsultaBasica:"consultarMunicipiosDepartamento",
+								codigoDepartamento:cmbDepartamento.selectedItem.CODIGO_DEPARTAMENTO,
+								vigencia:selectedBasemap()
+							});
+					}
+				}
+				validarSeleccion();
+			}
+
+			
+			protected function cmbMunicipio_changeHandler(event:IndexChangeEvent):void
+			{
+				providerCmbCentroPoblado = new ArrayCollection();
+				
+				if(currentState == "centroPoblado")
+				{
+					if(cmbMunicipio.selectedItem && cmbMunicipio.selectedItem.CODIGO_CONCATENADO_MUNICIPIO)
+					{
+						tokenServlet = servlet.send(
+							{
+								operacionConsultaBasica:"consultarCentrosPobladosMunicipio",
+								codigoConcatenadoMunicipio:cmbMunicipio.selectedItem.CODIGO_CONCATENADO_MUNICIPIO,
+								vigencia:selectedBasemap()
+							});
+					}
+				}
+				validarSeleccion();
+			}
+			
+			protected function cmbCentroPoblado_changeHandler(event:IndexChangeEvent):void
+			{
+				validarSeleccion();
+			}
+
+			protected function servlet_resultHandler(event:ResultEvent):void
+			{
+				var provider:ArrayCollection;
+				var combo:DropDownList;
+				var operacion:String;
+				var labelField:String;
+				
+				if(!tokenServlet)
+				{
+					showError("Ocurrió un error de sincronía en la consulta realizada");
+					return;
+				}
+				
+				switch (tokenServlet.message.body.operacionConsultaBasica)
+				{
+					case "consultarDepartamentos":
+					{
+						provider = providerCmbDepartamento;
+						combo = cmbDepartamento;
+						operacion = "consultar los departamentos";
+						labelField = "NOMBRE_DEPARTAMENTO";
+						break;
+					}
+					case "consultarMunicipiosDepartamento":
+					{
+						provider = providerCmbMunicipio;
+						combo = cmbMunicipio;
+						operacion = "consultar los municipios del departamento seleccionado";
+						labelField = "NOMBRE_MUNICIPIO";
+						break;
+					}
+					case "consultarCentrosPobladosMunicipio":
+					{
+						provider = providerCmbCentroPoblado;
+						combo = cmbCentroPoblado;
+						operacion = "consultar los centros poblados del municipio seleccionado";
+						labelField = "NOMBRE_CENTRO_POBLADO";
+						break;
+					}
+				}
+				
+				if(provider)
+				{
+					try
+					{
+						
+						var itemSeleccione:Object = new Object();
+						itemSeleccione[labelField] = "Seleccione...";
+						provider.addItem(itemSeleccione);
+						
+						if(event.result.Resultados)
+						{
+							if(event.result.Resultados.Resultado is ArrayCollection)
+							{
+								provider.addAll(event.result.Resultados.Resultado);
+							}else
+							{
+								provider.addItem(event.result.Resultados.Resultado);
+							}
+						}else
+						{
+							provider.removeAll()
+							itemSeleccione[labelField] = "No hay resultados";
+							provider.addItem(itemSeleccione);
+						}
+						
+						if(combo)
+						{
+							combo.selectedIndex = 0;
+							combo.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-1,0))
+						}
+					}catch(e:Error)
+					{
+						showError("No fué posible " + operacion + ".\n" + e.message);
+					}
+				}
+				
+				tokenServlet = null;
+			}
+
+
+			protected function servlet_faultHandler(event:FaultEvent):void
+			{
+				showError("No fué posible realizar la consulta.\n" + event.message);
+			}
+			
+			/**
+			 * Retorna el nombre del mapa base que se encuentra activo
+			 **/
+			public function selectedBasemap():String
+			{
+				var selectedBasemap:String;
+				
+				for each(var layer:Layer in map.layers)
+				{
+					for each(var basemap:Object in configData.basemaps)
+					{
+						if(layer.id == basemap.label)
+						{
+							if(layer.visible)
+							{
+								selectedBasemap = layer.id;
+							}
+						}
+					}
+					
+				}
+				
+				return selectedBasemap;
+			}
+			
+			
+			private function validarSeleccion():void
+			{
+				graphicsLayerConsultaBasicaWidget.clear();
+				
+				switch(currentState)
+				{
+					case "departamento":
+					{
+						if(cmbDepartamento.selectedItem && cmbDepartamento.selectedItem.CODIGO_DEPARTAMENTO)
+						{
+							btnConsultar.enabled = true;
+						}else
+						{
+							btnConsultar.enabled = false;
+						}
+						break;
+					}
+					case "municipio":
+					{
+						if(cmbMunicipio.selectedItem && cmbMunicipio.selectedItem.CODIGO_CONCATENADO_MUNICIPIO)
+						{
+							btnConsultar.enabled = true;
+						}else
+						{
+							btnConsultar.enabled = false;
+						}						
+						break;
+					}
+					case "centroPoblado":
+					{
+						if(cmbCentroPoblado.selectedItem && cmbCentroPoblado.selectedItem.CODIGO_CENTRO_POBLADO)
+						{
+							btnConsultar.enabled = true;
+						}else
+						{
+							btnConsultar.enabled = false;
+						}
+						break;
+					}
+					default:
+					{
+						btnConsultar.enabled = false;
+					}
+				}
+			}
+
+
+			protected function wTemplate_openHandler(event:Event):void
+			{
+				map.addLayer(graphicsLayerConsultaBasicaWidget);
+				if(cmbNivel)
+				{
+					cmbNivel.selectedIndex = 0;
+					cmbNivel.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-1,0))
+				}
+			}
+
+
+			protected function wTemplate_closedHandler(event:Event):void
+			{
+				map.removeLayer(graphicsLayerConsultaBasicaWidget);
+			}
+
+
+			protected function wTemplate_minimizedHandler(event:Event):void
+			{
+				// TODO Auto-generated method stub
+			}
+
+
+			protected function btnConsultar_clickHandler(event:MouseEvent):void
+			{
+				var nivel:Object;
+				
+				for each(var vigencia:Object in configObject.configuration.servicio.vigencias.vigencia)
+				{
+					if(vigencia.label == selectedBasemap())
+					{
+						for each(nivel in vigencia.niveles.nivel)
+						{
+							if(nivel.label == cmbNivel.selectedItem.label)
+							{
+								queryTask.url = nivel.url;
+								
+								queryTask.proxyURL = (nivel.useproxy ? configData.proxyUrl :null);
+								queryTask.useAMF = queryTask.proxyURL? false: nivel.useAMF;
+								queryTask.token = TokenUtil.buscarToken(queryTask.url,configData);
+								
+								break;
+							}
+						}
+						break;
+					}
+				}
+				
+				if(queryTask.url && queryTask.url != "")
+				{
+					var combo:DropDownList;
+					var atributo:String;
+					switch(currentState)
+					{
+						case "departamento":
+						{
+							combo = cmbDepartamento;
+							atributo = "CODIGO_DEPARTAMENTO";
+							break;
+						}
+						case "municipio":
+						{
+							combo = cmbMunicipio;
+							atributo = "CODIGO_CONCATENADO_MUNICIPIO";				
+							break;
+						}
+						case "centroPoblado":
+						{
+							combo = cmbCentroPoblado;
+							atributo = "CODIGO_CENTRO_POBLADO";
+							break;
+						}
+					}
+					query.where = nivel.pkGeo + " = " + combo.selectedItem[atributo];
+					queryTask.execute(query,new AsyncResponder(queryTask_Result,queryTask_Fault));
+					
+					graphicsLayerConsultaBasicaWidget.clear();
+				}
+			}
+			
+			private function queryTask_Result(featureSet:FeatureSet,token:Object = null):void
+			{
+				for each(var feature:Graphic in featureSet.features)
+				{
+					var colorFondo:uint = 0xFF0000;
+					var colorLinea:uint = 0xFF0000;
+					var outSmbol:SimpleLineSymbol = new SimpleLineSymbol(SimpleLineSymbol.STYLE_SOLID,colorLinea,1,3);
+					switch(feature.geometry.type)
+					{
+						case Geometry.MAPPOINT:
+						{
+							feature.symbol = new SimpleMarkerSymbol(SimpleMarkerSymbol.STYLE_CIRCLE,15,colorFondo,0.8);
+							break;
+						}
+						case Geometry.MULTIPOINT:
+						{
+							feature.symbol = new SimpleMarkerSymbol(SimpleMarkerSymbol.STYLE_CIRCLE,15,colorFondo,0.8);
+							break;
+						}
+						case Geometry.POLYGON:
+						{
+							feature.symbol = new SimpleFillSymbol(SimpleFillSymbol.STYLE_SOLID,colorFondo,0.4,outSmbol);
+							break;
+						}
+						case Geometry.POLYLINE:
+						{
+							feature.symbol = outSmbol;
+							break;
+						}
+					}
+					graphicsLayerConsultaBasicaWidget.add(feature);
+					
+					map.extent = feature.geometry.extent;
+					if(!map.extent.contains(feature.geometry))
+					{
+						map.level--;
+					}
+					
+					var classFactory:ClassFactory = new ClassFactory(GraphicsLayerInfoWindowRenderer);
+					classFactory.properties = {propiedades:{fields:new ArrayCollection(featureSet.fields),attributes:feature.attributes, feature:feature}};
+					feature.infoWindowRenderer = classFactory;
+					
+					//Realizar la consulta de los elementos raster que cubren este graphic
+					if(consultarRaster)
+					{
+						AppEvent.dispatch(Constantes.OPERACION_CONSULTAR_RASTER,feature);
+					}
+				}
+			}
+			private function queryTask_Fault(fault:Fault,token:Object = null):void
+			{
+				
+			}
+
+
+			protected function currentStateChangeHandler(event:StateChangeEvent):void
+			{
+				if(configData.data)
+				{
+					if(configData.data.consultaRaster && configData.data.consultaRaster == true)
+					{
+						isRasterConsultable = configData.data.consultaRaster;
+						
+						if(currentState != "default")
+						{
+							wTemplate.height += 30;
+						}
+					}else
+					{
+						isRasterConsultable = false;
+					}
+				}
+			}
+
+
+			protected function btnOpcionesAvanzadasRaster_clickHandler(event:MouseEvent):void
+			{
+				AppEvent.dispatch(Constantes.MOSTRAR_CONFIGURACION_RASTER,true);
+			}
+
+		]]>
+	</fx:Script>
+
+	<viewer:states>
+		<s:State name="default"/>
+		<s:State name="departamento"/>
+		<s:State name="municipio"/>
+		<s:State name="centroPoblado"/>
+	</viewer:states>
+	
+	<fx:Declarations>
+		<esri:GraphicsLayer id="graphicsLayerConsultaBasicaWidget" name="graphicsLayerConsultaBasicaWidget">
+			
+		</esri:GraphicsLayer>
+		<s:HTTPService id="servlet" result="servlet_resultHandler(event)" fault="servlet_faultHandler(event)" showBusyCursor="true"/>
+		<esri:Query id="query" outFields="[*]" returnGeometry="true" outSpatialReference="{map.spatialReference}"/>
+		<esri:QueryTask id="queryTask" method="POST" showBusyCursor="true" />
+	</fx:Declarations>
+	
+	
+	<viewer:WidgetTemplate id="wTemplate" 
+						   minHeight="0" 
+						   minWidth="200" 
+						   width="400"
+						   height.centroPoblado="230" height.municipio="200" height.departamento="170" height.default="140"
+						   minHeight.centroPoblado="200" minHeight.municipio="170" minHeight.departamento="140" minHeight.default="110"
+						   open="wTemplate_openHandler(event)"
+						   closed="wTemplate_closedHandler(event)"
+						   minimized="wTemplate_minimizedHandler(event)"
+						   >
+		<s:BorderContainer cornerRadius="5" top="15" bottom="0" right="0" left="0" backgroundAlpha="0" 
+						   minWidth="0" minHeight="0">
+			<s:VGroup horizontalCenter="0" verticalCenter="0" verticalAlign="middle" horizontalAlign="center" left="5" top="5" right="5" bottom="5"
+					  minWidth="0" minHeight="0">
+				<mx:Grid width="100%"  minWidth="0" minHeight="20" verticalAlign="middle">
+					<mx:GridRow width="100%">
+						<mx:GridItem horizontalAlign="right" verticalAlign="middle">
+							<s:Label text="{lblNivelInformacion}"/>
+						</mx:GridItem>
+						<mx:GridItem verticalAlign="middle" width="100%">
+							<s:DropDownList id="cmbNivel" selectedIndex="0" dataProvider="{providerCmbNivel}" width="100%"
+											change="cmbNivel_changeHandler(event)"/>
+						</mx:GridItem>
+					</mx:GridRow>
+					<mx:GridRow width="100%" includeIn="centroPoblado,departamento,municipio">
+						<mx:GridItem horizontalAlign="right" verticalAlign="middle">
+							<s:Label text="Departamento"/>
+						</mx:GridItem>
+						<mx:GridItem verticalAlign="middle" width="100%">
+							<s:DropDownList id="cmbDepartamento" selectedIndex="0" width="100%" dataProvider="{providerCmbDepartamento}"
+											labelField="NOMBRE_DEPARTAMENTO"
+											change="cmbDepartamento_changeHandler(event)"
+											/>
+						</mx:GridItem>
+					</mx:GridRow>
+					<mx:GridRow width="100%" includeIn="centroPoblado,municipio">
+						<mx:GridItem horizontalAlign="right" verticalAlign="middle">
+							<s:Label text="Municipio"/>
+						</mx:GridItem>
+						<mx:GridItem verticalAlign="middle" width="100%">
+							<s:DropDownList id="cmbMunicipio" selectedIndex="0" width="100%" dataProvider="{providerCmbMunicipio}"
+											labelField="NOMBRE_MUNICIPIO"
+											change="cmbMunicipio_changeHandler(event)"
+											/>
+						</mx:GridItem>
+					</mx:GridRow>
+					<mx:GridRow width="100%" includeIn="centroPoblado">
+						<mx:GridItem horizontalAlign="right" verticalAlign="middle">
+							<s:Label text="Zonas urbanas"/>
+						</mx:GridItem>
+						<mx:GridItem verticalAlign="middle" width="100%">
+							<s:DropDownList id="cmbCentroPoblado" selectedIndex="0" width="100%" dataProvider="{providerCmbCentroPoblado}"
+											labelField="NOMBRE_CENTRO_POBLADO"
+											change="cmbCentroPoblado_changeHandler(event)"
+											/>
+						</mx:GridItem>
+					</mx:GridRow>
+				</mx:Grid>
+				
+				<s:VGroup width="100%" minHeight="0"
+						  horizontalAlign="center"
+						  includeInLayout="{isRasterConsultable}" visible="{isRasterConsultable}" excludeFrom="default">
+					<mx:Spacer height="2"/>
+					<s:HGroup width="100%" horizontalAlign="center" verticalAlign="middle">
+						<s:CheckBox id="chkConsultaRaster" label="Consultar información raster" 
+									excludeFrom="default" 
+									selected="@{consultarRaster}"
+									includeInLayout="{isRasterConsultable}" visible="{isRasterConsultable}"
+									toolTip="Consulta la información raster disponible para la zona seleccionada"/>
+						<!--s:HGroup visible="{chkConsultaRaster.selected}" includeInLayout="{chkConsultaRaster.selected}" horizontalAlign="center" verticalAlign="middle">
+							<mx:Spacer width="100%"/>
+							<mx:LinkButton id="btnOpcionesAvanzadasRaster" label="Opciones Avanzadas" toolTip="Configura las opciones avanzadas para la consulta geográfica a la información Raster"
+										   click="btnOpcionesAvanzadasRaster_clickHandler(event)"/>
+						</s:HGroup-->
+					</s:HGroup>
+					<mx:Spacer height="2"/>
+				</s:VGroup>
+					
+				<s:Button id="btnConsultar" label="Consultar" enabled="false" click="btnConsultar_clickHandler(event)"/>
+			</s:VGroup>
+		</s:BorderContainer>
+	</viewer:WidgetTemplate>
+</viewer:BaseWidget>

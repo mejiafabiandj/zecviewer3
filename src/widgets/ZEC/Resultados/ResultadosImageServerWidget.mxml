@@ -1,0 +1,561 @@
+<?xml version="1.0" encoding="utf-8"?>
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:viewer="com.esri.viewer.*" 
+				   layout="absolute"
+				   creationComplete="initializeHandler(event)"
+				   widgetConfigLoaded="init()" xmlns:esri="http://www.esri.com/2008/ags"
+				   >
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.FeatureSet;
+			import com.esri.ags.Graphic;
+			import com.esri.ags.geometry.MapPoint;
+			import com.esri.ags.layers.ArcGISImageServiceLayer;
+			import com.esri.ags.layers.supportClasses.Field;
+			import com.esri.ags.layers.supportClasses.MosaicRule;
+			import com.esri.viewer.AppEvent;
+			
+			import gov.dane.util.Constantes;
+			import gov.dane.util.TokenUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.ListEvent;
+			import mx.rpc.AsyncResponder;
+			import mx.rpc.Fault;
+			import mx.utils.ObjectProxy;
+			
+			import org.alivepdf.display.Display;
+			import org.alivepdf.display.PageMode;
+			import org.alivepdf.events.PageEvent;
+			import org.alivepdf.fonts.CoreFont;
+			import org.alivepdf.layout.Layout;
+			import org.alivepdf.layout.Orientation;
+			import org.alivepdf.layout.Resize;
+			import org.alivepdf.layout.Size;
+			import org.alivepdf.layout.Unit;
+			import org.alivepdf.pdf.PDF;
+			import org.alivepdf.saving.Download;
+			import org.alivepdf.saving.Method;
+			
+			
+			[Bindable] private var providerResultados:ArrayCollection = new ArrayCollection();
+			[Bindable] private var providerServicios:ArrayCollection = new ArrayCollection();
+			
+			[Bindable] private var providerLstAtributos:ArrayCollection = new ArrayCollection();
+			
+			private var jerarquia:String;
+			private var imgLabel:String;
+			
+			
+			/**
+			 * Imagen de encabezado para archivos PDF
+			 */
+			public var imgHeader:Loader = new Loader();
+			
+			/**
+			 * Imagen de pie de página para archivos PDF
+			 */
+			public var imgFooter:Loader = new Loader();
+			
+			
+			
+			/**
+			 * Realiza la carga de los componentes necesarios cuando se termine de crear el widget
+			 */
+			private function init():void
+			{	
+				
+				if(configObject && configObject.configuration)
+				{
+					if(configObject.configuration.jerarquia)
+					{
+						jerarquia = configObject.configuration.jerarquia; 
+					}
+					if(configObject.configuration.label)
+					{
+						imgLabel = configObject.configuration.label; 
+					}
+				}
+				
+				imgHeader.load(new URLRequest("assets/images/header.png"));
+				imgFooter.load(new URLRequest("assets/images/footer.png"));
+				
+				
+				addSharedData(Constantes.WIDGET_ABIERTO,new ArrayCollection([widgetTitle]));
+				AppEvent.addListener(Constantes.OPERACION_LIMPIAR_RESULTADOS_RASTER,limpiarResultados);
+			}
+			
+			protected function initializeHandler(event:Event):void
+			{
+				AppEvent.addListener(AppEvent.DATA_PUBLISH, sharedDataUpdated);
+				
+			}
+			
+			
+			/**
+			 * Añadir los resultados en el tree
+			 * @param <b>event</b> objeto de tipo <b>AppEvent</b> que contiene la información del evento y la información compartida 
+			 */
+			private function sharedDataUpdated(event:com.esri.viewer.AppEvent):void
+			{
+				var data:ArrayCollection = event.data.collection as ArrayCollection;
+				
+				if(event.data.key == widgetTitle)
+				{
+					if(data[0] && data[0].featureSet is FeatureSet)
+					{
+						currentState = "resultados";
+						adicionarFeatures(data[0].featureSet as FeatureSet);
+						
+						var contieneServicio:Boolean = false;
+						for each(var servicio:Object in providerServicios)
+						{
+							if(servicio.servicio.label == data[0].servicio.label)
+							{
+								contieneServicio = true;
+								break;
+							}
+						}
+						
+						if(!contieneServicio)
+						{
+							providerServicios.addItem(data[0]);
+						}
+					}
+				}
+			}
+			
+			protected function wTemplate_openHandler(event:Event):void
+			{
+				graphicsLayer.clear();
+				map.addLayer(graphicsLayer);
+			}
+			
+			protected function wTemplate_closedHandler(event:Event):void
+			{
+				graphicsLayer.clear();
+				map.removeLayer(graphicsLayer);
+			}
+			
+			private function adicionarFeatures(featureSet:FeatureSet):void
+			{
+				for each(var feature:Graphic in featureSet.features)
+				{
+					var contieneGrupo:Boolean = false;
+					
+					for each(var grupo:Object in providerResultados)
+					{
+						if(grupo.label == feature.attributes[jerarquia])
+						{
+							grupo.children.addItem(new ObjectProxy({label:feature.attributes[imgLabel],feature:feature}) );
+							contieneGrupo = true;
+							break;
+						}
+					}
+					
+					if(!contieneGrupo)
+					{
+						providerResultados.addItem(new ObjectProxy({label:feature.attributes[jerarquia] , children: new ArrayCollection([new ObjectProxy({label:feature.attributes[imgLabel],feature:feature})])}));
+					}
+				}
+			
+			}
+			
+			private function limpiarResultados(event:AppEvent):void
+			{
+				providerResultados.removeAll();
+				providerServicios.removeAll();
+			}
+			
+			protected function grdResultados_changeHandler(event:Event):void
+			{
+				graphicsLayer.clear();
+				providerLstAtributos.removeAll();
+				
+				if(grdResultados.selectedItem)
+				{
+					if(grdResultados.selectedItem.hasOwnProperty("feature"))
+					{
+						var gra:Graphic = grdResultados.selectedItem.feature as Graphic						
+						graphicsLayer.add(gra);
+						
+						if(gra.geometry && gra.geometry.extent)
+						{
+							map.extent = gra.geometry.extent;
+							if(!map.extent.contains(gra.geometry))
+							{
+								map.zoomOut();
+							}
+						}else if(gra.geometry is MapPoint)
+						{
+							map.centerAt(gra.geometry as MapPoint);
+						}
+						
+						
+						for each(var raster:Object in providerServicios)
+						{
+							if(raster.servicio.label == gra.attributes[jerarquia]){
+								for(var prop:String in raster.featureSet.fieldAliases)
+								{
+									if(raster.featureSet.fieldAliases[prop] != null && raster.featureSet.fieldAliases[prop] != "" 
+										&& prop != "Shape")
+									{
+										providerLstAtributos.addItem(new ObjectProxy({label:raster.featureSet.fieldAliases[prop], value:gra.attributes[prop]}));
+									}
+								}
+								
+								query.where = configObject.configuration.campoIdInventario + " = '" + gra.attributes[imgLabel] + "'";
+								queryTask.url = configObject.configuration.urlInventario;				
+								queryTask.proxyURL = (configObject.configuration.useproxy ? configData.proxyUrl :null);
+								queryTask.useAMF = true;
+								queryTask.token = TokenUtil.buscarToken(queryTask.url,configData);
+								
+								queryTask.execute(query,new AsyncResponder(queryTask_Result,queryTask_Fault,null));
+								
+								break;
+							}
+						}
+						
+						providerLstAtributos.source = providerLstAtributos.source.sortOn("label");
+						
+						currentState = "detalles";
+					}else
+					{
+						currentState = "resultados";
+					}
+				}
+				
+			}
+			
+			private function queryTask_Result(featureSet:FeatureSet,token:Object = null):void
+			{
+				if(featureSet.features.length == 0)
+				{
+					providerLstAtributos.addItem(new ObjectProxy({label:"No hay mas información", value:""}));
+				}else
+				{
+					var gra:Graphic = featureSet.features[0];
+					for each(var field:Field in featureSet.fields)
+					{
+						if(field.type != Field.TYPE_RASTER && field.name != "Shape")
+						{
+							providerLstAtributos.addItem(new ObjectProxy({label:field.alias, value:gra.attributes[field.name]}));
+						}
+					}
+				}
+			}
+			
+			
+			private function queryTask_Fault(fault:Fault,token:Object = null):void
+			{
+				providerLstAtributos.addItem(new ObjectProxy({label:"No hay mas información", value:""}));
+			}
+			
+			protected function btnVerResultados_clickHandler(event:MouseEvent):void
+			{
+				currentState = "resultados";
+			}
+			
+			protected function btnCargarImagen_clickHandler(event:MouseEvent):void
+			{
+				if(grdResultados.selectedItem && grdResultados.selectedItem.feature)
+				{
+						var imageLayer:ArcGISImageServiceLayer = new ArcGISImageServiceLayer();
+						var regla:MosaicRule = new MosaicRule();
+						var gra:Graphic = (grdResultados.selectedItem.feature as Graphic);
+						var imgId:Object;
+						
+						
+						for each(var raster:Object in providerServicios)
+						{
+							if(raster.servicio.label == gra.attributes[jerarquia]){
+								imgId = gra.attributes[raster.servicio.objectid];
+								regla.method = "esriMosaicLockRaster";
+								regla.operation = "MT_MEAN";
+								regla.lockRasterIds = [imgId];
+								
+								imageLayer.url = raster.servicio.url;
+								imageLayer.proxyURL = (raster.servicio.useproxy ? configData.proxyUrl :null);
+								imageLayer.token = TokenUtil.buscarToken(imageLayer.url,configData);
+								imageLayer.name = raster.servicio.label + ": " + gra.attributes[raster.servicio.labelField];
+								imageLayer.id = raster.servicio.label + ": " + gra.attributes[raster.servicio.labelField];
+								imageLayer.mosaicRule = regla;
+								imageLayer.noData = 0;
+								break;
+							}
+						}
+						
+						map.addLayer(imageLayer);
+						
+						addSharedData(Constantes.OPERACION_ABRIR_WIDGET,new ArrayCollection([{label:"Visualizar Imágenes",data:null}]));
+				}else
+				{
+					Alert.show("No hay elementos seleccionados para visualizar", "ID DANE desconocido");
+				}
+			}
+			
+			protected function btnVerMetadato_clickHandler(event:MouseEvent):void
+			{
+				if(grdResultados.selectedItem && grdResultados.selectedItem.feature)
+				{
+					var gra:Graphic = (grdResultados.selectedItem.feature as Graphic);
+					var idDane:Object = gra.attributes[imgLabel];
+					if(idDane != null)
+					{
+						addSharedData(Constantes.OPERACION_ABRIR_WIDGET,new ArrayCollection([{label:"Metadatos Raster",data:{idDane:idDane,parentWidget:null}}]));
+					}else{
+						Alert.show("No fué posible encontrar el ID del item seleccionado", "ID DANE desconocido");
+					}
+				}else
+				{
+					Alert.show("No hay elementos seleccionados para consultar su metadato", "ID DANE desconocido");
+				}
+			}
+			
+			private function grdResultadosLabelFunction(item:Object, column:AdvancedDataGridColumn):String
+			{
+				if(item && item.hasOwnProperty("children"))
+				{
+					return item.label + " (" + item.children.length + ")"
+				}else if(item.label)
+				{
+					return item.label;
+				}else
+				{
+					return item.toString();
+				}
+				return null;
+			}
+			
+			
+			
+			/**
+			 * Crea un archivo en formato pdf que contiene el listado de los resultados de una consulta
+			 */
+			private function generaPDF(datos:ArrayCollection,titulo:String):void
+			{
+				var pdf:PDF = new PDF(Orientation.PORTRAIT, Unit.MM, Size.LETTER );
+				
+				pdf.addEventListener(PageEvent.ADDED,
+					function(ev:PageEvent):void
+					{
+						(ev.currentTarget as PDF).addImage(imgHeader,null,0,-20);
+						(ev.currentTarget as PDF).addImage(imgFooter,null,0,(ev.currentTarget as PDF).getMargins().height);
+					}
+				);
+				pdf.setMargins(10,30,20,20);
+				
+				pdf.setDisplayMode ( Display.REAL); 
+				pdf.addPage();
+				
+				//El tipo de letra Helvetica es equivalente a Arial
+				pdf.setFont(new CoreFont("Helvetica-BoldOblique"),18);
+				pdf.writeText(18,"REPORTE DE LA CONSULTA\n\n");
+				
+				escribirItem(datos);
+				
+				function escribirItem(item:Object, nivel:Number=0):void
+				{
+					var tab:String = "";
+					for(var i:Number = 0; i < nivel; i++) tab+="\t";
+					
+					if(item is ArrayCollection)
+					{
+						for each(var subItem:Object in item)
+						{
+							if(subItem.children)
+							{
+								pdf.setFont(new CoreFont("Helvetica-Bold"),14 - nivel*2);
+								pdf.addBookmark(subItem.label,nivel);		//se añade un marcador en el archivo PDf para facilitar la navegación
+								pdf.writeText(14 - nivel*2,tab + subItem.label + " (" + subItem.children.length + " Resultados)\n");
+								escribirItem(subItem.children,nivel+1);
+							}
+							else
+							{
+								escribirItem(subItem,nivel+1);
+							}
+						}
+					}
+					else
+					{
+						pdf.setFont(new CoreFont("Helvetica"),14 - nivel*2);
+						pdf.writeText(14 - nivel*2, tab + item.label + "\n");
+					}
+				}
+				
+				//pdf.addImage(map);
+				//pdf.addText(lista.toString(),10,10);
+				pdf.save( Method.REMOTE, configObject.configuration.urlPDF, Download.ATTACHMENT, titulo + ".pdf" );
+			}
+			
+			protected function btnExportar_clickHandler(event:MouseEvent):void
+			{
+				
+				if(providerResultados.length > 0)
+				{
+					generaPDF(providerResultados,"Reporte de la consulta");
+				}
+				else
+				{
+					Alert.show("No hay informacion para generar el reporte");
+				}
+				
+			}
+			
+			private function generaItemPDF():void
+			{
+				if(lstAtributos.dataProvider.length == 0 || !grdResultados.selectedItem)
+				{
+					Alert.show("No hay informacion para generar el reporte");
+					return;
+				}
+				Alert.show("El reporte se generará en una ventana emergente","Reporte",Alert.NONMODAL,this.parentApplication.getChildAt(0),
+					function():void
+					{
+						//Generar el archivo PDF
+						
+						var pdf:PDF = new PDF(Orientation.PORTRAIT, Unit.MM, Size.LETTER );
+						var rs:Resize = new Resize("FitToPage",null);
+						
+						pdf.addEventListener(PageEvent.ADDED,
+							function(ev:PageEvent):void
+							{
+								(ev.currentTarget as PDF).addImage(imgHeader,null,0,-20);
+								(ev.currentTarget as PDF).addImage(imgFooter,null,0,(ev.currentTarget as PDF).getMargins().height);
+							}
+						);
+						pdf.setMargins(10,30,20,20);
+						
+						pdf.setDisplayMode ( Display.FULL_WIDTH ,Layout.SINGLE_PAGE , PageMode.FULLSCREEN); 
+						pdf.addPage();
+						pdf.setFont(new CoreFont("Helvetica-BoldOblique"),18);
+						pdf.writeText(18,"REPORTE DEL ITEM SELECCIONADO\n");
+						
+						pdf.setFont(new CoreFont("Helvetica-Bold"),14);
+						pdf.addBookmark("CUBRIMIENTO");		//se añade un marcador en el archivo PDf para facilitar la navegación
+						pdf.writeText(14, "CUBRIMIENTO DE " + grdResultados.selectedItem.label.toString().toUpperCase());
+						pdf.writeText(10, "\n");
+						
+						pdf.addImage(map,rs,0,pdf.getY(),0,0,0,1,true,"PNG",600);
+						
+						pdf.addPage();
+						
+						pdf.addBookmark("INFORMACIÓN");		//se añade un marcador en el archivo PDf para facilitar la navegación
+						pdf.writeText(14, "INFORMACIÓN\n");
+						pdf.writeText(12, "\n");
+						
+						pdf.setFont(new CoreFont("Helvetica"),12);
+						
+						for each(var prop:Object in providerLstAtributos) {
+							if(prop != null && prop.label != "" && prop != "OBJECTID" && prop != "Shape")
+							{
+								pdf.writeText(12, prop.label + ": ");
+								pdf.writeText(12, prop.value + "\n");
+							}
+						}
+						
+						pdf.save( Method.REMOTE, configObject.configuration.urlPDF, Download.ATTACHMENT, "Reporte Item.pdf" );
+						
+						
+					});
+				
+			}
+			
+			protected function btnExportarDetalles_clickHandler(event:MouseEvent):void
+			{
+				if(lstAtributos.dataProvider.length == 0 || !grdResultados.selectedItem)
+				{
+					Alert.show("No hay informacion para generar el reporte");
+					return;
+				}else
+				{
+					generaItemPDF();
+				}
+				
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		
+		<esri:Query id="query" outFields="[*]" returnGeometry="false" 
+					spatialRelationship="esriSpatialRelIntersects" outSpatialReference="{map.spatialReference}"/>
+		<esri:QueryTask id="queryTask" method="POST" showBusyCursor="true" />
+		
+		<esri:GraphicsLayer id="graphicsLayer" name="Cubrimiento Resultados Raster">
+			<esri:symbol>
+				<esri:SimpleFillSymbol color="0x00FFFF" style="solid" alpha="0.4">
+					<esri:SimpleLineSymbol color="0x00FFFF" style="solid" width="3" />
+				</esri:SimpleFillSymbol>
+			</esri:symbol>
+		</esri:GraphicsLayer>
+	</fx:Declarations>
+	
+	<viewer:states>
+		<s:State name="resultados"/>
+		<s:State name="detalles"/>
+	</viewer:states>
+	
+	<viewer:WidgetTemplate id="wTemplate" 
+						   width="380" 
+						   height="250"
+						   open="wTemplate_openHandler(event)"
+						   closed="wTemplate_closedHandler(event)"
+						   >
+		<s:BorderContainer cornerRadius="5" top="15" bottom="0" right="0" left="0" backgroundAlpha="0" 
+						   minHeight="50" id="container">
+			<s:VGroup horizontalCenter="0" verticalCenter="0" verticalAlign="middle" 
+					  horizontalAlign="center" left="5" top="5" right="5" bottom="5"
+					  includeIn="resultados">
+				<s:HGroup width="100%">
+					
+					<mx:LinkButton icon="@Embed(source='assets/images/pdf16.png')" 
+								   label="Exportar resultados" 
+								   id="btnExportar" 
+								   click="btnExportar_clickHandler(event)" 
+								   enabled="{providerResultados.length > 0}"
+								   visible="{providerResultados.length > 0}"
+								   includeInLayout ="{providerResultados.length > 0}"
+								   />
+				</s:HGroup>
+				<mx:AdvancedDataGrid id="grdResultados" width="100%" height="100%"
+									 defaultLeafIcon="@Embed(source='assets/images/zoomToRaster.png')"
+									 folderOpenIcon="@Embed(source='assets/images/EditRaster.png')"
+									 folderClosedIcon="@Embed(source='assets/images/EditRaster.png')"
+									 change="grdResultados_changeHandler(event)"
+									 labelFunction="grdResultadosLabelFunction">
+					<mx:dataProvider>
+						<mx:HierarchicalData source="{providerResultados}" childrenField="children"/>
+					</mx:dataProvider>
+					<mx:columns>
+						<mx:AdvancedDataGridColumn headerText="Resultados" dataField="label"/>
+					</mx:columns>
+				</mx:AdvancedDataGrid>
+			</s:VGroup>
+			
+			<s:VGroup horizontalCenter="0" verticalCenter="0" verticalAlign="middle" 
+					  horizontalAlign="center" left="5" top="5" right="5" bottom="5"
+					  includeIn="detalles">
+				<s:HGroup width="100%" 
+						  enabled="{grdResultados.selectedItem &amp;&amp; grdResultados.selectedItem.feature}"
+						  visible="{grdResultados.selectedItem &amp;&amp; grdResultados.selectedItem.feature}"
+						  includeInLayout="{grdResultados.selectedItem &amp;&amp; grdResultados.selectedItem.feature}">
+					<mx:LinkButton icon="@Embed(source='assets/images/zoomToRaster.png')" label="Cargar Imagen" id="btnCargarImagen" click="btnCargarImagen_clickHandler(event)"/>
+					<mx:LinkButton icon="@Embed(source='assets/images/GenericSpatialFile16.png')" label="Ver Metadato" id="btnVerMetadato" click="btnVerMetadato_clickHandler(event)"/>
+					<mx:LinkButton icon="@Embed(source='assets/images/pdf16.png')" label="Exportar" id="btnExportarDetalles" click="btnExportarDetalles_clickHandler(event)"/>
+				</s:HGroup>
+				<s:DataGrid width="100%" height="100%" id="lstAtributos" dataProvider="{providerLstAtributos}">
+					<s:columns>
+						<s:ArrayList>
+							<s:GridColumn headerText="Atributo" dataField="label"/>
+							<s:GridColumn headerText="Valor" dataField="value"/>
+						</s:ArrayList>
+					</s:columns>
+				</s:DataGrid>
+				<s:Button id="btnVerResultados" label="Volver a Resultados" click="btnVerResultados_clickHandler(event)" />
+			</s:VGroup>
+		</s:BorderContainer>
+	</viewer:WidgetTemplate>
+</viewer:BaseWidget>

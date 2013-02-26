@@ -1,0 +1,547 @@
+<?xml version="1.0" encoding="utf-8"?>
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" 
+				   xmlns:viewer="com.esri.viewer.*" 
+				   layout="absolute"
+				   widgetConfigLoaded="init()" xmlns:esri="http://www.esri.com/2008/ags" xmlns:CargarElementos="widgets.DANE.Ruteo.CargarElementos.*">
+
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.Graphic;
+			import com.esri.ags.SpatialReference;
+			import com.esri.ags.events.DrawEvent;
+			import com.esri.ags.geometry.Geometry;
+			import com.esri.ags.geometry.MapPoint;
+			import com.esri.ags.geometry.Polygon;
+			import com.esri.ags.geometry.Polyline;
+			import com.esri.ags.tasks.GeometryServiceSingleton;
+			import com.esri.ags.tools.DrawTool;
+			import com.esri.ags.utils.WebMercatorUtil;
+			import com.hurlant.util.Base64;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.rpc.AsyncResponder;
+			import mx.rpc.Fault;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			import spark.formatters.NumberFormatter;
+			
+			/**
+			 * Bandera que indica el valor de la última accion realizada
+			 **/
+			private var lastDrawTool:String;
+			
+			[Bindable] private var distancia:Number = 0;
+			
+			[Bindable] private var providerTipoVehiculo:ArrayCollection = new ArrayCollection(
+				[
+					{label:"Automovil", value:"motorcar"},
+					{label:"Tranporte Público", value:"psv"},
+					{label:"Bicicleta", value:"bicycle"},
+					{label:"Clicloruta (rutas)", value:"cycleroute"},
+					{label:"Caminado", value:"foot"},
+					{label:"Motocicleta", value:"moped"}
+				]);
+			
+			
+			protected function init():void
+			{
+				
+			}
+			
+			protected function wTemplate_openHandler(event:Event):void
+			{
+				map.addLayer(graphicsLayerOrigen);
+				map.addLayer(graphicsLayerDestino);
+				map.addLayer(graphicsLayerRutaOSM);
+			}
+
+			protected function wTemplate_closedHandler(event:Event):void
+			{
+				map.removeLayer(graphicsLayerOrigen);
+				map.removeLayer(graphicsLayerDestino);
+				map.removeLayer(graphicsLayerRutaOSM);
+			}
+
+
+
+
+			protected function btnFrom_clickHandler(event:MouseEvent):void
+			{
+				addSharedData("Deactivate_DrawTool", null); // desactivar drawTool en otros widgets
+				
+				graphicsLayerOrigen.clear();
+				
+				lastDrawTool = "Añadir punto inicial";
+				setMapAction(DrawTool.MAPPOINT, lastDrawTool, null, map_drawEndHandler);
+			}
+			
+			protected function btnTo_clickHandler(event:MouseEvent):void
+			{
+				addSharedData("Deactivate_DrawTool", null); // desactivar drawTool en otros widgets
+			
+				graphicsLayerDestino.clear();
+				
+				lastDrawTool = "Añadir punto destino";
+				setMapAction(DrawTool.MAPPOINT, lastDrawTool, null, map_drawEndHandler);
+			}
+			
+			
+			private function map_drawEndHandler(event:DrawEvent):void
+			{
+				if(event.graphic && event.graphic.geometry && event.graphic.geometry is MapPoint)
+				{
+					var drawType:String = lastDrawTool;
+					var url:String
+					switch(drawType)
+					{
+						case "Añadir punto inicial":
+						{
+							if(map.spatialReference.wkid == 4686 || map.spatialReference.wkid == 4326)
+							{
+								url = configObject.configuration.urlreverse +  
+									"?lon=" + (event.graphic.geometry as MapPoint).x +
+									"&lat=" + (event.graphic.geometry as MapPoint).y;
+							}else if(map.spatialReference.wkid === 102100 || map.spatialReference.wkid === 102113 || map.spatialReference.wkid === 3857)
+							{
+								url = configObject.configuration.urlreverse +  
+									"?lon=" + (WebMercatorUtil.webMercatorToGeographic(event.graphic.geometry) as MapPoint).x +
+									"&lat=" + (WebMercatorUtil.webMercatorToGeographic(event.graphic.geometry) as MapPoint).y;
+							}
+							url = Base64.encode(url);
+							
+							servicio.url = configObject.configuration.urljava;
+							servicio.resultFormat = "object";
+							servicio.send(
+								{
+									urlOSM:url,
+									op:"reverseFrom"
+								});
+								
+							event.graphic.symbol = symbFrom;
+							graphicsLayerOrigen.add(event.graphic);
+						}break;
+						case "Añadir punto destino":
+						{
+							if(map.spatialReference.wkid == 4686 || map.spatialReference.wkid == 4326)
+							{
+								url = configObject.configuration.urlreverse +  
+									"?lon=" + (event.graphic.geometry as MapPoint).x +
+									"&lat=" + (event.graphic.geometry as MapPoint).y;
+							}else if(map.spatialReference.wkid === 102100 || map.spatialReference.wkid === 102113 || map.spatialReference.wkid === 3857)
+							{
+								url = configObject.configuration.urlreverse +  
+									"?lon=" + (WebMercatorUtil.webMercatorToGeographic(event.graphic.geometry) as MapPoint).x +
+									"&lat=" + (WebMercatorUtil.webMercatorToGeographic(event.graphic.geometry) as MapPoint).y;
+							}
+							url = Base64.encode(url);
+							
+							servicio.url = configObject.configuration.urljava;
+							servicio.resultFormat = "object";
+							servicio.send(
+								{
+									urlOSM:url,
+									op:"reverseTo"
+								});
+							
+							event.graphic.symbol = symbTo;
+							graphicsLayerDestino.add(event.graphic);
+						}break;
+					}
+					
+				}
+			}
+
+
+			private function calcularRuta():void
+			{
+				if(graphicsLayerOrigen.graphicProvider.length > 0 && graphicsLayerDestino.graphicProvider.length > 0)
+				{
+					graphicsLayerRutaOSM.clear();
+					
+					var orig:MapPoint = graphicsLayerOrigen.graphicProvider[0].geometry as MapPoint;
+					var dest:MapPoint = graphicsLayerDestino.graphicProvider[0].geometry as MapPoint;
+					
+					var geoOrig:MapPoint;
+					var geoDest:MapPoint;
+					
+					if(map.spatialReference.wkid == 4686 || map.spatialReference.wkid == 4326)
+					{
+						geoOrig = orig;
+						geoDest = dest;
+					}else if(map.spatialReference.wkid === 102100 || map.spatialReference.wkid === 102113 || map.spatialReference.wkid === 3857)
+					{
+						geoOrig = WebMercatorUtil.webMercatorToGeographic(orig) as MapPoint;
+						geoDest = WebMercatorUtil.webMercatorToGeographic(dest) as MapPoint;						
+					}
+					
+					
+					var url:String = configObject.configuration.urlroute + 
+						"?flat=" + geoOrig.y +
+						"&flon=" + geoOrig.x +
+						"&tlat=" + geoDest.y +
+						"&tlon=" + geoDest.x +
+						"&v=" + cmbTipo.selectedItem.value + 
+						"&fast=1" +
+						"&layer=mapnik" +
+						"&instructions=1";
+							
+					url = Base64.encode(url);
+					
+					servicio.url = configObject.configuration.urljava;
+					servicio.resultFormat = "object";
+					servicio.send(
+						{
+							urlOSM:url,
+							op:"route"
+						});
+					
+					
+				}
+					
+			}
+			
+
+
+			protected function servicio_resultHandler(event:ResultEvent):void
+			{
+				if(event.token.message.body && event.token.message.body.op)
+				{
+					switch(event.token.message.body.op)
+					{
+						case "reverseFrom":
+						{
+							txtFrom.text = event.result.reversegeocode.result.value || ""; 
+							graphicsLayerOrigen.graphicProvider.getItemAt(0).toolTip = txtFrom.text; 
+							calcularRuta();
+						}break;
+						case "reverseTo":
+						{
+							txtTo.text = event.result.reversegeocode.result.value || ""; 
+							graphicsLayerDestino.graphicProvider.getItemAt(0).toolTip = txtTo.text;
+							calcularRuta();
+							
+						}break;
+						case "route":
+						{
+							if(event.result.kml && event.result.kml.Document && event.result.kml.Document.Folder && event.result.kml.Document.Folder.Placemark &&
+								event.result.kml.Document.Folder.Placemark.LineString && event.result.kml.Document.Folder.Placemark.LineString.coordinates)
+							{
+								
+								var coordenadas:String = event.result.kml.Document.Folder.Placemark.LineString.coordinates;
+								var pares:Array = coordenadas.split(" ");
+								var points:Array = [];
+									
+								for each(var par:String in pares)
+								{
+									if(par != "")
+									{
+										var coord:Array = par.split(",");
+										var punto:MapPoint = new MapPoint(coord[0],coord[1],new SpatialReference(4326));
+										points.push(punto);
+									}
+								}
+								var linea:Polyline = new Polyline([points],new SpatialReference(4326));
+								
+								
+								var geo:Geometry;
+								if(map.spatialReference.wkid == 4686 || map.spatialReference.wkid == 4326)
+								{
+									geo = linea;
+								}else if(map.spatialReference.wkid === 102100 || map.spatialReference.wkid === 102113 || map.spatialReference.wkid === 3857)
+								{
+									geo = WebMercatorUtil.geographicToWebMercator(linea);
+								}
+								
+								var gra:Graphic = new Graphic(geo,simboloRuta,
+									{
+										descripcion:event.result.kml.Document.description,
+										distancia:event.result.kml.Document.distance
+									});
+								
+								gra.toolTip = "Distancia Total: " + event.result.kml.Document.distance + " Km";
+								
+								txtdescripcion.htmlText = event.token.message.body.adicionar? txtdescripcion.htmlText + "\n" + event.result.kml.Document.description : event.result.kml.Document.description;
+								if(event.result.kml.Document.distance is Number)
+								{
+									distancia = event.token.message.body.adicionar? distancia + event.result.kml.Document.distance : event.result.kml.Document.distance;
+								}
+								//txtDistancia.text = event.token.message.body.adicionar? ("Distancia Total: " + event.result.kml.Document.distance + " Km") : ("Distancia Total: " + event.result.kml.Document.distance + " Km");
+								graphicsLayerRutaOSM.add(gra);
+								
+								/*
+								var url:String = "http://translate.google.com.co/translate_a/t?client=t&text=translate&hl=es&sl=en&tl=es&multires=1&ssel=0&tsel=0&sc=1";
+								url = Base64.encode(url);
+								
+								servicio.url = configObject.configuration.urljava;
+								servicio.resultFormat = "text";
+								servicio.send(
+									{
+										urlOSM:url,
+										op:"translate"
+									});
+								*/
+								
+							}
+						}break;
+							
+					}
+				}
+			}
+
+
+			protected function servicio_faultHandler(event:FaultEvent):void
+			{
+				switch(event.token.message.body.op)
+				{
+					case "reverseFrom":
+					{
+						txtFrom.text = ""; 
+					}break;
+					case "reverseTo":
+					{
+						txtTo.text = ""; 
+					}break;
+				}
+				
+			}
+
+
+			protected function btnCalcular_clickHandler(event:MouseEvent):void
+			{
+				if(currentState == "manual")
+				{
+					calcularRuta();
+				}else if(currentState == "importar")
+				{
+					calcularRutaMultiple();
+				}
+			}
+
+
+			protected function btnLimpiar_clickHandler(event:MouseEvent):void
+			{
+				graphicsLayerDestino.clear();
+				graphicsLayerOrigen.clear();
+				graphicsLayerRutaOSM.clear();
+				
+				txtdescripcion.text = "";
+				txtDistancia.text = "";
+				txtFrom.text = txtTo.text = "";
+			}
+
+
+			protected function btnImportarLugares_clickHandler(event:MouseEvent):void
+			{
+				currentState = "importar";
+			}
+
+
+			protected function btnSeleccionManual_clickHandler(event:MouseEvent):void
+			{
+				currentState = "manual";
+			}
+
+			private var puntosACalcular:Array = []
+			
+			private function calcularRutaMultiple():void
+			{
+				puntosACalcular = [];
+				var poligonosAProyectar:Array = [];
+				for each(var elemento:Graphic in cargarElementos.providerGraphics)
+				{
+					if(elemento.geometry is MapPoint)
+					{
+						puntosACalcular.push(elemento.geometry);
+					}else if(elemento.geometry is Polygon)
+					{
+						poligonosAProyectar.push(elemento.geometry);
+					}
+				}
+				
+				if(poligonosAProyectar.length > 0)
+				{
+					GeometryServiceSingleton.instance.labelPoints(poligonosAProyectar,new AsyncResponder(labelPointsResult,labelPointsFault,poligonosAProyectar));
+				}
+				else if(puntosACalcular.length > 0)
+				{
+					hacerRutaMultiple();
+				}
+				
+			}
+			
+			private function labelPointsResult(results:Array, token:Object = null):void
+			{
+				for each(var point:MapPoint in results)
+				{
+					puntosACalcular.push(point);
+				}
+				if(puntosACalcular.length > 0)
+				{
+					hacerRutaMultiple();
+				}
+			}
+			
+			private function labelPointsFault(fault:Fault, token:Object = null):void
+			{
+				for each(var pol:Polygon in token)
+				{
+					puntosACalcular.push(pol.extent.center);
+				}
+				
+				if(puntosACalcular.length > 0)
+				{
+					hacerRutaMultiple();
+				}
+				
+			}
+			
+			private function hacerRutaMultiple():void
+			{
+				var elementos:Array = puntosACalcular;
+				
+				for (var i:Number = 0; i < elementos.length - 2; i++)
+				{
+					hacerRuta(elementos[i] as MapPoint,  elementos[i+1] as MapPoint);
+				}
+			}
+			
+			private function hacerRuta(origen:MapPoint, destino:MapPoint):void
+			{
+				var wkid:Number = origen.spatialReference.wkid;
+				var mapWkid:Number = map.spatialReference.wkid;
+				
+				var geoOrig:MapPoint = origen as MapPoint;
+				var geoDest:MapPoint = destino as MapPoint;
+					
+				if (mapWkid === 102100 || mapWkid === 102113 || mapWkid === 3857)
+				{
+					if (wkid === 102100 || wkid === 102113 || wkid === 3857 || origen.spatialReference.wkt === 'PROJCS["WGS_1984_Web_Mercator_Auxiliary_Sphere",GEOGCS["GCS_WGS_1984",DATUM["D_WGS_1984",SPHEROID["WGS_1984",6378137.0,298.257223563]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]],PROJECTION["Mercator_Auxiliary_Sphere"],PARAMETER["False_Easting",0.0],PARAMETER["False_Northing",0.0],PARAMETER["Central_Meridian",0.0],PARAMETER["Standard_Parallel_1",0.0],PARAMETER["Auxiliary_Sphere_Type",0.0],UNIT["Meter",1.0]]')
+					{
+						geoOrig = WebMercatorUtil.webMercatorToGeographic(origen) as MapPoint;
+						geoDest = WebMercatorUtil.webMercatorToGeographic(destino) as MapPoint
+					}
+				}
+				
+				var url:String = configObject.configuration.urlroute + 
+					"?flat=" + geoOrig.y +
+					"&flon=" + geoOrig.x +
+					"&tlat=" + geoDest.y +
+					"&tlon=" + geoDest.x +
+					"&v=" + cmbTipo.selectedItem.value + 
+					"&fast=1" +
+					"&layer=mapnik" +
+					"&instructions=1";
+				
+				url = Base64.encode(url);
+				
+				servicio.url = configObject.configuration.urljava;
+				servicio.resultFormat = "object";
+				servicio.send(
+					{
+						urlOSM:url,
+						op:"route",
+						adicionar:true
+					});
+			}
+		]]>
+	</fx:Script>
+
+	<fx:Declarations>
+		<esri:GraphicsLayer id="graphicsLayerOrigen" name="Origen Ruta OSM" symbol="{symbFrom}"/>
+		<esri:GraphicsLayer id="graphicsLayerDestino" name="Destino Ruta OSM" symbol="{symbTo}"/>
+		<esri:GraphicsLayer id="graphicsLayerRutaOSM" name="Ruteo OSM" />
+		
+		<esri:SimpleLineSymbol id="simboloRuta" color="0xFF0000" style="solid" width="4"/>
+		<esri:PictureMarkerSymbol id="symbFrom" source="assets/images/pin_from.png" width="40" height="40"/>
+		<esri:PictureMarkerSymbol id="symbTo" source="assets/images/pin_to.png" width="40" height="40"/>
+		
+		<s:HTTPService id="servicio" result="servicio_resultHandler(event)" fault="servicio_faultHandler(event)" showBusyCursor="true"
+					   method="POST"
+					   />
+	</fx:Declarations>
+	
+	<viewer:states>
+		<s:State name="manual"/>
+		<s:State name="importar"/>
+	</viewer:states>
+	
+	<viewer:WidgetTemplate id="wTemplate" 
+						   width="380" 
+						   height="{txtdescripcion.text.length > 0 ? 350 : 260}"
+						   open="wTemplate_openHandler(event)"
+						   closed="wTemplate_closedHandler(event)"
+						   >
+		
+		<s:BorderContainer cornerRadius="5" top="15" bottom="0" right="0" left="0" backgroundAlpha="0" 
+						   minHeight="50">
+			<s:VGroup horizontalCenter="0" verticalCenter="0" verticalAlign="middle" 
+					  horizontalAlign="center" left="5" top="5" right="5" bottom="5"
+					  >
+				<s:HGroup minHeight="0" horizontalAlign="right" width="100%">
+					<mx:LinkButton label="Importar lugares" visible.manual="true" visible.importar="false"
+								   includeInLayout.manual="true" includeInLayout.importar="false"
+								   id="btnImportarLugares" click="btnImportarLugares_clickHandler(event)"/>
+					<mx:LinkButton label="Selección Manual" visible.manual="false" visible.importar="true"
+								   includeInLayout.manual="false" includeInLayout.importar="true"
+								   id="btnSeleccionManual" click="btnSeleccionManual_clickHandler(event)"/>
+				</s:HGroup>
+				<s:HGroup verticalAlign="top" width="100%" visible.manual="true" visible.importar="false"
+						  includeInLayout.manual="true" includeInLayout.importar="false">
+					<mx:LinkButton id="btnFrom" 
+								   icon="@Embed(source='assets/images/pin_from.png')" 
+								   label="Desde"
+								   click="btnFrom_clickHandler(event)"/>
+					<s:Label id="txtFrom" width="100%" maxDisplayedLines="5"/>
+				</s:HGroup>
+				<s:HGroup verticalAlign="top" width="100%" visible.manual="true" visible.importar="false"
+						  includeInLayout.manual="true" includeInLayout.importar="false">
+					<mx:LinkButton id="btnTo" 
+								   icon="@Embed(source='assets/images/pin_to.png')" 
+								   label="Hasta"
+								   click="btnTo_clickHandler(event)"/>
+					<s:Label id="txtTo" width="100%" maxDisplayedLines="5"/>
+				</s:HGroup>
+				
+				<CargarElementos:CargarElementos id="cargarElementos" visible.manual="false" visible.importar="true"
+												includeInLayout.manual="false" includeInLayout.importar="true"
+												width="100%"
+												height="100%"
+												map="{map}"/>
+				
+				<s:HGroup width="100%" horizontalAlign="center" verticalAlign="middle" paddingBottom="3">
+					<s:Label text="Tipo de transporte:"/>
+					<s:DropDownList id="cmbTipo" dataProvider="{providerTipoVehiculo}" selectedIndex="0" requireSelection="true" width="150"/>
+				</s:HGroup>
+				
+				<s:Line width="98%">
+					<s:stroke>
+						<s:SolidColorStroke color="{getStyle('focusColor')}" />
+					</s:stroke>
+				</s:Line>
+				
+				<s:HGroup width="100%" horizontalAlign="center" paddingTop="3">
+					<s:Button id="btnCalcular" label="Calcular Ruta" click="btnCalcular_clickHandler(event)"/>
+					<s:Button id="btnLimpiar" label="Limpiar" click="btnLimpiar_clickHandler(event)"/>
+				</s:HGroup>
+				
+				<s:Line width="98%">
+					<s:stroke>
+						<s:SolidColorStroke color="{getStyle('focusColor')}" />
+					</s:stroke>
+				</s:Line>
+				
+				<s:Label id="txtDistancia" width="100%" paddingTop="5" fontWeight="bold" text="{'Distancia Total: ' + distancia + ' km'}"/>
+				<mx:HBox width="100%" height="80" maxHeight="80" verticalScrollPolicy="auto" paddingRight="5"
+						 includeInLayout="{txtdescripcion.text.length > 0}"
+						 visible="{txtdescripcion.text.length > 0}">
+					<mx:Text id="txtdescripcion"
+							 width="100%"/>
+				</mx:HBox>
+			</s:VGroup>
+		</s:BorderContainer>
+	</viewer:WidgetTemplate>
+</viewer:BaseWidget>

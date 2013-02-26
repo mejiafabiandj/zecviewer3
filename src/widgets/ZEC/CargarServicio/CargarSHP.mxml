@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx">
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.Map;
+			
+			import spark.events.TextOperationEvent;
+			
+			[Bindable] public var map:Map;
+			
+			private var fileReference:FileReference;
+			
+			protected function examinar(event:MouseEvent):void
+			{
+				fileReference = new FileReference();
+				fileReference.addEventListener(Event.SELECT, selectHandler);
+				fileReference.addEventListener(Event.CANCEL, cancelHandler);
+				fileReference.browse([new FileFilter("Archivos Zip", "*.zip"), new FileFilter("Archivos Excel", "*.xls")]);	
+				
+			}
+			
+			protected function txtArchivo_changeHandler(event:TextOperationEvent):void
+			{
+				// TODO Auto-generated method stub
+				
+			}
+			
+			private function selectHandler(event:Event):void
+			{
+				/* if(event.currentTarget){
+					if(event.currentTarget.type == ".xls"){
+						
+						//Se selecciono un archivo de excel 2003
+						fileReference.addEventListener(Event.COMPLETE, completeExcelHandler);
+						fileReference.addEventListener(IOErrorEvent.IO_ERROR, IOErrorHandler);
+						fileReference.load();
+						
+						//Comportamiento
+						txtArchivo.text = event.currentTarget.name;
+						isExcel = true;
+						
+					} else if(event.currentTarget.type == ".zip"){
+						
+						//Se selecciono el archivo de shapefile
+						fileReference.addEventListener(Event.COMPLETE, completeHandler);
+						fileReference.addEventListener(IOErrorEvent.IO_ERROR, IOErrorHandler);
+						fileReference.load();
+						
+						//Comportamiento
+						txtArchivo.text = event.currentTarget.name;
+						isExcel = false;
+					}
+				} */
+			}
+			
+			/**
+			 * En caso de que el usuario cancele la carga del archivo
+			 **/
+			private function cancelHandler(event:Event):void
+			{
+				fileReference = null;
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<mx:Grid verticalAlign="middle" horizontalAlign="center" width="100%">
+		<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle">
+			<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+				<s:Label text="Archivo SHP:"/>
+			</mx:GridItem>
+			<mx:GridItem verticalAlign="middle" width="100%">
+				<s:HGroup width="100%" useHandCursor="true" buttonMode="true">
+					<s:TextInput editable="false" width="100%"
+								 id="txtArchivo"
+								 text="Examinar ..."
+								 useHandCursor="true"
+								 buttonMode="true"
+								 selectable="false" 
+								 click="examinar(event)"
+								 change="txtArchivo_changeHandler(event)"/>
+					<s:Button label="..." width="30" useHandCursor="true" buttonMode="true"
+							  click="examinar(event)"/>
+				</s:HGroup>
+			</mx:GridItem>
+		</mx:GridRow>
+	</mx:Grid>
+			
+</s:Group>

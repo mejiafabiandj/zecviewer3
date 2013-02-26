@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:viewer="com.esri.viewer.*" layout="absolute"
+				   creationComplete="validacionGeorreferenciacion_creationCompleteHandler(event)"
+				   widgetConfigLoaded="validacionGeorreferenciacion_widgetConfigLoadedHandler(event)" xmlns:ValidacionGeorreferenciacion="widgets.DANE.ValidacionGeorreferenciacion.*">
+	<fx:Script>
+		<![CDATA[
+			import com.esri.viewer.AppEvent;
+			
+			import mx.controls.Alert;
+			import mx.events.FlexEvent;
+			
+			protected function validacionGeorreferenciacion_creationCompleteHandler(event:FlexEvent):void
+			{
+				for each (var widget:Object in configData.widgets)
+				{
+					if(widget.id == widgetId)
+					{
+						wTemplate.width = (widget.width && widget.width != "") ? widget.width : wTemplate.width;
+						wTemplate.height = (widget.height && widget.height != "") ? widget.height : wTemplate.height;
+						break;
+					}
+				}
+				
+				AppEvent.addListener(AppEvent.BASEMAP_SWITCH, basemapMenuClicked);
+				
+			}
+			
+			protected function validacionGeorreferenciacion_widgetConfigLoadedHandler(event:Event):void
+			{
+				if(configObject)
+				{
+					if(configData.data && configData.data.usuario)
+					{
+						validar.baseMaps = configData.basemaps;
+						validar.configObject = configObject;
+						validar.proxyUrl = configData.proxyUrl;
+					}
+				}else
+				{
+					Alert.show("No fué posible leer el archivo de configuración del módulo: " + widgetTitle);
+				}
+				
+			}
+			
+			protected function wTemplate_openHandler(event:Event):void
+			{
+				map.addLayer(validar.resultadosValidacionFeatureLayer);
+				
+			}
+			
+			protected function wTemplate_closedHandler(event:Event):void
+			{
+				map.removeLayer(validar.resultadosValidacionFeatureLayer);
+				
+			}
+			
+			/**
+			 * Evento resultado de el cambio del mapa base
+			 **/
+			private function basemapMenuClicked(event:AppEvent):void
+			{
+				validar.configurarNiveles();
+			}
+			
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<viewer:WidgetTemplate id="wTemplate" 
+						   width="380" 
+						   height="250"
+						   open="wTemplate_openHandler(event)"
+						   closed="wTemplate_closedHandler(event)"
+						   >
+		<ValidacionGeorreferenciacion:ValidarGeorreferenciacion id="validar" map="{map}" width="100%" height="100%" />
+	</viewer:WidgetTemplate>
+</viewer:BaseWidget>

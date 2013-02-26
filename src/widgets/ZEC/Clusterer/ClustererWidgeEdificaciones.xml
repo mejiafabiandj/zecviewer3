@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+   <layer url="http://dg_est45.dane.gov.co/arcgis/rest/services/Edificaciones/Obras/MapServer/0" 
+    	   useproxy="false"
+		   useAMF = "false"
+    	   label="Total Obras Censo 61"
+    	   visible="true"
+    	   alpha="1"
+    	   borderColor="0x686868"
+    	   backgroundColor="0x5C8944"
+    	   textColor="0xFFFFFF"
+    	   textSize="12"
+    	   outFields="TEXTO,DIRECCION,BARRIO,CODIGO,AG,FORMULARIO,DESCRIPCIO,COD5,SECTOR,NOM_MPIO,DPTO,DPTO_CNMBR,ETAPA,ESTADO,NOVEDAD,FECHA_NOVE,USUARIO"
+    	   />
+    <layer url="http://dg_est45.dane.gov.co/arcgis/rest/services/Edificaciones/Obras/MapServer/1" 
+    	   useproxy="false"
+		   useAMF = "false"
+    	   label="Total Obras Nuevas"
+    	   visible="false"
+    	   alpha="1"
+    	   borderColor="0xFF0000"
+    	   backgroundColor="0x6677CD"
+    	   textColor="0xFFFFFF"
+    	   textSize="12"
+    	   outFields="TEXTO,DIRECCION,BARRIO,CODIGO,AG,FORMULARIO,DESCRIPCIO,COD5,SECTOR,NOM_MPIO,DPTO,DPTO_CNMBR,ETAPA,ESTADO,NOVEDAD,FECHA_NOVE,USUARIO"
+    	   />
+ 
+ 	<!--<layer url="http://dg_est45.dane.gov.co/arcgis/rest/services/Unidades_Economicas/BOG_Unidades/MapServer/6"
+ 		   useproxy="false"
+		   useAMF = "false" 
+    	   label="Fuentes ICCP-ICCV"
+    	   visible="true"
+    	   alpha="1"
+    	   borderColor="0xAEC0FE"
+    	   backgroundColor="0x005CE6"
+    	   textColor="0xFFFFFF"
+    	   textSize="12"
+    	   outFields=""
+    	   />
+    	   
+	<layer url="http://dg_est45.dane.gov.co/arcgis/rest/services/Unidades_Economicas/BOG_Unidades/MapServer/7"
+		   useproxy="false"
+		   useAMF = "false" 
+    	   label="Fuentes IPC"
+    	   visible="true"
+    	   alpha="1"
+    	   borderColor="0x653863"
+    	   backgroundColor="0x70A800"
+    	   textColor="0xFFFFFF"
+    	   textSize="12"
+    	   outFields=""
+    	   >
+    	   <groupField name="LOCALIDAD" 
+    	   			   alias="Localidad" 
+    	   			   defaultValue="Otros"
+    	   			   values="ANTONIO NARIÑO,BARRIOS UNIDOS,BOSA,CIUDAD BOLIVAR,CHAPINERO,ENGATIVA,FONTIBON,KENNEDY,LA CANDELARIA,LOS MARTIRES,PUENTE ARANDA,RAFAEL URIBE,SAN CRISTOBAL,SANTA FE,SUBA,TEUSAQUILLO,TUNJUELITO,USAQUEN,USME" 
+    	   			   /> 
+    </layer>
+  -->
+	
+</configuration>

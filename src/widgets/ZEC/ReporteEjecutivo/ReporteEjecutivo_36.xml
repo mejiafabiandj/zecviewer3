@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<configuration>
+	<criterio nombre="Información de sectores"
+			  porDefecto="true"
+			  >
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/CEED/CEED_Sectores_Piloto_edicion/MapServer/0" where="1=1" >
+			<outFields>*</outFields>
+			<outFields nombre="DOM_ESTADO" valor="[ESTADO]==0?'No iniciado':[ESTADO]==1?'En proceso':[ESTADO]==2?'Terminado':[ESTADO]==3?'Obras Pendientes':''" />
+			<outFields nombre="TOTAL_OBRAS_ETAPA" valor="[OB_TOTAL]+[OB_NUEVAS]"/>
+			<outFields nombre="P_OBRAS_NUEVAS" valor="(([OB_NUEVAS]/[TOTAL_OBRAS_ETAPA])*100)?([OB_NUEVAS]/[TOTAL_OBRAS_ETAPA])*100:0"/>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="ETAPA"
+						color="0x3333ff"
+						>
+			</configMapa>
+		</alfanumerico>
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		<filtro nombre="Etapa" fieldLabel="ETAPA_OPE" field="ETAPA" value="">
+			<filtro nombre="Fase" fieldLabel="FASE1" field="FASE1" value="">
+				<filtro nombre="Supervisor" fieldLabel="SUPERVISOR" field="SUPERVISOR" value="">
+					<filtro nombre="Estado" fieldLabel="DOM_ESTADO" field="ESTADO" value="" />
+				</filtro>
+			</filtro>
+		</filtro>
+		<tabla>
+			<columnas field="SET_U" nombre="Código Sector"/>
+			<columnas field="DOM_ESTADO" nombre="Estado"/>
+			<columnas field="SUPERVISOR" nombre="Supervisor"/>
+			<columnas field="FASE1" nombre="Fase"/>
+			<columnas field="ETAPA" nombre="Etapa"/>
+			<columnas field="OB_PROCESO" nombre="Obras en proceso"/>
+			<columnas field="OB_PRLZADS" nombre="Obras paralizadas"/>
+			<columnas field="OB_CULMNDA" nombre="Obras culminadas"/>
+			<columnas field="OB_NUEVAS" nombre="Obras nuevas"/>
+			<columnas field="OB_PENDIEN" nombre="Obras pendientes"/>
+			<columnas field="OB_TOTAL" nombre="Total Obras Reportadas"/>
+			<columnas field="TT_OBRAS_O" nombre="TT Obras Seguimiento "/>
+			<columnas field="TOTAL_OBRAS_ETAPA" nombre="Total Obras Etapa"/>
+			<columnas field="P_OBRAS_NUEVAS" nombre="Porcentaje Obras Nuevas"/>
+		</tabla>
+	</criterio>
+	<criterio nombre="Cobertura por fase"
+			  porDefecto="false"
+			  >
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/CEED/CEED_Sectores_Piloto_edicion/MapServer/0" where="1=1" >
+			<outFields>*</outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="ETAPA"
+						color="0x3333ff"
+						>
+			</configMapa>
+		</alfanumerico>
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		<filtro nombre="Supervisor" fieldLabel="SUPERVISOR" field="SUPERVISOR" value="">
+			<filtro nombre="Fase" fieldLabel="FASE1" field="FASE1" value=""></filtro>
+		</filtro>
+		<tabla>
+			<groupby>ETAPA_OPE</groupby>
+			<groupby>SUPERVISOR</groupby>
+			<groupby>ESTADO</groupby>
+			<columnas field="ETAPA_OPE" nombre="Etapa_op"/>
+			<columnas field="SUPERVISOR" nombre="Supervisor"/>
+			<columnas field="ESTADO" nombre="cod. Estado"/>
+			<columnas field="total" nombre="Total"/>
+			<columnas field="FASE1" nombre="Fase"/>
+		</tabla>
+	</criterio>
+</configuration>

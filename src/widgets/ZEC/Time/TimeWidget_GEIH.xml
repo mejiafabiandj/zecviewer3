@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+	<titulo>GRAN ENCUESTA INTEGRADA DE HOGARES</titulo>
+	<label>Etapa</label>
+	<formatString>YYMM</formatString>
+	
+	<!---Id base 0 del widget de consulta operativa-->
+	<widgetId>0</widgetId>
+	
+	<defaultConfig>http://190.25.231.241:8030/JSegOp/Muestra?op=geih&accion=leer</defaultConfig>
+	
+	<timeStops>	<!---Deben existir mas de dos timeStop-->
+		<!--
+		<timeStop year="2011" month="09" label="SEPTIEMBRE DE 2011" config="http://190.25.231.241:8030/JSegOp/Muestra?op=geih&accion=leer&mes=09&ano=2011"/>
+		<timeStop year="2011" month="10" label="OCTUBRE DE 2011" config="http://190.25.231.241:8030/JSegOp/Muestra?op=geih&accion=leer&mes=10&ano=2011"/>
+		<timeStop year="2011" month="11" label="NOVIEMBRE DE 2011" config="http://190.25.231.241:8030/JSegOp/Muestra?op=geih&accion=leer&mes=11&ano=2011"/>
+		<timeStop year="2011" month="12" label="DICIEMBRE DE 2011" config="http://190.25.231.241:8030/JSegOp/Muestra?op=geih&accion=leer&mes=12&ano=2011"/>
+		<timeStop year="2012" month="01" label="ENERO DE 2012" config="http://190.25.231.241:8030/JSegOp/Muestra?op=geih&accion=leer&mes=01&ano=2012"/>
+		<timeStop year="2012" month="02" label="FEBRERO DE 2012" config="http://190.25.231.241:8030/JSegOp/Muestra?op=geih&accion=leer&mes=02&ano=2012"/>
+		<timeStop year="2012" month="03" label="MARZO DE 2012" config="http://190.25.231.241:8030/JSegOp/Muestra?op=geih&accion=leer&mes=03&ano=2012"/>
+		<timeStop year="2012" month="04" label="ABRIL DE 2012" config="http://190.25.231.241:8030/JSegOp/Muestra?op=geih&accion=leer&mes=04&ano=2012"/>
+		<timeStop year="2012" month="05" label="MAYO  DE 2012" config="http://190.25.231.241:8030/JSegOp/Muestra?op=geih&accion=leer&mes=05&ano=2012"/>
+		<timeStop year="2012" month="06" label="JUNIO DE 2012" config="http://190.25.231.241:8030/JSegOp/Muestra?op=geih&accion=leer&mes=06&ano=2012"/>
+		<timeStop year="2012" month="07" label="JULIO DE 2012" config="http://190.25.231.241:8030/JSegOp/Muestra?op=geih&accion=leer&mes=07&ano=2012"/>
+		<timeStop year="2012" month="08" label="AGOSTO DE 2012" config="http://190.25.231.241:8030/JSegOp/Muestra?op=geih&accion=leer&mes=08&ano=2012"/>
+		<timeStop year="2012" month="09" label="SEPTIEMBRE DE 2012" config="http://190.25.231.241:8030/JSegOp/Muestra?op=geih&accion=leer&mes=09&ano=2012"/>
+		-->
+		
+		<timeStop year="2012" month="10" label="OCTUBRE DE 2012" config="http://190.25.231.241:8030/JSegOp/Muestra?op=geih&accion=leer&mes=10&ano=2012"/>
+		<timeStop year="2012" month="11" label="NOVIEMBRE DE 2012" config="http://190.25.231.241:8030/JSegOp/Muestra?op=geih&accion=leer&mes=11&ano=2012"/>
+		<timeStop year="2012" month="12" label="DICIEMBRE DE 2012" config="http://190.25.231.241:8030/JSegOp/Muestra?op=geih&accion=leer&mes=12&ano=2012"/>
+		<timeStop year="2013" month="01" label="ENERO DE 2013" config="http://190.25.231.241:8030/JSegOp/Muestra?op=geih&accion=leer&mes=01&ano=2013"/>
+	</timeStops>
+</configuration>

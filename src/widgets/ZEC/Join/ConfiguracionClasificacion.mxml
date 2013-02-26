@@ -1,0 +1,902 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			   xmlns:s="library://ns.adobe.com/flex/spark" 
+			   xmlns:mx="library://ns.adobe.com/flex/mx"
+			   
+			   close="ventana_closeHandler(event)"
+			   title="Configuración de la clasificación"
+			   
+			   add="ventana_creationCompleteHandler()">
+	<fx:Metadata>
+		/**
+		* Disparado cuando se finaliza la clasificación de las clases seleccionadas. se retorna el renderer y el listado de 
+		* objetos que contienen llave y valor para cada uno de los elementos contenidos en el archivo dbf
+		* @eventType com.esri.viewer.AppEvent
+		**/
+		[Event(name="clasificado",type="com.esri.viewer.AppEvent")]
+		
+		/**
+		* Disparado cuando se finaliza la lectura de los valores únicos.
+		* @eventType com.esri.viewer.AppEvent
+		**/
+		[Event(name="valoresUnicosLeidos",type="com.esri.viewer.AppEvent")]
+		
+		
+		/**
+		* Disparado cuando se finaliza la adicion de las clases segun el criterio de clasificacion.
+		* @eventType com.esri.viewer.AppEvent
+		**/
+		[Event(name="clasesAdicionadas",type="com.esri.viewer.AppEvent")]
+		
+		/**
+		* 
+		* @eventType mx.events.FlexEvent
+		**/
+		[Event(name="btnAdicionarTodosCreationComplete",type="mx.events.FlexEvent")]
+		
+		/**
+		* 
+		* @eventType mx.events.FlexEvent
+		**/
+		[Event(name="cmbMetodosCreationComplete",type="mx.events.FlexEvent")]
+	</fx:Metadata>
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.renderers.UniqueValueRenderer;
+			import com.esri.ags.symbols.SimpleFillSymbol;
+			import com.esri.ags.symbols.SimpleLineSymbol;
+			import com.esri.viewer.AppEvent;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.List;
+			import mx.core.FlexGlobals;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.utils.HSBColor;
+			import mx.utils.ObjectProxy;
+			
+			import org.vanrijkom.dbf.DbfHeader;
+			import org.vanrijkom.dbf.DbfRecord;
+			import org.vanrijkom.dbf.DbfTools;
+			
+			import spark.events.IndexChangeEvent;
+			import spark.events.TextOperationEvent;
+			
+			/**
+			 * Disparado cuando se finaliza la clasificación de las clases seleccionadas. se retorna el renderer y el listado de 
+			 * objetos que contienen llave y valor para cada uno de los elementos contenidos en el archivo dbf
+			 * @eventType com.esri.viewer.AppEvent
+			 **/
+			public static const CLASIFICADO:String	 = "clasificado";
+			
+			
+			/**
+			 * Disparado cuando se finaliza la lectura de los valores únicos.
+			 * @eventType com.esri.viewer.AppEvent
+			 **/
+			public static const VALORES_UNICOS_LEIDOS:String	 = "valoresUnicosLeidos";
+			
+			
+			
+			public static const BTN_ADICIONAR_TODOS_CREATION_COMPLETE:String = "btnAdicionarTodosCreationComplete";
+			
+			public static const CMB_METODOS_CREATION_COMPLETE:String = "cmbMetodosCreationComplete";
+			
+			
+			
+			/**
+			 * Tipo de variable que toma valores definidos por un grupo finito de valores.
+			 * <p>Por ejemplo el estrato socioeconómico de una manzana es una variable discrita, 
+			 * ya que solo puede tomar los valores {0,1,2,3,4,5,6}
+			 **/
+			public static const TIPO_VARIABLE_DISCRETO:String = "metodoClasificacionDiscreto";
+			
+			public static const TIPO_VARIABLE_CONTINUO:String = "metodoClasificacioncontinuo";
+			
+			public static const TIPO_VARIABLE_CONTINUO_VALORES_UNICOS:String = "metodoClasificacioncontinuovaloresunicos";
+			
+			
+			public static const METODO_CLASIFICACION_VALORES_UNICOS:String = "Valores Únicos";
+			
+			public static const METODO_CLASIFICACION_INTERVALOS_IGUALES:String = "Intervalos Iguales";
+			
+			public static const METODO_CLASIFICACION_QUANTILES:String = "Quantiles";
+			
+			public static const METODO_CLASIFICACION_PUNTOS_NATURALES:String = "Puntos Naturales de Quiebre";
+			
+			/**
+			 * Tipo de variable que se va a clasificar
+			 **/
+			public static var tipoVariable:String;
+			
+			/**
+			 * Distancia máxima en metros usada para la geralización de las geometrias
+			 **/
+			public static var generalizacion:Number = 200;
+			
+			/**
+			 * Escala máxima a la que se mostrará la capa
+			 **/
+			[Bindable] public var escalaMinima:Number;
+			
+			/**
+			 * Escala mínima a la que se mostrará la capa
+			 **/
+			[Bindable] public var escalaMaxima:Number;
+			
+			
+			/**
+			 * Nombre de la variable criterio para clasificar
+			 **/
+			[Bindable] public var critero:String;
+			
+			/**
+			 * Nombre de la variable llave para clasificar
+			 **/
+			[Bindable] public var llave:String;
+			
+			
+			/**
+			 * Métodos de clasificación para variables contunuas
+			 **/
+			[Bindable] public var providerCmbMetodos:ArrayCollection = new ArrayCollection();
+			
+			/**
+			* Número de clases a clasificar para variables contunuas
+			**/
+			[Bindable] public var providerCmbClases:ArrayCollection = new ArrayCollection();
+			
+			
+			private var valoresUnicos:ArrayCollection = new ArrayCollection();
+			
+			
+			/**
+			 * Listado de objetos que contienen llave y valor para cada uno de los elementos contenidos en el archivo dbf
+			 **/
+			public var datosJoin:ArrayCollection = new ArrayCollection();
+			
+			[Bindable] public var nivelesGeneralizacion:ArrayCollection = new ArrayCollection();
+			
+			[Bindable] public var nivelGeneralizacion:Number;
+			
+			[Bindable] private var verAvanzados:Boolean = false;
+			
+			[Bindable] private var valoresFaltantes:ArrayCollection = new ArrayCollection();
+			
+			[Bindable] public var providerClases:ArrayCollection = new ArrayCollection();
+			
+			public var dbfHeader:DbfHeader;
+			
+			private var _dbfByteArray:ByteArray;
+			
+			/**
+			 * ByteArray que contiene el dbf con la información que se va a adicionar
+			 **/
+			public function get dbfByteArray():ByteArray
+			{
+				return _dbfByteArray;
+			}
+
+			/**
+			 * @private
+			 */
+			public function set dbfByteArray(value:ByteArray):void
+			{
+				_dbfByteArray = value;
+			}
+
+
+			protected function ventana_creationCompleteHandler(event:FlexEvent = null):void
+			{
+				if (!hasEventListener(VALORES_UNICOS_LEIDOS))
+				{
+					addEventListener(VALORES_UNICOS_LEIDOS,valoresUnicosLeidos_Handler);
+				}
+				
+				
+				
+				if(tipoVariable == TIPO_VARIABLE_CONTINUO)
+				{
+					currentState = "continuo";
+				}else if(tipoVariable == TIPO_VARIABLE_DISCRETO)
+				{
+					currentState = "discreto";
+				}else if(tipoVariable == TIPO_VARIABLE_CONTINUO_VALORES_UNICOS)
+				{
+					currentState = "continuo_valores_unicos";
+				}
+				
+				if(dbfByteArray && critero && llave)
+				{
+					obtenerValoresUnicos();
+				}
+				
+				if(sldrNivel)
+				{
+					sldrNivel.dispatchEvent(new Event(Event.CHANGE));
+				}
+				
+				
+			}
+			
+
+			protected function ventana_closeHandler(event:CloseEvent):void
+			{
+				PopUpManager.removePopUp(this);
+			}
+			
+			private function obtenerValoresUnicos():void
+			{
+				var dbfRecord:DbfRecord;
+				var unicos:ArrayCollection = new ArrayCollection();
+				
+				datosJoin.removeAll();
+				
+				for (var i:Number = 0 ; i < dbfHeader.recordCount ; i++)
+				{
+					dbfRecord = DbfTools.getRecord(dbfByteArray, dbfHeader, i);
+					
+					var elemento:ObjectProxy = new ObjectProxy({llave:dbfRecord.values[llave],valor:dbfRecord.values[critero]});
+					datosJoin.addItem(elemento);
+					
+					var hasValor:Boolean = false;
+					for each(var unico:ObjectProxy in unicos)
+					{
+						if(unico.valor == dbfRecord.values[critero])
+						{
+							hasValor = true;
+							break;
+						}
+					}
+					if(!hasValor)
+					{
+						var valor:ObjectProxy = new ObjectProxy({valor:dbfRecord.values[critero]});
+						if(tipoVariable == TIPO_VARIABLE_CONTINUO || tipoVariable == TIPO_VARIABLE_CONTINUO_VALORES_UNICOS)
+						{
+							valor.valor = Number(valor.valor) ? Number(valor.valor) : valor.valor;
+						}
+						unicos.addItem(valor);
+					}
+				}
+				
+				
+				if(tipoVariable == TIPO_VARIABLE_CONTINUO || tipoVariable == TIPO_VARIABLE_CONTINUO_VALORES_UNICOS)
+				{
+					unicos = new ArrayCollection(unicos.toArray().sortOn("valor",Array.NUMERIC));
+				}else
+				{
+					unicos = new ArrayCollection(unicos.toArray().sortOn("valor"));
+				}
+				
+				valoresUnicos.removeAll();
+				valoresUnicos.addAll(unicos);
+				
+				valoresFaltantes.removeAll();
+				valoresFaltantes.addAll(unicos);
+				
+				providerCmbMetodos.removeAll();
+				providerCmbClases.removeAll();
+				
+				if(valoresUnicos.length > 0)
+				{
+					providerCmbMetodos.addItem(METODO_CLASIFICACION_VALORES_UNICOS);
+					
+					if(valoresUnicos.length > 1)
+					{
+						for (var j:Number = 2; j <= 10 && j < valoresUnicos.length; j++)
+						{
+							providerCmbClases.addItem(j);
+						}
+						
+						if(cmbClases)
+						{
+							cmbClases.selectedIndex = Math.floor(providerCmbClases.length/2);
+							cmbClases.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-1,Math.floor(providerCmbClases.length/2)));
+						}
+						
+						providerCmbMetodos.addAll(new ArrayCollection([METODO_CLASIFICACION_INTERVALOS_IGUALES,METODO_CLASIFICACION_QUANTILES,METODO_CLASIFICACION_PUNTOS_NATURALES]));
+					}
+					
+					dispatchEvent(new AppEvent(VALORES_UNICOS_LEIDOS,unicos));
+					
+				}else
+				{
+					Alert.show("No hay valores en el criterio seleccionado para poder clasificar, por favor seleccione otro criterio o verifique sus datos");
+				}
+			}
+
+			/**
+			 * Realizar una clasificacion inicial por defecto segun el tipoi de valiable seleccionada
+			 **/
+			protected function valoresUnicosLeidos_Handler(event:AppEvent):void
+			{
+				switch(tipoVariable)
+				{
+					case TIPO_VARIABLE_CONTINUO:
+					{
+						if(event.data is ArrayCollection && event.data.length > 1)
+						{
+							if(cmbMetodos)
+							{
+								if(providerCmbMetodos.getItemIndex(event.data.length <= 15 ? METODO_CLASIFICACION_VALORES_UNICOS : METODO_CLASIFICACION_QUANTILES) != -1)
+								{
+									cmbMetodos.selectedIndex = providerCmbMetodos.getItemIndex(event.data.length <= 15 ? METODO_CLASIFICACION_VALORES_UNICOS : METODO_CLASIFICACION_QUANTILES);
+									cmbMetodos.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-1, providerCmbMetodos.getItemIndex(event.data.length <= 15 ? METODO_CLASIFICACION_VALORES_UNICOS : METODO_CLASIFICACION_QUANTILES) ));
+								}
+							}
+							else
+							{
+								addEventListener(CMB_METODOS_CREATION_COMPLETE,
+									function():void
+									{
+										if(providerCmbMetodos.getItemIndex(event.data.length <= 15 ? METODO_CLASIFICACION_VALORES_UNICOS : METODO_CLASIFICACION_QUANTILES) != -1)
+										{
+											cmbMetodos.selectedIndex = providerCmbMetodos.getItemIndex(event.data.length <= 15 ? METODO_CLASIFICACION_VALORES_UNICOS : METODO_CLASIFICACION_QUANTILES);
+											cmbMetodos.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-1, providerCmbMetodos.getItemIndex(event.data.length <= 15 ? METODO_CLASIFICACION_VALORES_UNICOS : METODO_CLASIFICACION_QUANTILES) ));
+										}
+									});
+							}
+						}
+					}break;
+					case TIPO_VARIABLE_CONTINUO_VALORES_UNICOS:
+					{
+						
+					}break;
+					case TIPO_VARIABLE_DISCRETO:
+					{
+						if(btnAdicionarTodos)
+						{
+							btnAdicionarTodos.dispatchEvent(new MouseEvent(MouseEvent.CLICK));
+						}
+						else
+						{
+							addEventListener(BTN_ADICIONAR_TODOS_CREATION_COMPLETE,adicionar);
+							function adicionar():void
+							{
+								btnAdicionarTodos.dispatchEvent(new MouseEvent(MouseEvent.CLICK));
+								removeEventListener(BTN_ADICIONAR_TODOS_CREATION_COMPLETE,adicionar);
+							}
+						}
+					}break;
+				}
+			}
+
+			protected function btnAdicionarTodos_clickHandler(event:MouseEvent):void
+			{
+				providerClases.removeAll();
+				providerClases.addAll(valoresUnicos);
+				valoresFaltantes.removeAll();
+				
+				
+			}
+
+
+			protected function btnEliminarTodos_clickHandler(event:MouseEvent):void
+			{
+				providerClases.removeAll();
+				valoresFaltantes.removeAll();
+				valoresFaltantes.addAll(valoresUnicos);
+			}
+
+
+			protected function btnEliminar_clickHandler(event:MouseEvent):void
+			{
+				if(grdClases.selectedIndices)
+				{
+					for (var i:Number = grdClases.selectedIndices.length -1 ; i >= 0 ; i--)
+					{
+						valoresFaltantes.addItem(providerClases.removeItemAt(grdClases.selectedIndices[i]));
+					}
+				}
+			}
+
+
+			protected function btnAdicionar_clickHandler(event:MouseEvent):void
+			{
+				var list:List = new List();
+				list.dataProvider = valoresFaltantes;
+				list.allowMultipleSelection = true;
+				list.width = 200;
+				list.height = 150;
+				list.labelField = "valor";
+				list.setStyle("selectionColor",getStyle('focusColor'));
+				
+				
+				var btn:Button = new Button();
+				btn.label = "Añadir";
+				btn.enabled = list.selectedIndices.length > 0;
+				
+				
+				list.addEventListener(ListEvent.CHANGE,
+					function():void
+					{
+						btn.enabled = list.selectedIndices.length > 0;
+					});
+				
+				btn.addEventListener(MouseEvent.CLICK,
+					function():void
+					{
+						if(list.selectedIndices.length > 0)
+						{
+							for (var i:Number = list.selectedIndices.length -1 ; i >= 0 ; i--)
+							{
+								providerClases.addItem(valoresFaltantes.removeItemAt(list.selectedIndices[i]));
+							}
+							window.dispatchEvent(new CloseEvent(CloseEvent.CLOSE));
+						}
+					});
+				
+				var vg:VGroup = new VGroup();
+				vg.horizontalAlign = "center";
+				vg.left = 5;
+				vg.right = 5;
+				vg.top = 5;
+				vg.bottom = 5;
+				vg.addElement(list);
+				vg.addElement(btn);
+				
+				var window:TitleWindow = new TitleWindow();
+				window.title = "Añadir valores"
+				window.addEventListener(CloseEvent.CLOSE,function():void{PopUpManager.removePopUp(window);});
+				window.addElement(vg);
+				
+				PopUpManager.addPopUp(window,Sprite(FlexGlobals.topLevelApplication),true);
+				PopUpManager.centerPopUp(window);
+			}
+
+
+			protected function sldrNivel_changeHandler(event:Event):void
+			{
+				if(nivelesGeneralizacion.length > 0 && nivelesGeneralizacion.length >= sldrNivel.value)
+				{
+					txtNivel.text = nivelesGeneralizacion[sldrNivel.value].label + " (" + nivelesGeneralizacion[sldrNivel.value].valor + "m)";
+					nivelGeneralizacion = sldrNivel.value;
+					if(Number(nivelesGeneralizacion[sldrNivel.value].valor))
+					{
+						generalizacion = Number(nivelesGeneralizacion[sldrNivel.value].valor);
+					}
+					
+					imgNivel.source = nivelesGeneralizacion[sldrNivel.value].imagen;
+				}
+			}
+
+
+			protected function sldrNivel_creationCompleteHandler(event:FlexEvent):void
+			{
+				sldrNivel.dispatchEvent(new Event(Event.CHANGE));
+			}
+
+
+			protected function txtEscalaMax_changeHandler(event:TextOperationEvent):void
+			{
+				escalaMaxima = Number(txtEscalaMax.text);
+			}
+
+
+			protected function txtEscalaMin_changeHandler(event:TextOperationEvent):void
+			{
+				escalaMinima = Number(txtEscalaMin.text);
+			}
+
+			
+			protected function btnAceptar_clickHandler(event:MouseEvent):void
+			{
+				switch(currentState)
+				{
+					case "discreto":
+					{
+						clasificarDiscreto();
+					}break;
+					case "continuo":
+					{
+						clasificarContinuo();
+					}break;
+					case "continuo_valores_unicos":
+					{
+						clasificarDiscreto();
+					}break;
+					
+				}
+			}
+			
+			private function clasificarDiscreto():void
+			{
+				var renderer:UniqueValueRenderer = new UniqueValueRenderer();
+				renderer.field = critero;
+				renderer.defaultLabel = "Otro Valor";
+				
+				var defaultSymb:SimpleFillSymbol = 
+					new SimpleFillSymbol(
+						SimpleFillSymbol.STYLE_SOLID,
+						pkrDefault.selectedColor,
+						0.5,
+						new SimpleLineSymbol(
+							SimpleLineSymbol.STYLE_SOLID,
+							pkrDefault.selectedColor,
+							1,
+							3
+						)
+					);
+				
+				renderer.defaultSymbol = defaultSymb;
+				
+				dispatchEvent(new AppEvent(CLASIFICADO,{defaultSymbol:defaultSymb,datos:datosJoin, clases:providerClases}));
+				PopUpManager.removePopUp(this);
+			}
+
+			
+
+
+			protected function cmbMetodos_changeHandler(event:IndexChangeEvent):void
+			{
+				providerClases.removeAll();
+				
+				if(cmbMetodos.selectedItem == METODO_CLASIFICACION_VALORES_UNICOS)
+				{
+					this.setCurrentState("continuo_valores_unicos");
+					this.currentState = "continuo_valores_unicos";
+					tipoVariable = TIPO_VARIABLE_CONTINUO_VALORES_UNICOS;
+					
+					providerClases.removeAll();
+					providerClases.addAll(valoresUnicos);
+					valoresFaltantes.removeAll();
+				}else
+				{
+					currentState = "continuo";
+					tipoVariable = TIPO_VARIABLE_CONTINUO;
+					if(cmbClases.selectedItem)
+					{
+						obtenerClases(cmbMetodos.selectedItem,cmbClases.selectedItem);
+					}
+				}
+			}
+
+			private function obtenerClases(metodo:String, clases:Number):void
+			{
+				var i:Number;
+				var intervalo:ObjectProxy;
+				
+				switch(metodo)
+				{
+					case METODO_CLASIFICACION_INTERVALOS_IGUALES:
+					{
+						var min:Number = valoresUnicos[0].valor;
+						var max:Number = valoresUnicos[valoresUnicos.length-1].valor;
+						var tamanoIntervalo:Number = Math.floor((max - min) / clases);
+						
+						if(tamanoIntervalo == 0)
+						{
+							break;
+						}
+						
+						max = min + tamanoIntervalo;
+						
+						
+						for (i = 0; i < clases; i++)
+						{
+							intervalo = new ObjectProxy();
+							
+							intervalo.min = min;
+							intervalo.max = max;
+							
+							min += tamanoIntervalo;
+							max = (i != clases-2) ? max + tamanoIntervalo : valoresUnicos[valoresUnicos.length-1].valor;
+							
+							intervalo.valor = intervalo.min + " - " + intervalo.max;
+							providerClases.addItem(intervalo);
+							
+						}
+						
+					}break;
+					case METODO_CLASIFICACION_QUANTILES:
+					{
+						var elementosPorClase:Number = Math.floor(valoresUnicos.length / clases);
+						for (i = 0 ; i < clases ; i++)
+						{
+							intervalo = new ObjectProxy();
+							
+							intervalo.min = valoresUnicos[elementosPorClase*i].valor;
+							intervalo.max = (i != clases-1) ? valoresUnicos[elementosPorClase*(i+1)].valor : valoresUnicos[valoresUnicos.length-1].valor;
+							
+							intervalo.valor = intervalo.min + " - " + intervalo.max;
+							providerClases.addItem(intervalo);
+						}
+					}break;
+					case METODO_CLASIFICACION_PUNTOS_NATURALES:
+					{
+						var unicos:ArrayCollection = new ArrayCollection();
+						for each(var val:ObjectProxy in valoresUnicos)
+						{
+							unicos.addItem(val.valor);
+						}
+						
+						var indices:ArrayCollection = getJenksBreaks(unicos,clases);
+						
+						
+						for (i = 0; i < clases; i++)
+						{
+							intervalo = new ObjectProxy();
+							
+							intervalo.min = (i == 0) ? valoresUnicos[0].valor : valoresUnicos[indices[i-1]].valor;
+							intervalo.max = valoresUnicos[indices[i]].valor;
+							
+							intervalo.valor = intervalo.min + " - " + intervalo.max;
+							providerClases.addItem(intervalo);
+							
+						}
+						
+					}break;
+				}
+				
+				
+			}
+			
+			
+			private function clasificarContinuo():void
+			{
+				var renderer:UniqueValueRenderer = new UniqueValueRenderer();
+				renderer.field = critero;
+				renderer.defaultLabel = "Otro Valor";
+				
+				var defaultSymb:SimpleFillSymbol = 
+					new SimpleFillSymbol(
+						SimpleFillSymbol.STYLE_SOLID,
+						pkrDefault.selectedColor,
+						0.5,
+						new SimpleLineSymbol(
+							SimpleLineSymbol.STYLE_SOLID,
+							pkrDefault.selectedColor,
+							1,
+							3
+						)
+					);
+				
+				renderer.defaultSymbol = defaultSymb;
+				
+				dispatchEvent(new AppEvent(CLASIFICADO,{defaultSymbol:defaultSymb,datos:datosJoin, clases:providerClases}));
+				PopUpManager.removePopUp(this);
+			}
+			/**
+			 * Método que realiza el cálulo de los indices base 0 para los puntos naturales de quiebre de una colección de datos numéricos
+			 * http://www.spatialanalysisonline.com/output/html/Univariateclassificationschemes.html#_Ref116892931
+			 **/ 
+			public static function getJenksBreaks(list:ArrayCollection, numclass:Number):ArrayCollection {
+				if(numclass == 0)
+					return null; 
+				if(numclass == 1)
+				{
+					return new ArrayCollection([list.length-1]);
+				}
+				
+				var numdata:Number = list.length;
+				var mat1:ArrayCollection = new ArrayCollection(new Array(numdata + 1));
+				var mat2:ArrayCollection = new ArrayCollection(new Array(numdata + 1));
+				var st:ArrayCollection = new ArrayCollection(new Array(numdata));
+				var j:Number;
+				
+				for(j = 1; j <= numdata ; j++)
+				{
+					mat1[j] = new ArrayCollection(new Array(numclass+ 1));
+					mat2[j] = new ArrayCollection(new Array(numclass+ 1));
+				}
+				
+				for (var i:Number = 1; i <= numclass; i++) {
+					mat1[1][i] = 1;
+					mat2[1][i] = 0;
+					for (j = 2; j <= numdata; j++)
+						mat2[j][i] = Number.MAX_VALUE;
+				}
+				
+				var v:Number = 0;
+				
+				for (var l:Number = 2; l <= numdata; l++) {
+					var s1:Number = 0;
+					var s2:Number = 0;
+					var w:Number = 0;
+					for (var m:Number = 1; m <= l; m++) {
+						var i3:Number = l - m + 1;
+						
+						var val:Number = list[i3-1];
+						
+						s2 += val * val;
+						s1 += val;
+						w++;
+						v = s2 - (s1 * s1) / w;
+						var i4:Number = i3 - 1;
+						if (i4 != 0) {
+							for (j = 2; j <= numclass; j++) {
+								if (mat2[l][j] >= (v + mat2[i4][j- 1])) {
+									mat1[l][j] = i3;
+									mat2[l][j] = v + mat2[i4][j -1];
+								}
+							}
+						}
+					}
+					mat1[l][1] = 1;
+					mat2[l][1] = v;
+				}
+				var k:Number = numdata;
+				var kclass:ArrayCollection = new ArrayCollection(new Array(numclass));
+				kclass[numclass - 1] = list.length - 1;
+				
+				for (j = numclass; j >= 2; j--) {
+					
+					var id:Number =  mat1[k][j] - 2;
+					kclass[j - 2] = id;
+					k = mat1[k][j] - 1;
+					
+				}
+				return kclass;
+			}
+
+			protected function cmbClases_changeHandler(event:IndexChangeEvent):void
+			{
+				providerClases.removeAll();
+				
+				if(cmbMetodos.selectedItem && cmbMetodos.selectedItem != METODO_CLASIFICACION_VALORES_UNICOS)
+				{
+					obtenerClases(cmbMetodos.selectedItem,cmbClases.selectedItem);
+				}
+			}
+
+
+			protected function btnAdicionarTodos_creationCompleteHandler(event:FlexEvent):void
+			{
+				dispatchEvent(new FlexEvent(BTN_ADICIONAR_TODOS_CREATION_COMPLETE));
+			}
+
+
+			protected function cmbMetodos_creationCompleteHandler(event:FlexEvent):void
+			{
+				dispatchEvent(new FlexEvent(CMB_METODOS_CREATION_COMPLETE));
+			}
+			
+			
+			
+
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<mx:NumberValidator id="valEscalaMax" allowNegative="false" domain="int" 
+							maxValue="{escalaMinima}" source="{txtEscalaMax}" property="text"
+							triggerEvent="change" required="true"
+							valid="{escalaMaxima = Number(txtEscalaMax.text)}"/>
+		<mx:NumberValidator id="valEscalaMin" allowNegative="false" domain="int" 
+							minValue="{escalaMaxima}" source="{txtEscalaMin}" property="text"
+							triggerEvent="change" required="true"
+							valid="{escalaMinima = Number(txtEscalaMin.text)}"/>
+	</fx:Declarations>
+	
+	<s:states>
+		<s:State name="discreto"/>
+		<s:State name="continuo"/>
+		<s:State name="continuo_valores_unicos"/>
+	</s:states>
+	<s:VGroup left="10" top="10" right="10" bottom="20" gap="0" horizontalAlign="center">
+		<s:HGroup width="100%">
+			<s:Group width="100%">
+				<s:BorderContainer right="10" bottom="10" left="10" top="10" minHeight="0" backgroundAlpha="0">
+					<s:Label left="10" top="10" right="10" bottom="10" id="txtCriterio"
+							 text="{critero}"/>
+				</s:BorderContainer>
+				<s:Label left="16" y="6" text="►Criterio" backgroundColor="{getStyle('backgroundColor')}" fontWeight="bold"/>
+			</s:Group>
+			<s:Group right="10" bottom="0" left="10" top="10" includeIn="continuo,continuo_valores_unicos">
+				<s:BorderContainer right="10" bottom="0" left="10" top="10" minHeight="0" backgroundAlpha="0">
+					<s:HGroup left="10" top="10" right="10" bottom="5" verticalAlign="middle">
+						<s:Label text="Método" minWidth="0"/>
+						<s:DropDownList id="cmbMetodos" width="150" dataProvider="{providerCmbMetodos}"
+										change="cmbMetodos_changeHandler(event)" prompt="Seleccione..."
+										creationComplete="cmbMetodos_creationCompleteHandler(event)"/>
+						<mx:Spacer width="5" includeIn="continuo"/>
+						<s:Label text="Clases" includeIn="continuo"/>
+						<s:DropDownList id="cmbClases" width="55" dataProvider="{providerCmbClases}" prompt="Seleccione..."
+										selectedIndex="{Math.floor(providerCmbClases.length/2)}"
+										includeIn="continuo"
+										change="cmbClases_changeHandler(event)"
+										/>
+					</s:HGroup>
+				</s:BorderContainer>
+				<s:Label left="16" y="6" text="►Método de clasificación" backgroundColor="{getStyle('backgroundColor')}" fontWeight="bold"/>
+			</s:Group>
+		</s:HGroup>
+		<s:Group width="100%">
+			<s:BorderContainer right="10" bottom="10" left="10" top="10" minHeight="0" backgroundAlpha="0">
+				<s:VGroup left="10" top="10" right="10" bottom="10">
+					<mx:DataGrid width="100%" dataProvider="{providerClases}"
+								 height="120"
+								 id="grdClases"
+								 allowMultipleSelection="true"
+								 selectionColor="{getStyle('focusColor')}"
+								 alternatingItemColors="{[getStyle('contentBackgroundColor'),getStyle('contentBackgroundColor')]}">
+						<mx:columns>
+							<mx:DataGridColumn id="grdClasesColorColumn" itemRenderer="widgets.DANE.Join.ClasificacionColorItemRenderer"
+											   headerRenderer="widgets.DANE.Join.ClasificacionColorHeaderRenderer"
+											   width="21" resizable="false" sortable="false"/>
+							<mx:DataGridColumn dataField="valor"/>
+						</mx:columns>
+					</mx:DataGrid>
+					<s:HGroup verticalAlign="middle">
+						<mx:ColorPicker id="pkrDefault"/>
+						<s:Label text="Otros valores"/>
+					</s:HGroup>
+					<s:HGroup includeIn="discreto,continuo_valores_unicos">
+						<s:Button id="btnAdicionarTodos" label="Añadir todos"
+								  click="btnAdicionarTodos_clickHandler(event)"
+								  creationComplete="btnAdicionarTodos_creationCompleteHandler(event)"/>
+						<s:Button id="btnAdicionar" label="Añadir valor..."
+								  click="btnAdicionar_clickHandler(event)"
+								  enabled="{valoresFaltantes.length > 0}"/>
+						<s:Button id="btnEliminar" label="Eliminar"
+								  click="btnEliminar_clickHandler(event)"
+								  enabled="{(grdClases.selectedIndices).length > 0}"/>
+						<s:Button id="btnEliminarTodos" label="Eliminar todos"
+								  click="btnEliminarTodos_clickHandler(event)"
+								  enabled="{grdClases.dataProvider.length > 0}"/>
+					</s:HGroup>
+				</s:VGroup>
+			</s:BorderContainer>
+			<s:Label left="16" y="6" text="►Valores" backgroundColor="{getStyle('backgroundColor')}" fontWeight="bold"/>
+		</s:Group>
+		<s:Group width="100%">
+			<s:BorderContainer right="10" bottom="10" left="10" top="10" minHeight="10" backgroundAlpha="0">
+				<s:HGroup left="10" top="10" right="10" bottom="10" includeInLayout="{verAvanzados}" visible="{verAvanzados}">
+					<mx:Grid verticalAlign="middle" horizontalAlign="center">
+						<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle">
+							<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+								<s:Label text="Escala Mínima (Desde)"/>
+							</mx:GridItem>
+							<mx:GridItem verticalAlign="middle" width="100%">
+								<s:TextInput text="{escalaMinima}" id="txtEscalaMin"
+											 change="txtEscalaMin_changeHandler(event)"/>
+							</mx:GridItem>
+						</mx:GridRow>
+						<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle">
+							<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+								<s:Label text="Escala Máxima (Hasta)"/>
+							</mx:GridItem>
+							<mx:GridItem verticalAlign="middle" width="100%">
+								<s:TextInput text="{escalaMaxima}" id="txtEscalaMax"
+											 change="txtEscalaMax_changeHandler(event)"/>
+							</mx:GridItem>
+						</mx:GridRow>
+						<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle">
+							<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+								<mx:Spacer height="5"/>
+							</mx:GridItem>
+							<mx:GridItem verticalAlign="middle" width="100%">
+								<mx:Spacer height="5"/>
+							</mx:GridItem>
+						</mx:GridRow>
+						<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle">
+							<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+								<s:Label text="Nivel de generalización"/>
+							</mx:GridItem>
+							<mx:GridItem verticalAlign="middle" width="100%">
+								<s:HSlider id="sldrNivel" width="100%" showDataTip="false" stepSize="1" minimum="0" maximum="{nivelesGeneralizacion.length - 1}"
+										   change="sldrNivel_changeHandler(event)"
+										   value="{nivelGeneralizacion}"
+										   show="sldrNivel_creationCompleteHandler(event)"
+										   creationComplete="sldrNivel_creationCompleteHandler(event)"/>
+							</mx:GridItem>
+						</mx:GridRow>
+					</mx:Grid>
+					<s:VGroup width="100%" height="100%"
+							  horizontalAlign="center">
+						<mx:Image width="95" height="60" id="imgNivel"/>
+						<s:Label id="txtNivel" textAlign="center" maxWidth="120" maxDisplayedLines="3"/>
+					</s:VGroup>
+				</s:HGroup>
+			</s:BorderContainer>
+			<s:Label left="16" y="6" text="►Configuración avanzada" 
+					 backgroundColor="{getStyle('backgroundColor')}" fontWeight="bold"
+					 useHandCursor="true" buttonMode="true"
+					 click="{verAvanzados =! verAvanzados}"/>
+		</s:Group>
+		<s:Button id="btnAceptar" label="Aceptar" enabled="{providerClases.length > 0}"
+				  click="btnAceptar_clickHandler(event)"/>
+	</s:VGroup>
+</s:TitleWindow>

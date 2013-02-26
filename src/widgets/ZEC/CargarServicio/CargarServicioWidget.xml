@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<configuration>
+	<descargarshp>true</descargarshp>
+	<servicios>
+		<servicio tipo="arcgisServer" nombre="Arcgis Server"/>
+		<!--  servicio tipo="shp" nombre="ESRI Shape file"/-->
+	</servicios>
+</configuration>

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+   
+     <layer url="http://190.25.231.241:8399/arcgis/rest/services/Microestablecimientos/Microestablecimientos/MapServer/0" 
+    	   useproxy="false"
+		   useAMF = "false"
+    	   label="Edificaciones"
+    	   visible="true"
+    	   alpha="1"
+    	   borderColor="0x3FFFC5"
+    	   backgroundColor="0x3F6AFF"
+    	   textColor="0xFFFFFF"
+    	   textSize="12"
+    	   outFields="TEXTO,DIRECCION,CODIGO,AG,DESCRIPCIO,SECTOR,NOM_MPIO,DPTO,DPTO_CNMBR,ETAPA,ESTADO,NOVEDAD,FECHA_NOVE,SHAPE,USUARIO"
+    	   />
+ 
+ 	<!-----------------------EJEMPLO USO CLUSTERER WIDGET--------------------------------->
+ 
+ 	<!--
+ 	<layer url="http://dg_est45.dane.gov.co/arcgis/rest/services/DANE/BOGOTA_UNIDADES/MapServer/6"
+ 		   useproxy="false"
+		   useAMF = "false" 
+    	   label="Fuentes ICCP-ICCV"
+    	   visible="true"
+    	   alpha="1"
+    	   borderColor="0xAEC0FE"
+    	   backgroundColor="0x005CE6"
+    	   textColor="0xFFFFFF"
+    	   textSize="12"
+    	   outFields=""
+    	   />
+    	   
+	<layer url="http://dg_est45.dane.gov.co/arcgis/rest/services/DANE/BOGOTA_UNIDADES/MapServer/7"
+		   useproxy="false"
+		   useAMF = "false" 
+    	   label="Fuentes IPC"
+    	   visible="true"
+    	   alpha="1"
+    	   borderColor="0x653863"
+    	   backgroundColor="0x70A800"
+    	   textColor="0xFFFFFF"
+    	   textSize="12"
+    	   outFields=""
+    	   >
+    	   <groupField name="LOCALIDAD" 
+    	   			   alias="Localidad" 
+    	   			   defaultValue="Otros"
+    	   			   values="ANTONIO NARIÑO,BARRIOS UNIDOS,BOSA,CIUDAD BOLIVAR,CHAPINERO,ENGATIVA,FONTIBON,KENNEDY,LA CANDELARIA,LOS MARTIRES,PUENTE ARANDA,RAFAEL URIBE,SAN CRISTOBAL,SANTA FE,SUBA,TEUSAQUILLO,TUNJUELITO,USAQUEN,USME" 
+    	   			   />
+    </layer>
+  	-->
+	
+</configuration>

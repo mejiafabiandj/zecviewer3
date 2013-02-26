@@ -1,0 +1,8 @@
+<?xml version="1.0" ?>
+<configuration>
+    <layerlist label="Mas Capas">
+        
+        
+        <excludelayer>Thematic Selection Layer</excludelayer>
+    </layerlist>
+</configuration>

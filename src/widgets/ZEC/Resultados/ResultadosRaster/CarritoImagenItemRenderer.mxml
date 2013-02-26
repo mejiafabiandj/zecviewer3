@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXAdvancedDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								  xmlns:s="library://ns.adobe.com/flex/spark" 
+								  xmlns:mx="library://ns.adobe.com/flex/mx" 
+								  focusEnabled="true">
+
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			
+			protected function image1_clickHandler(event:MouseEvent,data:Object):void
+			{
+				parentDocument.removerFoto(data);
+			}
+			
+			protected function imgItemPDF_clickHandler(event:MouseEvent):void
+			{
+				parentDocument.imgItemPDF(data);
+			}
+		]]>
+	</fx:Script>
+
+	<mx:Grid width="100%">
+		<mx:GridRow width="100%">
+			<mx:GridItem verticalAlign="middle" textAlign="left">
+				<mx:Label color="0x0b333c" styleName="WidgetCanvas" text="{data.imagen}" width="180"/>
+			</mx:GridItem>
+			<mx:GridItem verticalCenter="rigth" verticalAlign="middle" textAlign="right">
+				<mx:Image 
+					id="imgItemPDF"
+					source="assets/images/pdf.png" 
+					useHandCursor="true" 
+					buttonMode="true" 
+					toolTip="Reporte del item" 
+					width="18" height="18" 
+					click="imgItemPDF_clickHandler(event)"/>
+			</mx:GridItem>
+			<mx:GridItem verticalCenter="rigth" verticalAlign="middle" textAlign="right">
+				<mx:Image 
+					source="assets/images/delete.png" 
+					useHandCursor="true" 
+					buttonMode="true" 
+					toolTip="Eliminar item" 
+					width="15" height="15" 
+					click="image1_clickHandler(event,data)"/>
+			</mx:GridItem>
+		</mx:GridRow>
+	</mx:Grid>
+</s:MXAdvancedDataGridItemRenderer>

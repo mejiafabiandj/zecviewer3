@@ -1,0 +1,381 @@
+<?xml version="1.0" encoding="utf-8"?>
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:viewer="com.esri.viewer.*" layout="absolute" width="400" height="300" xmlns:esri="http://www.esri.com/2008/ags"
+				   creationComplete="{init()}">
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.*;
+			import com.esri.ags.events.DrawEvent;
+			import com.esri.ags.events.GeometryServiceEvent;
+			import com.esri.ags.geometry.*;
+			import com.esri.ags.layers.*;
+			import com.esri.ags.symbols.SimpleFillSymbol;
+			import com.esri.ags.symbols.SimpleLineSymbol;
+			import com.esri.ags.symbols.SimpleMarkerSymbol;
+			import com.esri.ags.tasks.supportClasses.BufferParameters;
+			import com.esri.ags.tools.DrawTool;
+			import com.esri.ags.tools.NavigationTool;
+			import com.esri.viewer.AppEvent;
+			
+			import flash.events.Event;
+			import flash.events.MouseEvent;
+			
+			import gov.dane.util.Constantes;
+			import gov.dane.util.TokenUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.Image;
+			import mx.managers.CursorManager;
+			import mx.rpc.AsyncResponder;
+			import mx.rpc.Fault;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.utils.ObjectProxy;
+			
+			private var drawMode:String;
+			private var points:Array;
+			private var graphicsLayer:GraphicsLayer = new GraphicsLayer();
+			
+			private const ANCHO_LINEA:Number = 2;
+			private const ANCHO_PUNTO:Number = 10;
+			private const LABEL_PUNTO:String = "Punto";
+			private const LABEL_LINEA:String = "Línea";
+			private const LABEL_POLIG:String = "Polígono";
+			
+			/**
+			 * Inicia componentes y propiedades
+			 */
+			private function init():void
+			{
+				//results = new ArrayCollection(["No hay resultados"]);
+				
+				points = new Array();
+				graphicsLayer.id = "GraphicsLayerAreaTrazada";
+				graphicsLayer.name = "GraphicsLayerAreaTrazada";
+				map.addLayer(graphicsLayer);
+			}
+			
+			//============================METODOS DE EFECTOS VISUALES============================//
+			/**
+			 * Desactivar la visibilidad del dibujo cuando se cierre el widget
+			 */
+			private function widgetClosedHandler(event:Event):void
+			{
+				graphicsLayer.visible = false;
+				setMapNavigation(null, null);
+			}
+			
+			/**
+			 * Desactivar la visibilidad del dibujo cuando se minimice el widget
+			 */
+			private function widgetMinimizedHandler(event:Event):void
+			{
+				//graphicsLayer.visible = false;
+				setMapNavigation(null, null);
+			}
+			
+			/**
+			 * Activa la visibilidad del dibujo cuando se abre el widget
+			 */
+			private function widgetOpenedHandler(event:Event):void
+			{	
+				graphicsLayer.visible = true;
+			}
+			
+			/**
+			 * Cambiar el aspecto visual de la imagen mientras el mouse se encuentra sobre ella
+			 */
+			private function onMouseOverImage(event:MouseEvent):void{
+				(event.currentTarget as Image).alpha = 0.8;
+			}
+			
+			/**
+			 * Restablecer el aspecto visual de la imagen cuando el mouse salga de ella
+			 */
+			private function onMouseOutImage(event:MouseEvent):void{
+				(event.currentTarget as Image).alpha = 1;
+			}
+			//============================FIN METODOS DE EFECTOS VISUALES============================//
+			
+			//============================METODOS DE CONSULTA GEOGRÁFICA============================//
+			/**
+			 * Realiza el cambio entre tipo de geometria del dibujo
+			 */
+			private function activateDrawTool(value:String, mode:String):void
+			{
+				drawMode = mode;
+				var label:String;
+				
+				ckcBuffer.visible = value==DrawTool.MAPPOINT || value==DrawTool.POLYLINE;
+				ckcBuffer.enabled = value==DrawTool.MAPPOINT || value==DrawTool.POLYLINE;
+				
+				//Texto que se muestra en "current action"
+				switch (value)
+				{
+					case DrawTool.MAPPOINT:
+					{
+						label = "Buscar punto";
+						break;
+					}
+					case DrawTool.POLYLINE:
+					{
+						label = "Buscar Linea";
+						break;
+					}
+					case DrawTool.POLYGON:
+					{
+						label = "Buscar Polígono";
+						sldrDistancia.visible = false;
+						ckcBuffer.selected = false;
+						break;
+					}
+				}
+				setMapAction(value, label, null,drawEnd);
+			}
+			
+			/**
+			 * Añadir el dibujo como un nuevo layer
+			 */ 
+			private function drawEnd(event:DrawEvent):void
+			{
+				this.cursorManager.setBusyCursor(); //pone el cursor como ocupado
+				
+				var outSR:SpatialReference = map.spatialReference;
+				var geom:Geometry = event.graphic.geometry;	//geometria seleccionada para el dibujo
+				var gra:Graphic = new Graphic(geom);
+				var puntos:Array;
+				var punto:MapPoint;
+				
+				graphicsLayer.clear();
+				
+				switch (geom.type)  
+				{         
+					case Geometry.MAPPOINT:
+					{
+						var ptSym:SimpleMarkerSymbol = new SimpleMarkerSymbol("circle", ANCHO_PUNTO, cpGraphic.selectedColor);
+						punto = geom as MapPoint;
+						gra.symbol = ptSym;
+						
+						break;
+					}
+						
+					case Geometry.POLYLINE:
+					{
+						var lineSym:SimpleLineSymbol = new SimpleLineSymbol("solid",cpGraphic.selectedColor, 1, ANCHO_LINEA);
+						gra.symbol = lineSym;
+						
+						break;
+					}
+					case Geometry.POLYGON:
+					{
+						var outlineSym:SimpleLineSymbol = new SimpleLineSymbol("solid",cpGraphic.selectedColor, 1, ANCHO_LINEA);
+						var polySym:SimpleFillSymbol = new SimpleFillSymbol("solid", cpGraphic.selectedColor, 0.25, outlineSym);
+						gra.symbol = polySym;
+						
+						break;
+					}
+					default: 
+					{
+						//geomQuery = null; 
+						break;
+					}
+				}
+				this.cursorManager.removeBusyCursor();
+				//Realizar un bufer sobre la geometria dibujada
+				if(ckcBuffer.selected && sldrDistancia.value != 0)
+				{
+					var bufferParameters:BufferParameters = new BufferParameters();
+					bufferParameters.geometries = [gra.geometry];
+					bufferParameters.distances = [ sldrDistancia.value ];
+					bufferParameters.unit = GeometryService.UNIT_METER;
+					bufferParameters.bufferSpatialReference = new SpatialReference(3116); //102100//30800
+					
+					this.cursorManager.setBusyCursor();
+					myGeometryService.addEventListener(GeometryServiceEvent.BUFFER_COMPLETE, bufferCompleteHandler);
+					myGeometryService.addEventListener(FaultEvent.FAULT,bufferFault);
+					myGeometryService.buffer(bufferParameters);
+				}
+				else
+				{
+					/*
+					//Borrar los resultados de la anterior consulta
+					var res:Object = new Object();
+					res.buscando = true;
+					addSharedData("Resultados",new ArrayCollection([res]));
+					
+					//Realizar la consulta de las grillas que intersecten la geometría dibujada
+					this.cursorManager.setBusyCursor();
+					
+					var nombreWidget:String = widgetTitle;
+					var arr:ArrayCollection = new ArrayCollection([{gra:gra}, nombreWidget]);
+					addSharedData("ConsultaGrillas",arr);
+					*/
+					
+					/**Método antiguo de consulta**/
+					AppEvent.dispatch(Constantes.OPERACION_CONSULTAR_RASTER,gra);
+					
+					
+				}
+				//añadir el gráfico de la geometria dibujada como un layer
+				graphicsLayer.add(gra);
+				setMapNavigation(NavigationTool.PAN,"Mover Mapa");
+			}
+			
+			
+			/**
+			 * Elimina el dibujo anterior
+			 */
+			private function limpiarDibujo():void
+			{
+				graphicsLayer.clear();
+				//addSharedData("Resultados",new ArrayCollection([{titulo: "No hay resultados"}]));
+			}
+			
+			/**
+			 * Evento que se produce al finalizar con exito la creacion del buffer
+			 */
+			private function bufferCompleteHandler(event:GeometryServiceEvent):void
+			{
+				this.cursorManager.removeBusyCursor();
+				
+				for each (var geom:Geometry in event.result)
+				{
+					var outlineSym:SimpleLineSymbol = new SimpleLineSymbol("solid",cpGraphic.selectedColor, 0.5, ANCHO_LINEA);
+					var polySym:SimpleFillSymbol = new SimpleFillSymbol("solid", cpGraphic.selectedColor, 0.25, outlineSym);
+					var graphic:Graphic = new Graphic(geom);
+					graphic.symbol = polySym;
+					graphicsLayer.add(graphic);
+					
+					//Borrar los resultados de la anterior consulta
+					/*
+					var res:Object = new Object();
+					res.buscando = true;
+					addSharedData("Resultados",new ArrayCollection([res]));
+					
+					//Realizar la consulta de las grillas que intersecten el buffer
+					this.cursorManager.setBusyCursor();
+					var nombreWidget:String = widgetTitle;
+					var arr:ArrayCollection = new ArrayCollection([{gra:graphic},nombreWidget]);
+					addSharedData("ConsultaGrillas",arr); 
+					*/
+					
+					/**Método antiguo de consulta**/
+					AppEvent.dispatch(Constantes.OPERACION_CONSULTAR_RASTER,graphic);
+					
+				}
+				myGeometryService.removeEventListener(GeometryServiceEvent.BUFFER_COMPLETE, bufferCompleteHandler);
+			}
+			
+			/**
+			 * Error al realizar el buffer
+			 */
+			private function bufferFault(error:FaultEvent):void
+			{
+				Alert.show("Se produjo un error al realizar el buffer, se realizara la consulta únicamente con la geometría dibujada","Error en Buffer");
+				
+				/*
+				//Borrar los resultados de la anterior consulta
+				var res:Object = new Object();
+				res.buscando = true;
+				addSharedData("Resultados",new ArrayCollection([res]));
+				
+				//Realizar la consulta de las grillas que intersecten la geometría dibujada
+				this.cursorManager.setBusyCursor();
+				var nombreWidget:String = widgetTitle;
+				var arr:ArrayCollection = new ArrayCollection([{gra:graphicsLayer.graphicProvider[0]} , nombreWidget]);
+				addSharedData("ConsultaGrillas",arr);
+				*/
+				
+				/**Método antiguo de consulta**/
+				AppEvent.dispatch(Constantes.OPERACION_CONSULTAR_RASTER,graphicsLayer.graphicProvider[0]);
+				
+				
+			}
+			
+			//============================FIN METODOS DE CONSULTA GEOGRÁFICA============================//
+			
+			
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+		
+		<!--Servicio de geoprocesamiento usado para realizar el buffer-->
+		<esri:GeometryService id="myGeometryService" url="http://dg_est45.dane.gov.co/arcgis/rest/services/Geometry/GeometryServer" showBusyCursor="true"/>
+		
+		<esri:Query id="query" outFields="[*]" returnGeometry="false" 
+					spatialRelationship="esriSpatialRelIntersects" outSpatialReference="{map.spatialReference}"/>
+		<esri:QueryTask id="queryTask" method="POST" showBusyCursor="true" />
+	</fx:Declarations>
+	
+	<viewer:WidgetTemplate id="wTemplate" 
+						   width="330" 
+						   height="180"
+						   minimized="{widgetMinimizedHandler(event)}" 
+						   closed="{widgetClosedHandler(event)}" 
+						   open="{widgetOpenedHandler(event)}" >
+		
+		<mx:ViewStack id="viewstack" width="100%" height="100%">
+			<mx:VBox label="Geográfica" width="100%" verticalAlign="middle" horizontalAlign="center">
+				<mx:VBox verticalAlign="middle" width="100%">
+					<mx:Label text="Elija el tipo de geometría a consultar"/>
+				</mx:VBox>
+				<mx:HBox horizontalAlign="center" width="100%" horizontalGap="8">
+					<mx:Image click="{activateDrawTool(DrawTool.MAPPOINT, LABEL_PUNTO)}" 
+							  source="assets/images/i_draw_point.png" 
+							  useHandCursor="true" 
+							  buttonMode="true" 
+							  toolTip="Punto" 
+							  width="40" 
+							  height="40" 
+							  mouseOver="{onMouseOverImage(event)}" 
+							  mouseOut="{onMouseOutImage(event)}"
+							  />
+					<mx:Image click="{activateDrawTool(DrawTool.POLYLINE, LABEL_LINEA)}" 
+							  source="assets/images/i_draw_line.png" 
+							  useHandCursor="true" 
+							  buttonMode="true" 
+							  toolTip="Línea" 
+							  width="40" 
+							  height="40" 
+							  mouseOver="{onMouseOverImage(event)}" 
+							  mouseOut="{onMouseOutImage(event)}"
+							  />
+					<mx:Image click="{activateDrawTool(DrawTool.POLYGON, LABEL_POLIG)}" 
+							  source="assets/images/i_draw_poly.png" 
+							  useHandCursor="true" 
+							  buttonMode="true" 
+							  toolTip="Polígono" 
+							  width="40" 
+							  height="40" 
+							  mouseOver="{onMouseOverImage(event)}" 
+							  mouseOut="{onMouseOutImage(event)}"
+							  />
+					<mx:VRule width="11" height="35"/>
+					<mx:Image click="{limpiarDibujo()}" 
+							  source="assets/images/i_clear.png" 
+							  useHandCursor="true" 
+							  buttonMode="true" 
+							  toolTip="Limpiar búsqueda" 
+							  width="40" 
+							  height="40" 
+							  mouseOver="{onMouseOverImage(event)}" 
+							  mouseOut="{onMouseOutImage(event)}"
+							  />
+				</mx:HBox>
+				<mx:HRule width="90%"/>
+				<mx:HBox width="100%" verticalAlign="middle" horizontalAlign="right" horizontalGap="0">
+					<mx:HBox width="100%" horizontalAlign="right" verticalAlign="middle" horizontalGap="0">
+						<mx:CheckBox label="Buffer" id="ckcBuffer" visible="false"/>
+						<mx:HSlider id="sldrDistancia" minimum="0" maximum="50000" snapInterval="50" allowTrackClick="true" labels="['Min','Max']" visible="{ckcBuffer.selected}" enabled="{ckcBuffer.selected}" width="120"/>
+						<mx:Label text="Color  "/>
+						<mx:ColorPicker id="cpGraphic" selectedColor="#990000"/>
+					</mx:HBox>
+				</mx:HBox>
+				
+			</mx:VBox>
+		</mx:ViewStack>
+	</viewer:WidgetTemplate>
+</viewer:BaseWidget>

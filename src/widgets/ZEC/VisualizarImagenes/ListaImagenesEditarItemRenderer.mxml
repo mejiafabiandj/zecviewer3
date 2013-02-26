@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				autoDrawBackground="true" width="100%">
+	
+	<fx:Script>
+		<![CDATA[
+			protected function image1_clickHandler(event:MouseEvent):void
+			{
+				if((owner as Object).document && ((owner as Object).document).hasOwnProperty("editar"))
+				{
+					((owner as Object).document as Object).editar(data);
+				}
+				
+			}
+			
+			protected function image2_clickHandler(event:MouseEvent):void
+			{
+				if((owner as Object).document && ((owner as Object).document).hasOwnProperty("eliminar"))
+				{
+					((owner as Object).document as Object).eliminar(data);
+				}
+			}
+			
+			protected function image3_clickHandler(event:MouseEvent):void
+			{
+				if((owner as Object).document && ((owner as Object).document).hasOwnProperty("alternarVisualizacion"))
+				{
+					((owner as Object).document as Object).alternarVisualizacion(data);
+				}
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<s:HGroup width="100%" verticalAlign="middle" paddingRight="5" paddingLeft="5" paddingTop="2">
+		<s:CheckBox selected="@{data.visible}"/>
+		<s:Label text="{data.name}" width="100%"/>
+		<s:Image source="assets/images/swipe_vertical.png" width="16" height="16" useHandCursor="true" buttonMode="true" toolTip="Alternar la visualización"
+				 click="image3_clickHandler(event)"/>
+		<s:Image source="assets/images/edit_editar.png" width="16" height="16" useHandCursor="true" buttonMode="true" toolTip="Editar los parámetros de visualización"
+				 click="image1_clickHandler(event)"/>
+		<s:Image source="assets/images/edit_cancel.png" width="16" height="16" useHandCursor="true" buttonMode="true" toolTip="Eliminar la imagen del mapa"
+				 click="image2_clickHandler(event)"/>
+	</s:HGroup>
+	
+	
+</s:ItemRenderer>

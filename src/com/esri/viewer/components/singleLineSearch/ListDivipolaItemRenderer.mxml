@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009"
+				xmlns:s="library://ns.adobe.com/flex/spark"
+				xmlns:mx="library://ns.adobe.com/flex/mx"
+				autoDrawBackground="false" xmlns:esri="http://www.esri.com/2008/ags" >
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.FeatureSet;
+			import com.esri.viewer.ViewerContainer;
+			
+			import gov.dane.util.TokenUtil;
+			
+			import mx.rpc.AsyncResponder;
+			import mx.rpc.Fault;
+			
+			import spark.events.TextOperationEvent;
+			
+			protected function textinput1_changeHandler(event:TextOperationEvent):void
+			{
+				query.outFields = [data.@campoNombre.toString(),data.@campoCodigo.toString()];
+				query.where = "(LOWER(" + data.@campoNombre.toString() + ") LIKE '%" + txt.text.toLocaleLowerCase() + 
+					"%' OR LOWER(" + data.@campoCodigo.toString() + ") LIKE '%" + txt.text.toLocaleLowerCase() + "%')" +
+					" OR (LOWER(" + data.@campoNombre.toString() + ") LIKE '*" + txt.text.toLocaleLowerCase() + 
+					"*' OR LOWER(" + data.@campoCodigo.toString() + ") LIKE '*" + txt.text.toLocaleLowerCase() + "*')";
+				
+				queryTask.url = data.@url.toString();
+				queryTask.proxyURL = (data.@useProxy ? ViewerContainer.getInstance().configData.proxyUrl :null);
+				queryTask.useAMF = queryTask.proxyURL? false: true;
+				queryTask.token = TokenUtil.buscarToken(queryTask.url);
+				
+				queryTask.execute(query,new AsyncResponder(queryTask_Result,queryTask_Fault));
+			}
+			
+			private function queryTask_Result(featureSet:FeatureSet,token:Object = null):void
+			{
+				if(featureSet.features.length == 0)
+				{
+					//Alert.show("La consulta realizada no retornó resultados");
+				}else
+				{
+					
+				}
+			}
+			
+			private function queryTask_Fault(fault:Fault,token:Object = null):void
+			{
+				
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<esri:Query id="query" returnGeometry="false" />
+		<esri:QueryTask id="queryTask" method="POST" showBusyCursor="true" concurrency="last"/>
+	</fx:Declarations>
+	
+	<s:TextInput id="txt" borderAlpha="0" paddingLeft="5" prompt="{data.@label}" change="textinput1_changeHandler(event)"/>
+	
+</s:ItemRenderer>

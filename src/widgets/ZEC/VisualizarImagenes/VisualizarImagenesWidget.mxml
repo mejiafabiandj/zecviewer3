@@ -1,0 +1,384 @@
+<?xml version="1.0" encoding="utf-8"?>
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:viewer="com.esri.viewer.*" layout="absolute"
+				   widgetConfigLoaded="init()" 
+				   creationComplete="visualizar_creationCompleteHandler(event)" xmlns:esri="http://www.esri.com/2008/ags" xmlns:Resultados="widgets.DANE.Resultados.*">
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.events.MapEvent;
+			import com.esri.ags.layers.ArcGISImageServiceLayer;
+			import com.esri.ags.layers.Layer;
+			import com.esri.ags.layers.supportClasses.MosaicRule;
+			import com.esri.ags.layers.supportClasses.RasterFunction;
+			import com.esri.ags.utils.JSON;
+			import com.esri.ags.utils.JSONUtil;
+			
+			import gov.dane.util.TokenUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.FlexEvent;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.utils.ObjectProxy;
+			
+			[Bindable] private var descEditar:String = "";
+			[Bindable] private var descSinImagenes:String = "";
+			[Bindable] private var bandasIds:String = "";
+			[Bindable] private var providerCmbTipoRealce:ArrayCollection = new ArrayCollection([{label:"Ninguno",value:0}, {label:"Desviación Estándar",value:3}, {label:"Igualación de Histograma",value:4}, {label:"Valores mínimos y máximos",value:5}]);
+			[Bindable] private var providerLstImagenes:ArrayCollection = new ArrayCollection();
+			[Bindable] private var providerLstEstadisticas:ArrayCollection = new ArrayCollection();
+			
+			
+			[Bindable] private var selectedImage:ArcGISImageServiceLayer;
+			
+			protected function init():void
+			{
+				if(configObject && configObject.configuration)
+				{
+					descEditar = configObject.configuration.descripcionEditar;
+					descSinImagenes = configObject.configuration.descripcionSinImagenes;
+					if(configObject.configuration.imageservice is ArrayCollection){
+						for each(var raster:Object in configObject.configuration.imageservice)
+						{
+							//raster.lockRasterIds = raster.lockRasterIds.toString().split(",");
+							cargarRaster(raster);
+						}
+					}else if(configObject.configuration.imageservice)
+					{
+						configObject.configuration.imageservice.lockRasterIds = configObject.configuration.imageservice.lockRasterIds.toString().split(",");
+						cargarRaster(configObject.configuration.imageservice);
+					}
+				}
+				
+			}
+			
+			protected function visualizar_creationCompleteHandler(event:FlexEvent):void
+			{
+				
+			}
+			
+			protected function wTemplate_openHandler(event:Event):void
+			{
+				map.addEventListener(MapEvent.LAYER_ADD,listarImagenes);
+				map.addEventListener(MapEvent.LAYER_REMOVE,listarImagenes);
+				map.addEventListener(MapEvent.LAYER_REMOVE_ALL,listarImagenes);
+				map.addEventListener(MapEvent.LAYER_REORDER,listarImagenes);
+				
+				listarImagenes();
+			}
+			
+			protected function wTemplate_closedHandler(event:Event):void
+			{
+				map.removeEventListener(MapEvent.LAYER_ADD,listarImagenes);
+				map.removeEventListener(MapEvent.LAYER_REMOVE,listarImagenes);
+				map.removeEventListener(MapEvent.LAYER_REMOVE_ALL,listarImagenes);
+				map.removeEventListener(MapEvent.LAYER_REORDER,listarImagenes);
+				
+				
+				swipe.deactivate();
+			}
+			
+			private function listarImagenes(event:MapEvent = null):void
+			{
+				providerLstImagenes.removeAll();
+				
+				for each (var layer:Layer in map.layers)
+				{
+					if(layer is ArcGISImageServiceLayer)
+					{
+						providerLstImagenes.addItem(layer);
+					}
+				}
+				
+			}
+			
+			private function cargarRaster(raster:Object):void
+			{
+				var imageLayer:ArcGISImageServiceLayer = new ArcGISImageServiceLayer();
+				var regla:MosaicRule = new MosaicRule();
+				if(raster.method)
+				{
+					regla.method = raster.method; 
+				}
+				if(raster.operation)
+				{
+					regla.operation = raster.operation; 
+				}
+				if(raster.lockRasterIds)
+				{
+					regla.lockRasterIds = raster.lockRasterIds is Array ? raster.lockRasterIds : raster.lockRasterIds.toString().split(","); 
+					var i:Number = 0;
+					for each(var lrid:Object in regla.lockRasterIds)
+					{
+						if(!isNaN(Number(lrid)))
+						{
+							lrid = Number(lrid);
+						}
+						regla.lockRasterIds[i] = lrid;
+						i++;
+					}
+				}
+				
+				imageLayer.url = raster.url;
+				imageLayer.proxyURL = (raster.useproxy ? configData.proxyUrl :null);
+				imageLayer.token = TokenUtil.buscarToken(imageLayer.url,configData);
+				imageLayer.name = raster.label;
+				imageLayer.id = raster.label;
+				imageLayer.mosaicRule = regla;
+				imageLayer.noData = raster.noData? raster.noData:null;
+				
+				if(raster.bandIds)
+				{
+					var bandas:Array = raster.bandIds.split(",");
+					var j:Number = 0;
+					for each(var banda:Object in bandas)
+					{
+						bandas[j] = Number(banda);
+						j++;
+					}
+					imageLayer.bandIds = bandas;
+				}
+				
+				if(raster.stretch)
+				{
+					var rasterFunction:RasterFunction = new RasterFunction();
+					rasterFunction.functionName = "Stretch";
+					rasterFunction.arguments = {StretchType:raster.stretch.stretchType, NumberOfStandardDeviations:raster.stretch.numberOfStandardDeviations};
+					
+					if(raster.stretch.statistics is ArrayCollection)
+					{
+						var statistics:Array = [];
+						for each(var stat:Object in raster.stretch.statistics)
+						{
+							statistics.push([stat.min,stat.max,stat.mean,stat.stdv]);
+						}
+						
+						rasterFunction.arguments["Statistics"] = statistics;
+					}
+					
+					imageLayer.renderingRule = rasterFunction;
+				}
+				
+				map.addLayer(imageLayer);
+			}
+			
+			
+			public function editar(item:Object):void
+			{
+				currentState = "editar";
+				
+				if(item is ArcGISImageServiceLayer)
+				{
+					selectedImage = item as ArcGISImageServiceLayer;
+					
+					servicio.url = selectedImage.url;
+					servicio.send({f:"json",op:"informacionCapa",token:TokenUtil.buscarToken(servicio.url)})
+					
+				}
+				
+			}
+			
+			public function eliminar(item:Object):void
+			{
+				if(item is ArcGISImageServiceLayer)
+				{
+					map.removeLayer(item as ArcGISImageServiceLayer);
+				}
+				
+			}
+			
+			protected function btnAceptar_clickHandler(event:MouseEvent):void
+			{
+				var rasterFunction:RasterFunction = new RasterFunction();
+				rasterFunction.functionName = "Stretch";
+				rasterFunction.arguments = {StretchType:cmbTipoRealce.selectedItem.value, NumberOfStandardDeviations:txtNumDesv.value};
+				
+				var statistics:Array = []
+				for each(var stat:Object in providerLstEstadisticas)
+				{
+					statistics.push([stat.min,stat.max,stat.mean,stat.stdv]);
+				}
+				rasterFunction.arguments["Statistics"] = statistics;
+				
+				//rasterFunction.arguments["Gamma"] = [ 1,1,1];
+				var bandas:Array = bandasIds.split(",");
+				var i:Number = 0;
+				for each(var banda:Object in bandas)
+				{
+					bandas[i] = Number(banda);
+					i++;
+				}
+				selectedImage.bandIds = bandas;
+				
+				if(cmbTipoRealce.selectedItem.value != 0)
+				{					
+					selectedImage.renderingRule = rasterFunction;
+				}else
+				{
+					selectedImage.renderingRule = null;
+				}
+				currentState = "lista";
+				
+			}
+			
+			protected function servicio_resultHandler(event:ResultEvent):void
+			{
+				if(event.result && event.result is String)
+				{
+					var result:Object = JSONUtil.decode(event.result.toString());
+					if(result && result.bandCount)
+					{
+						bandasIds = selectedImage.bandIds ? selectedImage.bandIds.join(','): '0,1,2';
+						
+						providerLstEstadisticas.removeAll();
+						
+						for (var i:Number = 0 ; i < result.minValues.length; i++)
+						{
+							var min:Number,max:Number,mean:Number,stdv:Number;
+							
+							min = result.minValues[i];
+							max = result.maxValues[i];
+							mean = result.meanValues[i];
+							stdv = result.stdvValues[i];
+							
+							min = Math.round(min * 100) / 100;
+							max = Math.round(max * 100) / 100;
+							mean = Math.round(mean * 100) / 100;
+							stdv = Math.round(stdv * 100) / 100;
+							
+							providerLstEstadisticas.addItem(new ObjectProxy({min: min, max:max, mean:mean, stdv:stdv}));
+						}
+						
+						
+					}
+				}
+					
+				
+			}
+			
+			protected function servicio_faultHandler(event:FaultEvent):void
+			{
+				// TODO Auto-generated method stub
+				
+			}
+			
+			
+			public function alternarVisualizacion(item:Object):void
+			{
+				if(item is ArcGISImageServiceLayer)
+				{
+					swipe.layer = item as ArcGISImageServiceLayer;
+					swipe.map = map;
+					swipe.activate();
+				}
+				
+			}
+			
+			protected function swipe_activateHandler(event:Event):void
+			{
+				// TODO Auto-generated method stub
+				
+			}
+			
+			protected function swipe_deactivateHandler(event:Event):void
+			{
+				// TODO Auto-generated method stub
+				
+			}
+			
+			protected function btnSalirSwipe_clickHandler(event:MouseEvent):void
+			{
+				swipe.deactivate();
+				
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<s:HTTPService id="servicio" result="servicio_resultHandler(event)" fault="servicio_faultHandler(event)" showBusyCursor="true" resultFormat="text" method="POST"/>
+		<Resultados:SwipeTool id="swipe" activate="swipe_activateHandler(event)" deactivate="swipe_deactivateHandler(event)"/>
+	</fx:Declarations>
+	<viewer:states>
+		<s:State name="lista"/>
+		<s:State name="editar"/>
+	</viewer:states>
+	<viewer:WidgetTemplate id="wTemplate" 
+						   width="380" 
+						   height="250"
+						   open="wTemplate_openHandler(event)"
+						   closed="wTemplate_closedHandler(event)"
+						   >
+		<s:BorderContainer cornerRadius="5" top="15" bottom="0" right="0" left="0" backgroundAlpha="0" 
+						   minHeight="50" id="container">
+			<s:VGroup horizontalCenter="0" verticalCenter="0" verticalAlign="middle" 
+					  horizontalAlign="center" left="5" top="5" right="5" bottom="5"
+					  includeIn="lista">
+				<mx:Text htmlText="{descSinImagenes}" width="95%" visible="{providerLstImagenes.length == 0}" includeInLayout="{providerLstImagenes.length == 0}"/>
+				<s:List id="lstImagenes" width="100%" height="100%" dataProvider="{providerLstImagenes}"
+						itemRenderer="widgets.DANE.VisualizarImagenes.ListaImagenesEditarItemRenderer"
+						enabled="{!swipe.active}"
+						visible="{providerLstImagenes.length > 0}" includeInLayout="{providerLstImagenes.length > 0}">
+					
+				</s:List>
+				<s:Button id="btnSalirSwipe" label="Volver a imágenes" click="btnSalirSwipe_clickHandler(event)" visible="{swipe.active}" includeInLayout="{swipe.active}"/>
+			</s:VGroup>
+			<mx:VBox horizontalCenter="0" verticalCenter="0" verticalAlign="top" 
+					  horizontalAlign="center" width="100%" top="5"  bottom="5" 
+					  maxHeight="{container.height - 10}"
+					  includeIn="editar" verticalScrollPolicy="auto">
+				<mx:Text htmlText="{descEditar}" width="95%"/>
+				
+				
+				<mx:Grid width="95%" paddingLeft="5" paddingRight="5">
+					<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle" >
+						<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+							<s:Label text="Bandas"/>
+						</mx:GridItem>
+						<mx:GridItem verticalAlign="middle" width="100%">
+							<s:TextInput id="txtBandas"
+										 width="100%"
+										 text="@{bandasIds}"
+										 toolTip='Si hay múltiples bandas, puede especificar una única banda para visualizarla, o puede cambiar la combinación de bandas separadas por coma "," (rojo, verde, azul), especificando el número de la banda, por ejemplo: 2,1,3.'/>
+						</mx:GridItem>
+					</mx:GridRow>
+					
+					<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle" >
+						<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+							<s:Label text="Tipo de realce"/>
+						</mx:GridItem>
+						<mx:GridItem verticalAlign="middle" width="100%">
+							<s:DropDownList id="cmbTipoRealce" width="100%" dataProvider="{providerCmbTipoRealce}" requireSelection="true" selectedIndex="0"
+											/>
+						</mx:GridItem>
+					</mx:GridRow>
+					<mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle" visible="{cmbTipoRealce.selectedItem.value != 0}" includeInLayout="{cmbTipoRealce.selectedItem.value != 0}">
+						<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+							<s:Label text="Número de desviaciones"/>
+						</mx:GridItem>
+						<mx:GridItem verticalAlign="middle" width="100%">
+							<s:NumericStepper id="txtNumDesv" minimum="0" maximum="100" stepSize="1" value="2"/>
+						</mx:GridItem>
+					</mx:GridRow>
+				</mx:Grid>
+				
+				<s:Label text="Estadísticas:" paddingTop="8" width="95%" visible="{cmbTipoRealce.selectedItem.value != 0}" includeInLayout="{cmbTipoRealce.selectedItem.value != 0}"/>
+				<s:DataGrid id="LstEstadisticas" width="95%" maxHeight="100" minHeight="50" dataProvider="{providerLstEstadisticas}"
+							editable="true"
+							horizontalScrollPolicy="off"
+							visible="{cmbTipoRealce.selectedItem.value != 0}" includeInLayout="{cmbTipoRealce.selectedItem.value != 0}">
+					<s:columns>
+						<s:ArrayList>
+							<s:GridColumn headerText="Mínimo" dataField="min" width="80" editable="true"/>
+							<s:GridColumn headerText="Máximo" dataField="max" width="80" editable="true"/>
+							<s:GridColumn headerText="Media" dataField="mean" width="80" editable="true"/>
+							<s:GridColumn headerText="Desviación estandar" dataField="stdv" editable="true"/>
+						</s:ArrayList>
+					</s:columns>
+				</s:DataGrid>
+				
+				<s:Button id="btnAceptar" label="Aceptar" click="btnAceptar_clickHandler(event)"/>
+			</mx:VBox>
+		</s:BorderContainer>
+	</viewer:WidgetTemplate>
+</viewer:BaseWidget>

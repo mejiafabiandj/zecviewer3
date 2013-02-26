@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+	<titulo>GEIH</titulo>
+	<label>Etapa</label>
+	<formatString>YYMM</formatString>
+	
+	<!---Id base 0 del widget de consulta operativa-->
+	<widgetId>0</widgetId>
+	
+	<defaultConfig>http://190.25.231.241:8030/JSegOp/Muestra?op=cultura&accion=leer</defaultConfig>
+	
+	<timeStops>	<!--Deben existir mas de dos timeStop-->
+		<timeStop year="2011" month="09" label="SEPTIEMBRE DE 2011" config="com/dane/widgets/GEIH/ConsultaGeneralGEIH/Etapa1109.xml"/>
+		<timeStop year="2011" month="10" label="OCTUBRE DE 2011" config="com/dane/widgets/GEIH/ConsultaGeneralGEIH/Etapa1110.xml"/>
+	</timeStops>
+</configuration>

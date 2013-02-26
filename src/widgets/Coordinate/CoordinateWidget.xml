@@ -1,0 +1,15 @@
+<?xml version="1.0" ?>
+<configuration label="Coordinates (default)">
+    <!-- geo, dms, mercator -->
+    <outputunit>geo</outputunit>
+    <numberformatter precision="8"/>
+    <labelstyle color="0x000000" fontfamily="Verdana" fontsize="9" fontweight="bold"/>
+    <labels>
+        <template>Latitud:{1} Longitud:{0}</template>
+    </labels> 
+</configuration>
+
+<!--
+    See Coordinate widget tag reference at
+    http://links.esri.com/coordinatewidget
+-->

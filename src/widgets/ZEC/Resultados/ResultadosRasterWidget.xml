@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="iso-8859-1" ?>
+<configuration>
+	<urlPDF>http://190.25.231.241:8030/RASTER/CreatePDFServlet</urlPDF>
+	
+	<programas>
+		<programa nombre="LANDSAT" useproxy="false" useAMF="true">
+			<url>http://190.25.231.241:8399/arcgis/rest/services/BIMG/Grillas_Raster/MapServer/2</url>
+			<atributoLayer numerico='false'>PATH_ROW</atributoLayer>					<!--Es el nombre del atributo en el layer que se utiliza para realizar las consultas geográficas-->
+			<atributoInventario>pathrow_codigo</atributoInventario>	<!--Es el nombre del atributo en el inventario asociado a un atributo en el layer-->
+		</programa>
+		<programa nombre="SPOT" useproxy="false" useAMF="true">
+			<url>http://190.25.231.241:8399/arcgis/rest/services/BIMG/Grillas_Raster/MapServer/0</url>
+			<atributoLayer numerico='false'>KJ</atributoLayer>						<!--Es el nombre del atributo en el layer que se utiliza para realizar las consultas geográficas-->
+			<atributoInventario>pathrow_codigo</atributoInventario>	<!--Es el nombre del atributo en el inventario asociado a un atributo en el layer-->
+		</programa>
+		<programa nombre="ALOS" useproxy="false" useAMF="true">
+			<url>http://190.25.231.241:8399/arcgis/rest/services/BIMG/Grillas_Raster/MapServer/1</url>
+			<atributoLayer numerico='false'>P_R_ABR</atributoLayer>					<!--Es el nombre del atributo en el layer que se utiliza para realizar las consultas geográficas-->
+			<atributoInventario>pathrow_codigo</atributoInventario>	<!--Es el nombre del atributo en el inventario asociado a un atributo en el layer-->
+		</programa>
+		<programa nombre="AEROFOTOGRAFÍA" useproxy="false" useAMF="true">
+			<url>http://190.25.231.241:8399/arcgis/rest/services/BIMG/CentrosFoto_LineasVuelo/MapServer/0</url>
+			<atributoLayer numerico='true'>ID_CENTRO</atributoLayer>			<!--Es el nombre del atributo en el layer que se utiliza para realizar las consultas geográficas-->
+			<atributoInventario>id_centro</atributoInventario>	<!--Es el nombre del atributo en el inventario asociado a un atributo en el layer-->
+		</programa>
+		<programa nombre="LINEA" useproxy="false" useAMF="true">
+			<url>http://190.25.231.241:8399/arcgis/rest/services/BIMG/CentrosFoto_LineasVuelo/MapServer/1</url>
+			<atributoLayer numerico='true'>ID_VUELO</atributoLayer>			<!--Es el nombre del atributo en el layer que se utiliza para realizar las consultas geográficas-->
+			<atributoInventario>imagen</atributoInventario>	<!--Es el nombre del atributo en el inventario asociado a un atributo en el layer-->
+		</programa>
+		<programa nombre="FOTOGRAFIA" useproxy="false" useAMF="true">
+			<url>http://190.25.231.241:8399/arcgis/rest/services/BIMG/CentrosFoto_LineasVuelo/MapServer/0</url>
+			<atributoLayer numerico='true'>archivo</atributoLayer>			<!--Es el nombre del atributo en el layer que se utiliza para realizar las consultas geográficas-->
+			<atributoInventario>id_centro</atributoInventario>	<!--Es el nombre del atributo en el inventario asociado a un atributo en el layer-->
+		</programa>
+	</programas>
+	
+	<!--Listado de atributos del inventario que se visualizan en el reporte del carrito-->
+	<reporte>
+		<!--atributo label="Sensor" field="sensor" width="20"/-->
+		<atributo label="Programa" field="programa" width="21"/>
+		<atributo label="Fecha de Toma" field="fecha_toma" width="18"/>
+		<atributo label="Imagen" field="imagen" width="35"/>
+		<atributo label="ID DANE" field="id_dane" width="22"/>
+		<atributo label="Path-Row, código" field="pathrow_codigo" width="11"/>
+		<atributo label="Línea de vuelo" field="linea_vuelo" width="10"/>
+		<atributo label="Número de foto" field="no_foto" width="10"/>
+		<atributo label="Estado" field="estado" width="18"/>
+		<atributo label="Ubicación" field="ubicacion" width="35"/>
+	</reporte>
+</configuration>

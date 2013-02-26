@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" 
+		 creationComplete="group1_creationCompleteHandler(event)">
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.Map;
+			import com.esri.ags.layers.ArcGISDynamicMapServiceLayer;
+			import com.esri.ags.layers.ArcGISTiledMapServiceLayer;
+			import com.esri.ags.layers.Layer;
+			import com.esri.ags.layers.supportClasses.AllDetails;
+			import com.esri.ags.layers.supportClasses.LayerDetails;
+			import com.esri.ags.layers.supportClasses.LayerInfo;
+			import com.esri.ags.layers.supportClasses.LayerLegendInfo;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.AsyncResponder;
+			import mx.rpc.Fault;
+			
+			import spark.events.IndexChangeEvent;
+			
+			[Bindable] public var map:Map;
+			
+			[Bindable] private var providerCapas:ArrayCollection = new ArrayCollection();
+			
+			[Bindable] private var isMarcoVisible:Boolean = true;
+
+			protected function group1_creationCompleteHandler(event:FlexEvent):void
+			{
+				if(map)
+				{
+					providerCapas.removeAll();
+					/*
+					providerCapas.addItem({name:"Capas visibles"});
+					providerCapas.addItem({name:"Todas las capas"});
+					*/
+					isMarcoVisible = selectedBasemap() != "default";
+					
+					if(isMarcoVisible)
+					{
+						rdoMarco.selected = true;
+						rdoMarco.dispatchEvent(new Event(Event.CHANGE));
+					}else
+					{
+						rdoTodas.selected = true;
+						rdoTodas.dispatchEvent(new Event(Event.CHANGE));
+					}
+				}
+			}
+			
+			
+			/**
+			 * Retorna el nombre del mapa base que se encuentra activo
+			 **/
+			public function selectedBasemap():String
+			{
+				var selectedBasemap:String = "default";
+				
+				var vigencias:Array = ["Vigencia_2005","Vigencia_2006","Vigencia_2008"];
+				for each(var layer:Layer in map.layers)
+				{
+					for each(var basemap:Object in vigencias)
+					{
+						if(layer.id == basemap)
+						{
+							if(layer.visible)
+							{
+								selectedBasemap = layer.id;
+							}
+						}
+					}
+					
+				}
+				
+				return selectedBasemap;
+			}
+			
+			private function detailsComplete(details:LayerDetails,layer:Object):void
+			{
+				if(rdoMarco.selected)
+				{
+					if(details.type.toUpperCase() == "FEATURE LAYER" &&
+						(details.name == "Departamento" || details.name == "Municipio " || details.name == "Zonas urbanas"
+							|| details.name == "Municipio"))
+					{
+						providerCapas.addItem(
+							{
+								name:details.name,
+								id:details.id,
+								url:(layer as Object).url, 
+								proxyURL:(layer as Object).proxyURL,
+								layer:layer
+							});
+					}
+				}else
+				{
+					if(details.type.toUpperCase() == "FEATURE LAYER")
+					{
+						providerCapas.addItem(
+							{
+								name:details.name,
+								id:details.id,
+								url:(layer as Object).url, 
+								proxyURL:(layer as Object).proxyURL,
+								layer:layer
+							});
+					}
+				}
+			}
+			
+			private function detailsFault(fault:Fault,token:Object):void
+			{
+				
+			}
+
+
+			protected function rdoMarco_changeHandler(event:Event):void
+			{
+				providerCapas.removeAll();
+				if(rdoMarco.selected)
+				{
+					for each(var layer:Layer in map.layers)
+					{
+						if(layer.visible && (layer is ArcGISDynamicMapServiceLayer || layer is ArcGISTiledMapServiceLayer) &&
+							layer.id == selectedBasemap())
+						{
+							
+							for each(var layerInfo:LayerInfo in (layer as Object).layerInfos)
+							{
+								if(layerInfo.subLayerIds == null && layerInfo.name != "Default")
+								{
+									(layer as Object).getDetails(layerInfo.layerId, new AsyncResponder(detailsComplete,detailsFault,layer));
+								}
+							}
+						}
+					}
+					
+				}
+			}
+
+
+			protected function rdoTodas_changeHandler(event:Event):void
+			{
+				providerCapas.removeAll();
+				if(rdoTodas.selected)
+				{
+					for each(var layer:Layer in map.layers)
+					{
+						if(layer.visible && (layer is ArcGISDynamicMapServiceLayer || layer is ArcGISTiledMapServiceLayer))
+						{
+							
+							for each(var layerInfo:LayerInfo in (layer as Object).layerInfos)
+							{
+								if(layerInfo.subLayerIds == null && layerInfo.name != "Default")
+								{
+									(layer as Object).getDetails(layerInfo.layerId, new AsyncResponder(detailsComplete,detailsFault,layer));
+								}
+							}
+						}
+					}
+				}
+			}
+
+
+			protected function image1_clickHandler(event:MouseEvent):void
+			{
+				PopUpManager.removePopUp(this);
+			}
+
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<s:RadioButtonGroup id="radiogroup1"/>
+		
+	</fx:Declarations>
+	<s:BorderContainer minHeight="0" cornerRadius="5" contentBackgroundColor="{getStyle('contentBackgroundColor')}" color="{getStyle('color')}">
+		<s:filters>
+			<s:DropShadowFilter distance="8" alpha="0.8" color="{getStyle('contentBackgroundColor')}"/>
+		</s:filters>
+		
+		<s:HGroup  left="2" right="20" top="2" bottom="2">
+			<s:VGroup>
+				<s:HGroup visible="{isMarcoVisible}" includeInLayout="{isMarcoVisible}">
+					<s:RadioButton label="Marco geoestadístico" groupName="radiogroup1"
+								   id="rdoMarco" change="rdoMarco_changeHandler(event)"/>
+					<s:RadioButton label="Todas las capas" groupName="radiogroup1"
+								   id="rdoTodas" change="rdoTodas_changeHandler(event)"/>
+				</s:HGroup>
+				<s:DropDownList id="cmbCapas" prompt="Seleccione la capa..." minWidth="220" dataProvider="{providerCapas}"
+								width="100%"
+								labelField="name"/>
+			</s:VGroup>
+		</s:HGroup>
+		<mx:Image right="2" top="2" source="assets/images/edit_cancel.png" useHandCursor="true"
+				  buttonMode="true"
+				  toolTip="Cerrar"
+				  click="image1_clickHandler(event)"/>
+	</s:BorderContainer>
+	
+</s:Group>

@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<configuration>
+	<maxNumPaneles>4</maxNumPaneles>
+	<numPanelesIniciales>2</numPanelesIniciales>
+	<timeextent>
+		<timestamp starttime="01/01/2011;DD/MM/YYYY"
+				   endtime="01/02/2011;DD/MM/YYYY"
+				   label="Etapa 1101"/>
+		<timestamp starttime="01/02/2011;DD/MM/YYYY"
+				   endtime="01/03/2011;DD/MM/YYYY"
+				   label="Etapa 1102"/>
+		<timestamp starttime="01/03/2011;DD/MM/YYYY"
+				   endtime="01/04/2011;DD/MM/YYYY"
+				   label="Etapa 1103"/>
+		<timestamp starttime="01/04/2011;DD/MM/YYYY"
+				   endtime="01/05/2011;DD/MM/YYYY"
+				   label="Etapa 1104"/>
+		<timestamp starttime="01/05/2011;DD/MM/YYYY"
+				   endtime="01/06/2011;DD/MM/YYYY"
+				   label="Etapa 1105"/>
+		<timestamp starttime="01/06/2011;DD/MM/YYYY"
+				   endtime="01/07/2011;DD/MM/YYYY"
+				   label="Etapa 1106"/>
+		<timestamp starttime="01/07/2011;DD/MM/YYYY"
+				   endtime="01/08/2011;DD/MM/YYYY"
+				   label="Etapa 1107"/>
+		<timestamp starttime="01/08/2011;DD/MM/YYYY"
+				   endtime="01/09/2011;DD/MM/YYYY"
+				   label="Etapa 1108"/>
+		<timestamp starttime="01/09/2011;DD/MM/YYYY"
+				   endtime="01/10/2011;DD/MM/YYYY"
+				   label="Etapa 1109"/>
+	    <timestamp starttime="01/10/2011;DD/MM/YYYY"
+				   endtime="01/11/2011;DD/MM/YYYY"
+				   label="Etapa 1110"/>
+	    <timestamp starttime="01/11/2011;DD/MM/YYYY"
+				   endtime="01/12/2011;DD/MM/YYYY"
+				   label="Etapa 1111"/>
+		<timestamp starttime="01/12/2011;DD/MM/YYYY"
+				   endtime="01/01/2012;DD/MM/YYYY"
+				   label="Etapa 1112"/>
+	    <timestamp starttime="01/01/2012;DD/MM/YYYY"
+				   endtime="01/02/2012;DD/MM/YYYY"
+				   label="Etapa 1201"/>
+		<timestamp starttime="01/02/2012;DD/MM/YYYY"
+				   endtime="01/03/2012;DD/MM/YYYY"
+				   label="Etapa 1202"/>
+		<timestamp starttime="01/03/2012;DD/MM/YYYY"
+				   endtime="01/04/2012;DD/MM/YYYY"
+				   label="Etapa 1203"/>   
+	    <timestamp starttime="01/04/2012;DD/MM/YYYY"
+				   endtime="01/05/2012;DD/MM/YYYY"
+				   label="Etapa 1204"/>
+	    <timestamp starttime="01/05/2012;DD/MM/YYYY"
+				   endtime="01/06/2012;DD/MM/YYYY"
+				   label="Etapa 1205"/>
+	    <timestamp starttime="01/05/2012;DD/MM/YYYY"
+				   endtime="01/06/2012;DD/MM/YYYY"
+				   label="Etapa 1205"/>
+	    <timestamp starttime="01/06/2012;DD/MM/YYYY"
+				   endtime="01/07/2012;DD/MM/YYYY"
+				   label="Etapa 1206"/>
+	    <timestamp starttime="01/07/2012;DD/MM/YYYY"
+				   endtime="01/08/2012;DD/MM/YYYY"
+				   label="Etapa 1207"/>
+	    <timestamp starttime="01/08/2012;DD/MM/YYYY"
+				   endtime="01/09/2012;DD/MM/YYYY"
+				   label="Etapa 1208"/>
+	    <timestamp starttime="01/09/2012;DD/MM/YYYY"
+				   endtime="01/10/2012;DD/MM/YYYY"
+				   label="Etapa 1209"/>
+	    <timestamp starttime="01/10/2012;DD/MM/YYYY"
+				   endtime="01/11/2012;DD/MM/YYYY"
+				   label="Etapa 1210"/>
+	    <timestamp starttime="01/11/2012;DD/MM/YYYY"
+				   endtime="01/12/2012;DD/MM/YYYY"
+				   label="Etapa 1211"/>
+	    <timestamp starttime="01/12/2012;DD/MM/YYYY"
+				   endtime="01/01/2013;DD/MM/YYYY"
+				   label="Etapa 1212"/>
+	    <timestamp starttime="01/01/2013;DD/MM/YYYY"
+				   endtime="01/02/2013;DD/MM/YYYY"
+				   label="Etapa 1301"/>
+	</timeextent>
+</configuration>

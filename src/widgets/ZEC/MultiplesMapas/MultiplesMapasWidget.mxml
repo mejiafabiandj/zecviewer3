@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" 
+				   xmlns:viewer="com.esri.viewer.*" layout="absolute"
+				   creationComplete="basewidget1_creationCompleteHandler(event)"
+				   widgetConfigLoaded="basewidget1_widgetConfigLoadedHandler(event)">
+	<fx:Script>
+		<![CDATA[
+			import com.esri.viewer.WidgetStates;
+			
+			import mx.containers.HBox;
+			import mx.containers.TitleWindow;
+			import mx.core.FlexGlobals;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			
+			private var ventana:TitleWindow;
+			
+			protected function basewidget1_creationCompleteHandler(event:FlexEvent):void
+			{
+				
+			}
+			
+			
+			protected function wtemplate_openHandler(event:Event):void
+			{
+				if(configObject)
+				{
+					abrir();
+				}
+			}
+			
+			
+
+			protected function basewidget1_widgetConfigLoadedHandler(event:Event):void
+			{
+				abrir();
+			}
+
+			private function abrir():void
+			{
+				if(ventana)
+				{
+					return;
+				}else
+				{
+					ventana = new TitleWindow();
+				}
+				
+				ventana.title = "Múltiples Mapas";
+				ventana.width = FlexGlobals.topLevelApplication.width - 50;
+				ventana.height = FlexGlobals.topLevelApplication.height - 50;
+				ventana.showCloseButton = true;
+				
+				
+				
+				var contenedor:ContenedorMultiplesMapas = new ContenedorMultiplesMapas();
+				
+				contenedor.percentHeight = 100;
+				contenedor.percentWidth = 100;
+				
+				contenedor.maxPaneles = configObject.configuration.maxNumPaneles;
+				contenedor.mapasIniciales = configObject.configuration.numPanelesIniciales;
+				contenedor.map = map;
+				contenedor.timeExtent = configObject.configuration.timeextent;
+				
+				
+				ventana.addElement(contenedor);
+				
+				ventana.addEventListener(FlexEvent.CREATION_COMPLETE,
+					function(e:FlexEvent):void
+					{
+						
+						e.currentTarget.showCloseButton	= true;
+						ventana.isPopUp = false;
+					});
+				
+				ventana.addEventListener(CloseEvent.CLOSE,
+					function(e:CloseEvent):void
+					{
+						PopUpManager.removePopUp(ventana);
+						
+						wtemplate.closeButton.dispatchEvent(new MouseEvent(MouseEvent.CLICK));
+						ventana = null;
+					});
+				
+				PopUpManager.addPopUp(ventana,Sprite(FlexGlobals.topLevelApplication),true);
+				PopUpManager.centerPopUp(ventana);
+			}
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<viewer:WidgetTemplate id="wtemplate"
+						   open="wtemplate_openHandler(event)"
+						   visible="false"
+						   >
+	</viewer:WidgetTemplate>
+</viewer:BaseWidget>

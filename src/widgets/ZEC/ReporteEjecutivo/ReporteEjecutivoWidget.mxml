@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="utf-8"?>
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" 
+				   xmlns:viewer="com.esri.viewer.*" layout="absolute"
+				   creationComplete="basewidget1_creationCompleteHandler(event)" 
+				   widgetConfigLoaded="basewidget1_widgetConfigLoadedHandler(event)"
+				   xmlns:executive="com.dane.widgets.ReporteEjecutivo.reports.executive.*" 
+				   xmlns:Interfaz="TableroIndicadores.Interfaz.*"
+				   width="100%"
+				   height="100%" xmlns:TableroIndicadores="widgets.DANE.ReporteEjecutivo.TableroIndicadores.*">
+	<fx:Script>
+		<![CDATA[
+			import widgets.DANE.ReporteEjecutivo.TableroIndicadores.Tablero;
+			
+			import com.esri.viewer.WidgetStates;
+			
+			import gov.dane.util.TokenUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.TitleWindow;
+			import mx.controls.Alert;
+			import mx.core.FlexGlobals;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			
+			protected function basewidget1_creationCompleteHandler(event:FlexEvent):void
+			{
+			}
+
+
+			protected function wtemplate_openHandler(event:Event):void
+			{
+				/*
+				var reporte:CTableroIndicadores = new CTableroIndicadores();
+				var ventana:TitleWindow = new TitleWindow();
+				
+				ventana.title = "Reporte ejecutivo";
+				ventana.width = FlexGlobals.topLevelApplication.width - 50;
+				ventana.height = FlexGlobals.topLevelApplication.height - 50;
+				
+				reporte.percentHeight = 100;
+				reporte.percentWidth = 100;
+				reporte.config = configuracion;
+				ventana.addElement(reporte);
+				
+				ventana.addEventListener(FlexEvent.CREATION_COMPLETE,
+					function(e:FlexEvent):void
+					{
+						e.currentTarget.showCloseButton	= true;
+					});
+				
+				ventana.addEventListener(CloseEvent.CLOSE,
+					function(e:CloseEvent):void
+					{
+						PopUpManager.removePopUp(ventana);
+						
+						wtemplate.closeButton.dispatchEvent(new MouseEvent(MouseEvent.CLICK));
+						//wtemplate.widgetState = WidgetStates.WIDGET_MINIMIZED;
+					});
+				
+				PopUpManager.addPopUp(ventana,Sprite(FlexGlobals.topLevelApplication),true);
+				PopUpManager.centerPopUp(ventana);
+				*/
+				
+			}
+
+
+			protected function basewidget1_widgetConfigLoadedHandler(event:Event):void
+			{
+				/*var c:Object=[
+					{
+						nombre: "Reporte 1",
+						porDefecto: true,
+						alfanumerico:{
+							url: "http://systema47.dane.gov.co:8399/arcgis/rest/services/Divipola/Divipola_2011/MapServer/2",
+							key: "CL519EUvzsoSMkjtbuAIg91u_8M-vf-ReVNVtisVBaig1KJgrULhtVuQsM_DYeYbseZBSREPW4Z69b-YPZAwOA..",
+							outFields: [
+								"*",
+								{ nombre: "CAMPO1", valor: "[SHAPE_Area]+[SHAPE_Length]" }
+							],
+							confmapa: {
+								metodo: "II",//II = Intervalos iguales, Q = Quantiles , PNQ = Puntos Naturales de Quiebre
+								tipoVariable: "C",//D = Discreta , DN = Discreto numérico, C = Continua
+								clases: 6, //Numero de clases o intervalos
+								field: "SHAPE_Area",//"TOTAL_OBRAS_ETAPA",
+								color: 0x3333ff
+							}
+						},
+						filtro: { // Filtros por selección de ComboBox y los valores por defecto
+							nombre: "Departamento",
+							fieldLabel: "DPTO",
+							field: "DPTO",
+							tipo: "D", // C =  Constante, D = Dinamico
+							value: "",
+							filtro:{
+								nombre: "Municipio",
+								fieldLabel: "MPIO",
+								field: "MPIO",
+								tipo: "D",
+								value: ""
+							}
+						},
+						mapasBase:[
+							{
+								url: "http://systema47.dane.gov.co:8399/arcgis/rest/services/Divipola/DIVIPOLA_MOBILE_2012/MapServer",
+								key: "CL519EUvzsoSMkjtbuAIg91u_8M-vf-ReVNVtisVBaig1KJgrULhtVuQsM_DYeYbseZBSREPW4Z69b-YPZAwOA.."
+							}
+						],
+						tabla: {
+							tipo: "advance", //"cubo", "tabla", "advance"
+							groupby:["DPTO","MPIO"],
+							columnas: [
+								{ field: "DPTO", nombre: "Departamento" },
+								{ field: "MPIO", nombre: "Municipio" },
+								{ field: "NOM_CPOB", nombre: "Centro Poblado" },
+								{ field: "CLASE", nombre: "Clase" }
+							]
+						}
+					}
+				];*/
+				var tablero:Tablero = new Tablero();
+				
+				var cnfs:Array = (configObject.configuration.criterio as Object).hasOwnProperty("length") ? (configObject.configuration.criterio as ArrayCollection).source : [configObject.configuration.criterio];
+				
+				for each(var conf:Object in cnfs)
+				{
+					conf.alfanumerico.outFields = (conf.alfanumerico.outFields is Array || conf.alfanumerico.outFields is ArrayCollection) ? conf.alfanumerico.outFields : [conf.alfanumerico.outFields];
+					conf.alfanumerico.key = TokenUtil.buscarToken(conf.alfanumerico.url, configData);
+					if(conf.hasOwnProperty("mapasBase")){
+						conf.mapasBase = (conf.mapasBase is Array || conf.mapasBase is ArrayCollection) ? conf.mapasBase : [conf.mapasBase];
+						for each(var mb:Object in conf.mapasBase){
+							mb.key = TokenUtil.buscarToken(mb.url, configData);
+						}
+					}
+					
+					/*if(conf.alfanumerico.key == null ){
+						conf.alfanumerico.key = "CL519EUvzsoSMkjtbuAIg91u_8M-vf-ReVNVtisVBaig1KJgrULhtVuQsM_DYeYbseZBSREPW4Z69b-YPZAwOA..";
+					}*/
+					/*
+					if(conf.tabla.dimension_fila)
+					{
+						conf.tabla.dimension_fila = (conf.tabla.dimension_fila as Object).hasOwnProperty("length") ? conf.tabla.dimension_fila : [conf.tabla.dimension_fila];
+					}
+					if(conf.tabla.dimension_columna)
+					{
+						conf.tabla.dimension_columna = (conf.tabla.dimension_columna as Object).hasOwnProperty("length") ? conf.tabla.dimension_columna : [conf.tabla.dimension_columna];
+					}
+					if(conf.tabla.medidas)
+					{
+						conf.tabla.medidas = (conf.tabla.medidas as Object).hasOwnProperty("length") ? conf.tabla.medidas : [conf.tabla.medidas];
+					}*/
+					if(conf.tabla.columnas)
+					{
+						conf.tabla.columnas = (conf.tabla.columnas as Object).hasOwnProperty("length") ? conf.tabla.columnas : [conf.tabla.columnas];
+					}
+					/*
+					if(conf.charts)
+					{
+						conf.charts = (conf.charts as Object).hasOwnProperty("length") ? conf.charts : [conf.charts];
+					}
+					if(conf.charts && conf.charts.fields)
+					{
+						conf.charts.fields = (conf.charts.fields as Object).hasOwnProperty("length") ? conf.charts.fields : [conf.charts.fields];
+					}*/
+				}
+				tablero.configuracion = cnfs;
+				wtemplate.addElement(tablero);
+				tablero.actualizar();
+			}
+			
+			
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<viewer:WidgetTemplate id="wtemplate"
+						   open="wtemplate_openHandler(event)"
+						   visible="true"
+						   width="100%"
+						   height="100%"
+						   >
+		<!--<Interfaz:CTableroIndicadores config="{conf}" width="100%" height="100%">
+		</Interfaz:CTableroIndicadores>-->
+	</viewer:WidgetTemplate>
+</viewer:BaseWidget>

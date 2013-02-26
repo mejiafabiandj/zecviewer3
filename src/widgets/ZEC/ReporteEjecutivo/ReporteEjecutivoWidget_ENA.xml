@@ -1,0 +1,1293 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<configuration>
+	<criterio nombre="Georreferenciación ANTIOQUIA"
+			  porDefecto="true">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='05'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio> 
+<criterio nombre="Georreferenciación ATLANTICO"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='08'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio> 
+
+<criterio nombre="Georreferenciación BOLIVAR"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='13'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio> 
+<criterio nombre="Georreferenciación BOYACA"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='15'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio> 
+<criterio nombre="Georreferenciación CALDAS"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='17'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio> 
+<!-- criterio nombre="Georreferenciación CAQUETA"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='18'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio--> 
+<criterio nombre="Georreferenciación CAUCA"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='19'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio> 
+<criterio nombre="Georreferenciación CESAR"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='20'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio> 
+<criterio nombre="Georreferenciación CORDOBA"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='23'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio> 
+<criterio nombre="Georreferenciación CUNDINAMARCA"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='25'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio> 
+<!-- <criterio nombre="Georreferenciación CHOCO"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='27'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio> -->
+<criterio nombre="Georreferenciación HUILA"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='41'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio> 
+<criterio nombre="Georreferenciación LA GUAJIRA"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='44'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio> 
+<criterio nombre="Georreferenciación MAGDALENA"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='47'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio> 
+<criterio nombre="Georreferenciación META"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='50'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio> 
+<criterio nombre="Georreferenciación NARIÑO"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='52'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio> 
+<criterio nombre="Georreferenciación NORTE DE SANTANDER"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='54'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio> 
+<criterio nombre="Georreferenciación QUINDIO"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='63'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio> 
+<criterio nombre="Georreferenciación RISARALDA"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='66'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio> 
+<criterio nombre="Georreferenciación SANTANDER"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='68'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio> 
+<criterio nombre="Georreferenciación SUCRE"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='70'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio> 
+<criterio nombre="Georreferenciación TOLIMA"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='73'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio> 
+<criterio nombre="Georreferenciación VALLE DEL CAUCA"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='76'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio> 
+<!-- <criterio nombre="Georreferenciación ARAUCA"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='81'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio> -->
+<criterio nombre="Georreferenciación CASANARE"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='85'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio> 
+<!-- <criterio nombre="Georreferenciación PUTUMAYO"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='86'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio> -->
+<!-- <criterio nombre="Georreferenciación AMAZONAS"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='91'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio> 
+<criterio nombre="Georreferenciación GUAINIA"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='94'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio> 
+<criterio nombre="Georreferenciación GUAVIARE"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='95'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio> 
+<criterio nombre="Georreferenciación VAUPES"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='97'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio> 
+<criterio nombre="Georreferenciación VICHADA"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='99'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio> 
+<criterio nombre="Georreferenciación ARCHIPIELAGO DE SAN ANDRES"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="DPTO ='88'">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		
+		<filtro nombre="COINCIDE GEORREFERENCIACION" fieldLabel="COINCIDE" field="COINCIDE" value="" tipo="D">
+			<filtro nombre="DP UPMSG" fieldLabel="DP_UPMSG" field="DP_UPMSG" value="" tipo="D">
+			</filtro>
+		</filtro>				
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			<columnas field="FEC_IMPORT" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio> -->
+
+
+	
+	<criterio nombre="Fecha de la georreferenciación"
+			  porDefecto="false">
+
+		<alfanumerico url="http://190.25.231.241:8399/arcgis/rest/services/ena/PRUEBA_ENA_OPERATIVO/MapServer/0" where="1=1">
+			<outFields>*</outFields>
+			<outFields nombre="Fecha" valor="(new Date([FEC_IMPORT])).toDateString('YYYY-MM-DD')"></outFields>
+			<configMapa metodo="II"
+						tipoVariable="D"
+						clases="6"
+						field="COINCIDE"
+						color="0x3333ff"
+						tomarSimbologiaServicio="false"
+						>
+			</configMapa>
+		</alfanumerico>
+		
+		<mapasBase url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2011/MapServer"></mapasBase>
+		<filtro nombre="Fecha" fieldLabel="FEC_IMPORT" field="FEC_IMPORT" value="" tipo="F">
+			<filtro></filtro>	
+		</filtro>
+
+		<tabla>
+			<columnas field="DPTO" nombre="Departamento"/>
+			<columnas field="DP_UPMSG" nombre="Codigo Segmento Operativo"/>
+			<columnas field="COD_SM" nombre="Codigo Segmento Calculado"/>
+			<columnas field="COINCIDE" nombre="Georreferenciacion Correcta"/>
+			<columnas field="OBSERVACIO" nombre="Observacion Georreferenciacion"/> 
+			
+			<columnas field="Fecha" nombre="Fecha de Inicio"/>
+			<columnas field="SERIAL" nombre="Serial DMC"/>
+			<columnas field="GPSLAT" nombre="Latitud GPS"/>
+			<columnas field="GPSLNG" nombre="Longitud GPS"/>
+			<columnas field="X" nombre="Coordenada X"/>
+			<columnas field="Y" nombre="Coordenada Y"/>
+			
+		</tabla>
+	</criterio>	
+
+</configuration>

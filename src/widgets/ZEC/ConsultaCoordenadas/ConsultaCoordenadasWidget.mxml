@@ -1,0 +1,517 @@
+<?xml version="1.0" encoding="utf-8"?>
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" 
+				   xmlns:viewer="com.esri.viewer.*" layout="absolute"
+				   creationComplete="basewidget1_creationCompleteHandler(event)"
+				   widgetConfigLoaded="basewidget1_widgetConfigLoadedHandler(event)" 
+				   xmlns:tasks="com.esri.ags.tasks.*" xmlns:supportClasses="com.esri.ags.tasks.supportClasses.*"
+				   currentStateChange="basewidget1_currentStateChangeHandler(event)">
+
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.FeatureSet;
+			import com.esri.ags.SpatialReference;
+			import com.esri.ags.geometry.MapPoint;
+			import com.esri.ags.layers.Layer;
+			import com.esri.viewer.AppEvent;
+			import com.esri.viewer.ViewerContainer;
+			import com.esri.viewer.WidgetStates;
+			
+			import flashx.textLayout.operations.DeleteTextOperation;
+			import flashx.textLayout.operations.InsertTextOperation;
+			
+			import gov.dane.util.Constantes;
+			import gov.dane.util.TokenUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.FlexEvent;
+			import mx.events.StateChangeEvent;
+			import mx.formatters.NumberFormatter;
+			import mx.rpc.AsyncResponder;
+			import mx.rpc.Fault;
+			
+			import spark.events.IndexChangeEvent;
+			import spark.events.TextOperationEvent;
+			
+			
+			[Bindable] private var providerCmbNivel:ArrayCollection = new ArrayCollection();
+			
+			[Bindable] private var msgSistemaRef:String;
+			
+			private var selectedVigencia:Object;
+			
+			private var timer:Timer = new Timer(5000);
+			
+			protected function basewidget1_creationCompleteHandler(event:FlexEvent):void
+			{
+				AppEvent.addListener(AppEvent.BASEMAP_SWITCH, basemapMenuClicked);
+				txtLatD.dispatchEvent(new TextOperationEvent(TextOperationEvent.CHANGE));
+				
+				timer.addEventListener(TimerEvent.TIMER,timer_Tic);
+			}
+			
+			
+			
+			protected function basewidget1_widgetConfigLoadedHandler(event:Event  = null):void
+			{
+				if(configObject)
+				{
+					providerCmbNivel.removeAll();
+					
+					msgSistemaRef = configObject.configuration.msgSistemaRef;
+					
+					for each(var vigencia:Object in configObject.configuration.vigencias.vigencia)
+					{
+						if(vigencia.label == selectedBasemap())
+						{
+							selectedVigencia = vigencia;
+							
+							if(vigencia.niveles.nivel is ArrayCollection)
+							{
+								providerCmbNivel.addAll(vigencia.niveles.nivel);
+							}else
+							{
+								providerCmbNivel.addItem(vigencia.niveles.nivel);
+							}
+							
+							if(providerCmbNivel.length > 0)
+							{
+								cmbNivel.selectedIndex = providerCmbNivel.length - 1;
+								cmbNivel.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-1,providerCmbNivel.length - 1));
+							}else
+							{
+								cmbNivel.selectedIndex = -1;
+								cmbNivel.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CHANGE,false,false,-1,-1));
+							}
+							break;
+						}
+					}
+				}
+			}
+			
+			
+			/**
+			 * Evento resultado de el cambio del mapa base
+			 **/
+			private function basemapMenuClicked(event:AppEvent):void
+			{
+				basewidget1_widgetConfigLoadedHandler();
+			}
+			
+			/**
+			 * Retorna el nombre del mapa base que se encuentra activo
+			 **/
+			public function selectedBasemap():String
+			{
+				var selectedBasemap:String = "default";
+				
+				for each(var layer:Layer in map.layers)
+				{
+					for each(var basemap:Object in configData.basemaps)
+					{
+						if(layer.id == basemap.label)
+						{
+							if(layer.visible)
+							{
+								selectedBasemap = layer.id;
+							}
+						}
+					}
+				}
+				return selectedBasemap;
+			}
+			
+			
+			protected function rdioGroup_changeHandler(event:Event):void
+			{
+				if(rdoDD.selected)
+				{
+					currentState = "decimal";
+				}else
+				{
+					currentState = "dms";
+				}
+			}
+
+			protected function basewidget1_currentStateChangeHandler(event:StateChangeEvent):void
+			{
+
+			}
+
+			protected function btnConsultar_clickHandler(event:MouseEvent):void
+			{
+				if(X && Y && cmbNivel.selectedItem)
+				{
+					var mapPoint:MapPoint = new MapPoint(X,Y,new SpatialReference(4326));
+					
+					map.centerAt(mapPoint);
+					map.scale = 5000;
+					
+					query.geometry = mapPoint;
+					
+					queryTask.url = selectedVigencia.url + "/" + cmbNivel.selectedItem.id;
+										
+					queryTask.proxyURL = (selectedVigencia.useproxy ? configData.proxyUrl :null);
+					queryTask.useAMF = queryTask.proxyURL? false: selectedVigencia.useAMF;
+					queryTask.token = TokenUtil.buscarToken(queryTask.url,configData);
+					
+					queryTask.execute(query,new AsyncResponder(queryTask_Result,queryTask_Fault));
+				}	
+			}
+
+			private function queryTask_Result(featureSet:FeatureSet,token:Object = null):void
+			{
+				if(featureSet.features.length == 0)
+				{
+					Alert.show("La consulta realizada no retornó resultados");
+				}else
+				{
+					setState(WidgetStates.WIDGET_MINIMIZED);
+					addSharedData(Constantes.OPERACION_ABRIR_WIDGET,new ArrayCollection([{label:"Resultados",data:{featureSet:featureSet,token:null}}]));
+				}
+			}
+			
+			private function queryTask_Fault(fault:Fault,token:Object = null):void
+			{
+				showError("No fué posible realizar la consulta\n\n" + fault.message);
+			}
+
+
+			[Bindable] private var X:Number = 0;
+			[Bindable] private var Xd:Number = 0;
+			[Bindable] private var Xm:Number = 0;
+			[Bindable] private var Xs:Number = 0;
+			[Bindable] private var Y:Number = 0;
+			[Bindable] private var Yd:Number = 0;
+			[Bindable] private var Ym:Number = 0;
+			[Bindable] private var Ys:Number = 0;
+			
+			private function recalcular():void
+			{
+				if(currentState == "dms")
+				{
+					X = Xd >= 0? Xd + Xm/60 + Xs/3600 : Xd - Xm/60 - Xs/3600;
+					Y = Yd >= 0? Yd + Ym/60 + Ys/3600 : Yd - Ym/60 - Ys/3600;
+				}else if(currentState == "decimal")
+				{
+					Xd = X > 0 ? Math.floor(X) : -Math.floor(Math.abs(X));
+					Yd = Y > 0 ? Math.floor(Y) : -Math.floor(Math.abs(Y));
+					
+					Xm = X > 0 ? (X-Math.floor(X))*60 : (-X - Math.floor(-X))*60;
+					Xs = (Xm - Math.floor(Xm))*60;
+					Xm = Math.floor(Xm);
+					
+					Yd = Y > 0 ? Math.floor(Y) : -Math.floor(-Y); 
+					Ym = Y > 0 ? (Y-Math.floor(Y))*60 : (-Y - Math.floor(-Y))*60;
+					Ys = (Ym - Math.floor(Ym))*60;
+					Ym = Math.floor(Ym);
+				}
+				
+				
+			}
+
+			
+			
+			protected function rdoLatitud_changeHandler(event:Event):void
+			{
+				if(currentState == "dms" && Number(txtLatD.text))
+				{
+					Yd = (rdoN.selected ? Math.abs(Number(txtLatD.text)) : -Math.abs(Number(txtLatD.text)));
+					recalcular();
+				}else if(currentState == "decimal" && Number(txtLatitud.text))
+				{
+					Y = (rdoN.selected ? Math.abs(Number(txtLatitud.text)) : -Math.abs(Number(txtLatitud.text)));
+					recalcular();
+				}
+			}
+			
+			
+			protected function rdoLongitud_changeHandler(event:Event):void
+			{
+				if(currentState == "dms" && Number(txtLongD.text))
+				{
+					Xd = (rdoE.selected ? Math.abs(Number(txtLongD.text)) : -Math.abs(Number(txtLongD.text)));
+					recalcular();
+				}else if(currentState == "decimal" && Number(txtLongitud.text))
+				{
+					X = (rdoE.selected ? Math.abs(Number(txtLongitud.text)) : -Math.abs(Number(txtLongitud.text)));
+					recalcular();
+				}
+			}
+
+			
+			private function timer_Tic(event:TimerEvent):void
+			{
+				timer.stop();
+				
+				var activePosition:Number;
+				var anchorPosition:Number;
+				if(txtLatitud && txtLongitud)
+				{					
+					activePosition = txtLatitud.selectionActivePosition;
+					anchorPosition = txtLatitud.selectionAnchorPosition;
+					txtLatitud.text = "" + Y;
+					txtLatitud.selectRange(anchorPosition,activePosition);
+					
+					activePosition = txtLongitud.selectionActivePosition;
+					anchorPosition = txtLongitud.selectionAnchorPosition;
+					txtLongitud.text = "" + X;
+					txtLongitud.selectRange(anchorPosition,activePosition);
+				}
+				
+				if(txtLongD && txtLongM && txtLongS && txtLatD && txtLatM && txtLatS )
+				{
+					txtLongD.text = Xd + "";
+					txtLongM.text = Xm + "";
+					
+					activePosition = txtLongS.selectionActivePosition;
+					anchorPosition = txtLongS.selectionAnchorPosition;
+					txtLongS.text = Xs + "";
+					txtLongS.selectRange(anchorPosition,activePosition);
+					
+					txtLatD.text = Yd + "";
+					txtLatM.text = Ym + "";
+					
+					activePosition = txtLatS.selectionActivePosition;
+					anchorPosition = txtLatS.selectionAnchorPosition;
+					txtLatS.text = Ys + "";
+					txtLatS.selectRange(anchorPosition,activePosition);
+				}
+			}
+			
+			protected function txt_changeHandler(event:TextOperationEvent):void
+			{
+				timer.stop();
+				timer.start();
+				
+				if(Number(event.currentTarget.text))
+				{
+					if(event.currentTarget == txtLatitud || event.currentTarget == txtLatD)
+					{
+						rdoN.selected = Number(event.currentTarget.text) >= 0;
+						rdoS.selected = !rdoN.selected;
+						rdoLatitud.dispatchEvent(new Event(Event.CHANGE));
+					}else if(event.currentTarget == txtLongitud || event.currentTarget == txtLongD)
+					{
+						rdoE.selected = Number(event.currentTarget.text) >= 0;
+						rdoO.selected = !rdoE.selected;
+						rdoLongitud.dispatchEvent(new Event(Event.CHANGE));
+					}
+					else if(event.currentTarget == txtLongM)
+					{
+						Xm = Number(txtLongM.text);
+						recalcular();
+					}else if(event.currentTarget == txtLongS)
+					{
+						Xs = Number(txtLongS.text);
+						recalcular();
+					}
+					else if(event.currentTarget == txtLatM)
+					{
+						Ym = Number(txtLatM.text);
+						recalcular();
+					}else if(event.currentTarget == txtLatS)
+					{
+						Ys = Number(txtLatS.text);
+						recalcular();
+					}
+				}
+			}
+			
+			
+
+		]]>
+	</fx:Script>
+
+	<fx:Declarations>
+		<tasks:QueryTask id="queryTask" showBusyCursor="true"/>
+		<supportClasses:Query id="query" outFields="*" returnGeometry="true"/>
+		
+		<s:RadioButtonGroup id="rdioGroup" change="rdioGroup_changeHandler(event)"/>
+		<s:RadioButtonGroup id="rdoLatitud" change="rdoLatitud_changeHandler(event)"/>
+		<s:RadioButtonGroup id="rdoLongitud" change="rdoLongitud_changeHandler(event)"/>
+		
+		
+		<mx:NumberValidator id="validatorLat" domain="real" required="true" decimalSeparator="." thousandsSeparator=","
+							maxValue="90" minValue="-90"
+							source="{txtLatitud}" triggerEvent="change" property="text"
+							valid="{btnConsultar.enabled = true}" invalid="{btnConsultar.enabled = false}"/>
+		<mx:NumberValidator id="validatorLong" domain="real" required="true" decimalSeparator="." thousandsSeparator=","
+							maxValue="180" minValue="-180"
+							source="{txtLongitud}" triggerEvent="change" property="text"
+							valid="{btnConsultar.enabled = true}" invalid="{btnConsultar.enabled = false}"/>
+		
+		<mx:NumberValidator id="intValidatorLatD" domain="int" required="true" decimalSeparator="." thousandsSeparator="," 
+							maxValue="90" minValue="-90"
+							source="{txtLatD}" triggerEvent="change" property="text"
+							valid="{btnConsultar.enabled = true}" invalid="{btnConsultar.enabled = false}"/>
+		<mx:NumberValidator id="intValidatorLatM" domain="int" required="true" decimalSeparator="." thousandsSeparator="," 
+							maxValue="60" minValue="0"
+							source="{txtLatM}" triggerEvent="change" property="text"
+							valid="{btnConsultar.enabled = true}" invalid="{btnConsultar.enabled = false}"/>
+		<mx:NumberValidator id="validatorLatS" domain="real" required="true" decimalSeparator="." thousandsSeparator=","
+							maxValue="60" minValue="0"
+							source="{txtLatS}" triggerEvent="change" property="text"
+							valid="{btnConsultar.enabled = true}" invalid="{btnConsultar.enabled = false}"/>
+		
+		<mx:NumberValidator id="intValidatorLongD" domain="int" required="true" decimalSeparator="." thousandsSeparator="," 
+							maxValue="180" minValue="-180"
+							source="{txtLongD}" triggerEvent="change" property="text"
+							valid="{btnConsultar.enabled = true}" invalid="{btnConsultar.enabled = false}"/>
+		<mx:NumberValidator id="intValidatorLongM" domain="int" required="true" decimalSeparator="." thousandsSeparator="," 
+							maxValue="60" minValue="0"
+							source="{txtLongM}" triggerEvent="change" property="text"
+							valid="{btnConsultar.enabled = true}" invalid="{btnConsultar.enabled = false}"/>
+		<mx:NumberValidator id="validatorLongS" domain="real" required="true" decimalSeparator="." thousandsSeparator=","
+							maxValue="60" minValue="0"
+							source="{txtLongS}" triggerEvent="change" property="text"
+							valid="{btnConsultar.enabled = true}" invalid="{btnConsultar.enabled = false}"/>
+	</fx:Declarations>
+	<viewer:states>
+		<s:State name="dms"/>
+		<s:State name="decimal"/>
+	</viewer:states>
+	<viewer:WidgetTemplate id="wTemplate" 
+						   width="460" height="320"
+						   minWidth="460">
+		<s:BorderContainer cornerRadius="5" top="15" bottom="0" right="0" left="0" backgroundAlpha="0" 
+						   minHeight="50"
+						   >
+			<s:VGroup horizontalCenter="0" verticalCenter="0" verticalAlign="middle" horizontalAlign="center" 
+					  left="5" top="5" right="5" bottom="5"
+					  >
+				<s:HGroup verticalAlign="middle" horizontalAlign="center" width="100%">
+					<s:Label text="Nivel de información" fontWeight="bold"/>
+					<s:DropDownList id="cmbNivel"
+									dataProvider="{providerCmbNivel}"
+									prompt="Seleccione..." width="180"/>
+				</s:HGroup>
+				
+				<s:Group width="100%">
+					<s:BorderContainer right="10" bottom="10" left="10" top="10" minHeight="0" backgroundAlpha="0"
+									   cornerRadius="3">
+						<mx:Grid verticalAlign="middle" horizontalAlign="center" right="10" bottom="10" left="10" top="10">
+							<mx:GridRow left="0" right="0" horizontalAlign="center" verticalAlign="middle">
+								<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+									<s:Label text="Latitud:" fontWeight="bold"/>
+								</mx:GridItem>
+								<mx:GridItem verticalAlign="middle" left="0" right="0">
+									<s:HGroup width="100%" verticalAlign="middle">	
+										<s:VGroup gap="0">
+											<s:RadioButton id="rdoN" groupName="rdoLatitud" label="N" fontSize="8" selected="true"/>
+											<s:RadioButton id="rdoS" groupName="rdoLatitud" label="S" fontSize="8"/>
+										</s:VGroup>
+										<s:TextInput width="100%" includeIn="decimal"
+													 id="txtLatitud" 
+													 enter="{btnConsultar.dispatchEvent(new MouseEvent(MouseEvent.CLICK))}"
+													 change="txt_changeHandler(event)"
+													 text="{Y}"/>
+										<s:HGroup width="100%" verticalAlign="middle" includeIn="dms">
+											<s:TextInput width="30" id="txtLatD"
+														 enter="{btnConsultar.dispatchEvent(new MouseEvent(MouseEvent.CLICK))}"
+														 change="txt_changeHandler(event)"
+														 text="{Yd}"/>
+											<s:Label text="Grados" fontSize="10"/>
+											<s:Line height="90%">
+												<s:stroke>
+													<s:SolidColorStroke color="{getStyle('focusColor')}"/>
+												</s:stroke>
+											</s:Line>
+											<s:TextInput width="30" id="txtLatM"
+														 enter="{btnConsultar.dispatchEvent(new MouseEvent(MouseEvent.CLICK))}"
+														 change="txt_changeHandler(event)"
+														 text="{Ym}"/>
+											<s:Label text="Minutos" fontSize="10"/>
+											<s:Line height="90%">
+												<s:stroke>
+													<s:SolidColorStroke color="{getStyle('focusColor')}"/>
+												</s:stroke>
+											</s:Line>
+											<s:TextInput width="45" id="txtLatS"
+														 enter="{btnConsultar.dispatchEvent(new MouseEvent(MouseEvent.CLICK))}"
+														 change="txt_changeHandler(event)"
+														 text="{Ys}"/>
+											<s:Label text="Segundos" fontSize="10"/>
+										</s:HGroup>
+									</s:HGroup>
+								</mx:GridItem>
+							</mx:GridRow>
+							<mx:GridRow left="0" right="0" horizontalAlign="center" verticalAlign="middle">
+								<mx:GridItem verticalAlign="middle" horizontalAlign="right">
+									<s:Label text="Longitud:" fontWeight="bold"/>
+								</mx:GridItem>
+								<mx:GridItem verticalAlign="middle" left="0" right="0">
+									<s:HGroup width="100%" verticalAlign="middle">	
+										<s:VGroup gap="0">
+											<s:RadioButton id="rdoE" groupName="rdoLongitud" label="E" fontSize="8" selected="true"/>
+											<s:RadioButton id="rdoO" groupName="rdoLongitud" label="O" fontSize="8"/>
+										</s:VGroup>
+										<s:TextInput width="100%" includeIn="decimal"
+													 id="txtLongitud" 
+													 enter="{btnConsultar.dispatchEvent(new MouseEvent(MouseEvent.CLICK))}"
+													 change="txt_changeHandler(event)"
+													 text="{X}"
+													 />
+										<s:HGroup width="100%" verticalAlign="middle" includeIn="dms">
+											<s:TextInput width="30" id="txtLongD"
+														 enter="{btnConsultar.dispatchEvent(new MouseEvent(MouseEvent.CLICK))}"
+														 change="txt_changeHandler(event)"
+														 text="{Xd}"/>
+											<s:Label text="Grados" fontSize="10"/>
+											<s:Line height="90%">
+												<s:stroke>
+													<s:SolidColorStroke color="{getStyle('focusColor')}"/>
+												</s:stroke>
+											</s:Line>
+											<s:TextInput width="30" id="txtLongM"
+														 enter="{btnConsultar.dispatchEvent(new MouseEvent(MouseEvent.CLICK))}"
+														 change="txt_changeHandler(event)"
+														 text="{Xm}"/>
+											<s:Label text="Minutos" fontSize="10"/>
+											<s:Line height="90%">
+												<s:stroke>
+													<s:SolidColorStroke color="{getStyle('focusColor')}"/>
+												</s:stroke>
+											</s:Line>
+											<s:TextInput width="45" id="txtLongS"
+														 enter="{btnConsultar.dispatchEvent(new MouseEvent(MouseEvent.CLICK))}"
+														 change="txt_changeHandler(event)"
+														 text="{Xs}"/>
+											<s:Label text="Segundos" fontSize="10"/>
+										</s:HGroup>
+									</s:HGroup>
+								</mx:GridItem>
+							</mx:GridRow>
+						</mx:Grid>
+					</s:BorderContainer>
+				</s:Group>
+				
+				
+				<s:HGroup width="100%" horizontalAlign="center">					
+					<s:RadioButton id="rdoDMS" groupName="rdioGroup" label="Grados, Minutos, Segundos" selected="true"/>
+					<s:Line height="90%">
+						<s:stroke>
+							<s:SolidColorStroke color="{getStyle('focusColor')}"/>
+						</s:stroke>
+					</s:Line>
+					<s:RadioButton id="rdoDD" groupName="rdioGroup" label="Grados decimales"/>
+				</s:HGroup>
+				<s:Line width="90%">
+					<s:stroke>
+						<s:SolidColorStroke color="{getStyle('focusColor')}"/>
+					</s:stroke>
+				</s:Line>
+				<s:HGroup width="100%" horizontalAlign="right">
+					<mx:Text htmlText="{msgSistemaRef}"
+							 maxWidth="460"
+							 right="20"
+							 />
+				</s:HGroup>
+				<s:Button id="btnConsultar" label="Consultar"
+						  click="btnConsultar_clickHandler(event)"/>
+			</s:VGroup>
+		</s:BorderContainer>
+	</viewer:WidgetTemplate>
+</viewer:BaseWidget>

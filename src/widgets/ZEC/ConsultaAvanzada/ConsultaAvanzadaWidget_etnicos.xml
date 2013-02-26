@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<configuration>
+	<retornarGeometria>true</retornarGeometria>
+	<generalizargeometria value="true" cantidad="0.005"/>
+	<vigencias>
+		<vigencia 	label="Censo 2005" 
+					url="http://190.25.231.241:8399/arcgis/rest/services/Etnicos/GruposEtnicos/MapServer" 
+					useAMF="true"
+					useproxy="false">
+			<niveles>
+				<nivel 	label="Departamento" 
+						id="1"
+						pk="V_MAGNA_2005.MGN_ADM_DPTO_POLITICO.DPTO_CCDGO"
+						/>
+				<nivel 	label="Municipio" 
+						id="0"
+						pk="V_MAGNA_2005.MGN_ADM_MPIO_GRAFICO.MPIO_CCNCTNDO"
+						/>
+						
+				<nivel 	label="Resguardos Indígenas" 
+						id="2"
+						pk="Resguardos_IGAC_DANE_2012_v2.COD_DANE"
+						/>
+				
+			</niveles>
+		</vigencia>
+		<vigencia 	label="Vigencia_2006" 
+					url="http://190.25.231.241:8399/arcgis/rest/services/Etnicos/GruposEtnicos/MapServer" 
+					useAMF="true"
+					useproxy="false">
+			<niveles>
+				<nivel 	label="Departamento" 
+						id="1"
+						pk="V_MAGNA_2005.MGN_ADM_DPTO_POLITICO.DPTO_CCDGO"
+						/>
+				<nivel 	label="Municipio" 
+						id="0"
+						pk="V_MAGNA_2005.MGN_ADM_MPIO_GRAFICO.MPIO_CCNCTNDO"
+						/>
+				
+			</niveles>
+		</vigencia>
+	</vigencias>
+</configuration>

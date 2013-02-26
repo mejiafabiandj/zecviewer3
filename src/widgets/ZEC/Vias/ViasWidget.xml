@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<configuration>
+	<url>http://190.25.231.241:8030/JSegOp/Invias</url>
+	<nota><![CDATA[<b>*Fuente <a href='http://viajeroseguro.invias.gov.co/invias' target='_blank'>Viajero Seguro INVIAS</a></b>]]></nota>
+	<labels
+		id="Código"
+		descripcion="Descripción"
+		estado="Estado"
+		fecha="Fecha"
+		idTramo="Código de la vía"
+		latitud="Latitud"
+		longitud="Longitud"	
+		nombre="Nombre"
+		tipo="Tipo"
+		fechaFin="Fecha de finalización"	
+		fechaInicio="Fecha de inicio"	
+		horaAmFin="Hora finalización (AM/PM)"	
+		horaAmInicio="Hora inicio (AM/PM)"	
+		horaFin="Hora de finalización"
+		horaInicio="Hora de inicio"	
+		observacion="Observación"
+		sitio="Sitio"
+		tipoCierre="Tipo de cierre"	
+		sentido="Sentido"
+		tipoPeaje="Tipo de peaje"	
+		valorCategoriaI="Valor Categoría I ($)"	
+		valorCategoriaIi="Valor Categoría II ($)"
+		valorCategoriaIii="Valor Categoría III ($)"
+		valorCategoriaIv="Valor Categoría IV ($)"
+		valorCategoriaV="Valor Categoría V ($)"
+		valorCategoriaVi="Valor Categoría VI ($)"
+		valorCategoriaVii="Valor Categoría VII ($)"
+		valorCategoriaViii="Valor Categoría VIII ($)"
+	/>
+</configuration>

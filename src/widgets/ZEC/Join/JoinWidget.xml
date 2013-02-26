@@ -1,0 +1,308 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<configuration>
+	
+	<generalizacion>
+		<nivel id="0" label="Manzana" valor="5" imagen="assets/images/Niveles/Manzana.png"/>
+		<nivel id="1" label="Barrio" valor="50" imagen="assets/images/Niveles/Barrio.png"/>
+		<nivel id="2" label="Centro Poblado" valor="80" imagen="assets/images/Niveles/CentroPobladoPequeño.png"/>
+		<nivel id="3" label="Centro Poblado Grande" valor="100" imagen="assets/images/Niveles/CentroPobladoGrande.png"/>
+		<nivel id="4" label="Área Metropolitana" valor="300" imagen="assets/images/Niveles/AreaMetropolitana.png"/>
+		<nivel id="5" label="Municipio" valor="500" imagen="assets/images/Niveles/Municipio.png"/>
+		<nivel id="6" label="Departamento" valor="1000" imagen="assets/images/Niveles/Departamento.png"/>
+		<nivel id="7" label="Pais" valor="2000" imagen="assets/images/Niveles/Pais.png"/>
+	</generalizacion>
+	
+	<vigencias>
+		<vigencia 	label="Vigencia_2006" 
+					url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2006/MapServer" 
+					useAMF="true"
+					useproxy="false">
+			<niveles>
+				<!--El atributo "generalizacion" hace referencia al id de los niveles de generalización definidos 
+					en la etiquieta <generalizacion><nivel id=""... />...</generalizacion> -->
+				<nivel 	label="País" 
+						id="8"
+						pk="PAIS_CCDGO"
+						generalizacion="7"
+						/>
+				<nivel 	label="Departamento" 
+						id="7"
+						pk="DPTO_CCDGO"
+						generalizacion="6"
+						/>
+				<nivel 	label="Municipio" 
+						id="10"
+						pk="MPIO_CCNCTNDO"
+						generalizacion="5"
+						/>
+				<nivel 	label="Sección Rural" 
+						id="13"
+						pk="SECR_CCNCTNDO"
+						generalizacion="5"
+						/>
+				<nivel 	label="Sector Rural" 
+						id="12"
+						pk="SETR_CCNCTNDO"
+						generalizacion="4"
+						/>
+				<nivel 	label="Cabecera Resto Rural" 
+						id="14"
+						pk="CLAS_CNCTNDO"
+						generalizacion="5"
+						/>
+				<nivel 	label="Zonas Urbanas" 
+						id="18"
+						pk="CPOB_CCNCTNDO"
+						generalizacion="3"
+						/>
+				<nivel 	label="Sección Urbana" 
+						id="17"
+						pk="SECU_CCNCTNDO"
+						generalizacion="2"
+						/>
+				<nivel 	label="Sector Urbano" 
+						id="16"
+						pk="SETU_CCNCTNDO"
+						generalizacion="2"
+						/>
+				<nivel 	label="Manzana" 
+						id="19"
+						pk="MANZ_CCNCTNDO"
+						generalizacion="0"
+						/>
+			</niveles>
+		</vigencia>
+		<vigencia 	label="Vigencia_2005" 
+					url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2005/MapServer" 
+					useAMF="true"
+					useproxy="false">
+			<niveles>
+				<nivel 	label="País" 
+						id="8"
+						pk="PAIS_CCDGO"
+						generalizacion="7"
+						/>
+				<nivel 	label="Departamento" 
+						id="7"
+						pk="DPTO_CCDGO"
+						generalizacion="6"
+						/>
+				<nivel 	label="Municipio" 
+						id="10"
+						pk="MPIO_CCNCTNDO"
+						generalizacion="5"
+						/>
+				<nivel 	label="Sección Rural" 
+						id="13"
+						pk="SECR_CCNCTNDO"
+						generalizacion="5"
+						/>
+				<nivel 	label="Sector Rural" 
+						id="12"
+						pk="SETR_CCNCTNDO"
+						generalizacion="4"
+						/>
+				<nivel 	label="Cabecera Resto Rural" 
+						id="14"
+						pk="CLAS_CNCTNDO"
+						generalizacion="5"
+						/>
+				<nivel 	label="Zonas Urbanas" 
+						id="18"
+						pk="CPOB_CCNCTNDO"
+						generalizacion="3"
+						/>
+				<nivel 	label="Sección Urbana" 
+						id="17"
+						pk="SECU_CCNCTNDO"
+						generalizacion="2"
+						/>
+				<nivel 	label="Sector Urbano" 
+						id="16"
+						pk="SETU_CCNCTNDO"
+						generalizacion="2"
+						/>
+				<nivel 	label="Manzana" 
+						id="19"
+						pk="MANZ_CCNCTNDO"
+						generalizacion="0"
+						/>
+			</niveles>
+		</vigencia>
+		<vigencia 	label="Vigencia_2008" 
+					url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2008/MapServer" 
+					useAMF="true"
+					useproxy="false">
+			<niveles>
+				<nivel 	label="País" 
+						id="8"
+						pk="PAIS_CCDGO"
+						generalizacion="7"
+						/>
+				<nivel 	label="Departamento" 
+						id="7"
+						pk="DPTO_CCDGO"
+						generalizacion="6"
+						/>
+				<nivel 	label="Municipio" 
+						id="10"
+						pk="MPIO_CCNCTNDO"
+						generalizacion="5"
+						/>
+				<nivel 	label="Sección Rural" 
+						id="13"
+						pk="SECR_CCNCTNDO"
+						generalizacion="5"
+						/>
+				<nivel 	label="Sector Rural" 
+						id="12"
+						pk="SETR_CCNCTNDO"
+						generalizacion="4"
+						/>
+				<nivel 	label="Cabecera Resto Rural" 
+						id="14"
+						pk="CLAS_CNCTNDO"
+						generalizacion="5"
+						/>
+				<nivel 	label="Zonas Urbanas" 
+						id="18"
+						pk="CPOB_CCNCTNDO"
+						generalizacion="3"
+						/>
+				<nivel 	label="Sección Urbana" 
+						id="17"
+						pk="SECU_CCNCTNDO"
+						generalizacion="2"
+						/>
+				<nivel 	label="Sector Urbano" 
+						id="16"
+						pk="SETU_CCNCTNDO"
+						generalizacion="2"
+						/>
+				<nivel 	label="Manzana" 
+						id="19"
+						pk="MANZ_CCNCTNDO"
+						generalizacion="0"
+						/>
+			</niveles>
+		</vigencia>
+		
+		<vigencia 	label="Vigencia_2011" 
+					url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2006/MapServer" 
+					useAMF="true"
+					useproxy="false">
+			<niveles>
+				<!--El atributo "generalizacion" hace referencia al id de los niveles de generalización definidos 
+					en la etiquieta <generalizacion><nivel id=""... />...</generalizacion> -->
+				<nivel 	label="País" 
+						id="8"
+						pk="PAIS_CCDGO"
+						generalizacion="7"
+						/>
+				<nivel 	label="Departamento" 
+						id="7"
+						pk="DPTO_CCDGO"
+						generalizacion="6"
+						/>
+				<nivel 	label="Municipio" 
+						id="10"
+						pk="MPIO_CCNCTNDO"
+						generalizacion="5"
+						/>
+				<nivel 	label="Sección Rural" 
+						id="13"
+						pk="SECR_CCNCTNDO"
+						generalizacion="5"
+						/>
+				<nivel 	label="Sector Rural" 
+						id="12"
+						pk="SETR_CCNCTNDO"
+						generalizacion="4"
+						/>
+				<nivel 	label="Cabecera Resto Rural" 
+						id="14"
+						pk="CLAS_CNCTNDO"
+						generalizacion="5"
+						/>
+				<nivel 	label="Zonas Urbanas" 
+						id="18"
+						pk="CPOB_CCNCTNDO"
+						generalizacion="3"
+						/>
+				<nivel 	label="Sección Urbana" 
+						id="17"
+						pk="SECU_CCNCTNDO"
+						generalizacion="2"
+						/>
+				<nivel 	label="Sector Urbano" 
+						id="16"
+						pk="SETU_CCNCTNDO"
+						generalizacion="2"
+						/>
+				<nivel 	label="Manzana" 
+						id="19"
+						pk="MANZ_CCNCTNDO"
+						generalizacion="0"
+						/>
+			</niveles>
+		</vigencia>
+		
+		<vigencia 	label="default" 
+					url="http://190.25.231.241:8399/arcgis/rest/services/Vigencia_2006/MapServer" 
+					useAMF="true"
+					useproxy="false">
+			<niveles>
+				<nivel 	label="País" 
+						id="8"
+						pk="PAIS_CCDGO"
+						generalizacion="7"
+						/>
+				<nivel 	label="Departamento" 
+						id="7"
+						pk="DPTO_CCDGO"
+						generalizacion="6"
+						/>
+				<nivel 	label="Municipio" 
+						id="10"
+						pk="MPIO_CCNCTNDO"
+						generalizacion="5"
+						/>
+				<nivel 	label="Sección Rural" 
+						id="13"
+						pk="SECR_CCNCTNDO"
+						generalizacion="5"
+						/>
+				<nivel 	label="Sector Rural" 
+						id="12"
+						pk="SETR_CCNCTNDO"
+						generalizacion="4"
+						/>
+				<nivel 	label="Cabecera Resto Rural" 
+						id="14"
+						pk="CLAS_CNCTNDO"
+						generalizacion="5"
+						/>
+				<nivel 	label="Zonas Urbanas" 
+						id="18"
+						pk="CPOB_CCNCTNDO"
+						generalizacion="3"
+						/>
+				<nivel 	label="Sección Urbana" 
+						id="17"
+						pk="SECU_CCNCTNDO"
+						generalizacion="2"
+						/>
+				<nivel 	label="Sector Urbano" 
+						id="16"
+						pk="SETU_CCNCTNDO"
+						generalizacion="2"
+						/>
+				<nivel 	label="Manzana" 
+						id="19"
+						pk="MANZ_CCNCTNDO"
+						generalizacion="0"
+						/>
+			</niveles>
+		</vigencia>
+	</vigencias>
+</configuration>
